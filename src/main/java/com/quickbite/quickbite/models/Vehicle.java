@@ -8,21 +8,15 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
 import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 
-import java.time.Instant;
-
 @Getter
 @Setter
 @Entity
-public class User extends Base {
-    private String name;
-    private String email;
-    private String phoneNumber;
-    private String passwordHash;
-
+public class Vehicle extends Base {
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
-    private UserRole role;
+    private VehicleType vehicleType;
 
-    private boolean isActive;
-    private Instant lastLoginAt;
+    private String numberPlate;
+    private String brand;
+    private String model;
 }
