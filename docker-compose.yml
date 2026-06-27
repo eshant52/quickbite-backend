@@ -1,0 +1,92 @@
+name: my-backend-stack
+services:
+  # PostgreSQL Database
+  # NOTE: If you already have my-postgres running, comment out this service
+  postgres:
+    image: postgres:18.1
+    container_name: my-postgres
+    restart: always
+    networks:
+      - my-network
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-eshant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pgtest}
+      POSTGRES_DB: ${POSTGRES_DB:-quickbite}
+    ports:
+      - "5430:5432"
+    volumes:
+      - my-postgres-volume:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eshant} -d ${POSTGRES_DB:-quickbite}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - full  # Only start with --profile full
+
+  # Redis Cache
+  # NOTE: If you already have my-redis running, comment out this service
+  redis:
+    image: redis:8.4-alpine
+    container_name: my-redis
+    restart: always
+    networks:
+      - my-network
+    environment:
+      REDIS_USERNAME: ${REDIS_USERNAME:-quickbite}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redistest}
+    ports:
+      - "6377:6379"
+    volumes:
+      - ${REDIS_CONF_PATH:-./redis-setup/redis.conf}:/usr/local/etc/redis/redis.conf
+      - ${REDIS_ENTRYPOINT_PATH:-./redis-setup/redis-entrypoint.sh}:/usr/local/bin/redis-entrypoint.sh
+      - my-redis-volume:/data
+    entrypoint: ["/bin/sh", "/usr/local/bin/redis-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "redis-cli --user ${REDIS_USERNAME} --pass ${REDIS_PASSWORD} ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - full  # Only start with --profile full
+
+  kafka:
+    image: apache/kafka:4.3.0
+    container_name: my-kafka
+    restart: always
+    networks:
+      - my-network
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - my-kafka-volume:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    profiles:
+      - full  # Only start with --profile full
+
+networks:
+  my-network:
+    name: my-network
+    external: true
+
+volumes:
+  my-postgres-volume:
+    name: my-postgres-volume
+  my-redis-volume:
+    name: my-redis-volume
+  my-kafka-volume:
+    name: my-kafka-volume

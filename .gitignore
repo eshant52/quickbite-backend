@@ -35,6 +35,7 @@ build/
 # Environment
 .env
 .env.*
+!.env.local.example
 !.env.example
 
 # Certs - NEVER commit private key
@@ -47,3 +48,6 @@ logs/
 
 # OS
 .DS_Store
+
+# Rough note
+docs/roughbook.md
