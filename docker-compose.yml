@@ -3,7 +3,10 @@ services:
   # PostgreSQL Database
   # NOTE: If you already have my-postgres running, comment out this service
   postgres:
-    image: postgres:18.1
+    build:
+      context: ./postgres-setup
+      dockerfile: Dockerfile
+    image: my-postgres-postgis:18.1
     container_name: my-postgres
     restart: always
     networks:
