@@ -3,7 +3,7 @@ package com.quickbite.quickbite.dtos.auth;
 import java.time.Instant;
 import java.util.UUID;
 
-public record SessionResponseDto(
+public record SessionResponse(
         UUID familyId,
         String deviceName,
         String os,

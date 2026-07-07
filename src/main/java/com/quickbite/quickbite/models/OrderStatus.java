@@ -1,9 +1,12 @@
 package com.quickbite.quickbite.models;
 
 public enum OrderStatus {
-    PLACED,
     ACCEPTED,
-    OUT_FOR_DELIVERY,
+    CANCELLED,
+    DECLINED,
     DELIVERED,
-    CANCELED,
+    OUT_FOR_DELIVERY,
+    PLACED,
+    PREPARING,
+    READY_FOR_PICKUP
 }

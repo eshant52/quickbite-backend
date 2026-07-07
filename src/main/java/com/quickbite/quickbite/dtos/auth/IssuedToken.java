@@ -1,4 +1,12 @@
-package com.quickbite.quickbite.dtos;
+package com.quickbite.quickbite.dtos.auth;
 
-public record IssuedToken() {
+import com.quickbite.quickbite.models.User;
+
+import java.util.UUID;
+
+public record IssuedToken(
+        String rawToken,
+        UUID familyId,
+        User user
+) {
 }

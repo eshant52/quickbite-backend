@@ -1,4 +1,4 @@
-package com.quickbite.quickbite.services;
+package com.quickbite.quickbite.services.auth;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;

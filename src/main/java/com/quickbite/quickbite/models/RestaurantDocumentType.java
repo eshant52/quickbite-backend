@@ -1,10 +1,10 @@
 package com.quickbite.quickbite.models;
 
 public enum RestaurantDocumentType {
-    FSSAI_LISENSE,
+    FSSAI_LICENSE,
     GST,
     PAN,
     BANK_PROOF,
-    BUSINESS_LISENSE,
+    BUSINESS_LICENSE,
     OTHER
 }

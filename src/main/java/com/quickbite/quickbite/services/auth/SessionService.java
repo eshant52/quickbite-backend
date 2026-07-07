@@ -1,4 +1,4 @@
-package com.quickbite.quickbite.services;
+package com.quickbite.quickbite.services.auth;
 
 import com.quickbite.quickbite.dtos.auth.DeviceInfo;
 import com.quickbite.quickbite.dtos.auth.IssuedToken;

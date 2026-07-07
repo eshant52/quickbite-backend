@@ -1,4 +1,4 @@
-package com.quickbite.quickbite.services;
+package com.quickbite.quickbite.services.auth;
 
 import java.time.Duration;
 import java.util.Set;

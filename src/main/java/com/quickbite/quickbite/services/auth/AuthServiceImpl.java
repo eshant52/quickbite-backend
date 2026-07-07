@@ -1,10 +1,10 @@
-package com.quickbite.quickbite.services;
+package com.quickbite.quickbite.services.auth;
 
-import com.quickbite.quickbite.dtos.auth.AuthResponseDto;
+import com.quickbite.quickbite.dtos.auth.AuthResponse;
 import com.quickbite.quickbite.dtos.auth.DeviceInfo;
 import com.quickbite.quickbite.dtos.auth.IssuedToken;
-import com.quickbite.quickbite.dtos.auth.LoginRequestDto;
-import com.quickbite.quickbite.dtos.auth.RegisterRequestDto;
+import com.quickbite.quickbite.dtos.auth.LoginRequest;
+import com.quickbite.quickbite.dtos.auth.RegisterRequest;
 import com.quickbite.quickbite.exceptions.AuthenticationException;
 import com.quickbite.quickbite.models.User;
 import com.quickbite.quickbite.models.UserRole;
@@ -22,24 +22,24 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final SessionService sessionService;
-    private final SessionManagementTokenService sessionManagementTokenService;
+    private final SessionManagementTokenStoreService sessionManagementTokenStoreService;
 
     public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil,
-                           SessionService sessionService, SessionManagementTokenService sessionManagementTokenService) {
+                           SessionService sessionService, SessionManagementTokenStoreService sessionManagementTokenStoreService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.sessionService = sessionService;
-        this.sessionManagementTokenService = sessionManagementTokenService;
+        this.sessionManagementTokenStoreService = sessionManagementTokenStoreService;
     }
 
     @Override
-    public AuthResponseDto login(LoginRequestDto loginRequestDto, DeviceInfo deviceInfo) {
-        User user = userRepository.findUserByEmail(loginRequestDto.email())
+    public AuthResponse login(LoginRequest loginRequest, DeviceInfo deviceInfo) {
+        User user = userRepository.findUserByEmail(loginRequest.email())
                 .orElseThrow(
                         () -> new AuthenticationException("Invalid email or password"));
 
-        if (!passwordEncoder.matches(loginRequestDto.password(), user.getPasswordHash())) {
+        if (!passwordEncoder.matches(loginRequest.password(), user.getPasswordHash())) {
             throw new AuthenticationException("Invalid email or password");
         }
 
@@ -53,43 +53,43 @@ public class AuthServiceImpl implements AuthService {
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
 
-        return new AuthResponseDto(accessToken, issuedToken.rawToken(), issuedToken.familyId(), "Bearer");
+        return new AuthResponse(accessToken, issuedToken.rawToken(), issuedToken.familyId(), "Bearer");
     }
 
     @Override
-    public AuthResponseDto refresh(String rawRefreshToken) {
+    public AuthResponse refresh(String rawRefreshToken) {
         IssuedToken issuedRotatedToken = sessionService.validateAndRotate(rawRefreshToken);
 
         User user = issuedRotatedToken.user();
         String accessToken = jwtUtil.generateAccessToken(user, issuedRotatedToken.familyId());
 
-        return new AuthResponseDto(accessToken, issuedRotatedToken.rawToken(), issuedRotatedToken.familyId(), "Bearer");
+        return new AuthResponse(accessToken, issuedRotatedToken.rawToken(), issuedRotatedToken.familyId(), "Bearer");
     }
 
     @Override
-    public AuthResponseDto claimSession(String sessionManagementToken, DeviceInfo deviceInfo) {
-        UUID userId = sessionManagementTokenService.validateAndGetUserId(sessionManagementToken);
+    public AuthResponse claimSession(String sessionManagementToken, DeviceInfo deviceInfo) {
+        UUID userId = sessionManagementTokenStoreService.validateAndGetUserId(sessionManagementToken);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationException("Invalid or expired session management token"));
 
         IssuedToken issuedToken = sessionService.createNewSession(user, deviceInfo);
-        sessionManagementTokenService.invalidate(sessionManagementToken);
+        sessionManagementTokenStoreService.invalidate(sessionManagementToken);
 
         String accessToken = jwtUtil.generateAccessToken(user, issuedToken.familyId());
-        return new AuthResponseDto(accessToken, issuedToken.rawToken(), issuedToken.familyId(), "Bearer");
+        return new AuthResponse(accessToken, issuedToken.rawToken(), issuedToken.familyId(), "Bearer");
     }
 
     @Override
-    public User register(RegisterRequestDto registerRequestDto) {
-        userRepository.findUserByEmail(registerRequestDto.email()).ifPresent(existing -> {
+    public User register(RegisterRequest registerRequest) {
+        userRepository.findUserByEmail(registerRequest.email()).ifPresent(_ -> {
             throw new AuthenticationException("Email is already registered");
         });
 
         User user = new User();
-        user.setName(registerRequestDto.name());
-        user.setEmail(registerRequestDto.email());
-        user.setPhoneNumber(registerRequestDto.phoneNumber());
-        user.setPasswordHash(passwordEncoder.encode(registerRequestDto.password()));
+        user.setName(registerRequest.name());
+        user.setEmail(registerRequest.email());
+        user.setPhoneNumber(registerRequest.phoneNumber());
+        user.setPasswordHash(passwordEncoder.encode(registerRequest.password()));
         user.setRole(UserRole.CUSTOMER);
         user.setActive(true);
 

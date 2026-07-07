@@ -4,6 +4,6 @@ public enum PaymentNotificationType {
     PENDING,
     SUCCESS,
     FAILED,
-    CANCELED,
+    CANCELLED,
     REFUNDED
 }

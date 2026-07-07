@@ -4,14 +4,14 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.UUID;
 
-public record AuthResponseDto(
+public record AuthResponse(
         String accessToken,
         @JsonInclude(JsonInclude.Include.NON_NULL)
         String refreshToken,
         UUID familyId,
         String tokenType
 ) {
-    public AuthResponseDto {
+    public AuthResponse {
         tokenType = "Bearer";
     }
 }

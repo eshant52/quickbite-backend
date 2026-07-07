@@ -1,4 +1,4 @@
-package com.quickbite.quickbite.services;
+package com.quickbite.quickbite.services.auth;
 
 import com.quickbite.quickbite.dtos.auth.DeviceInfo;
 import com.quickbite.quickbite.dtos.auth.IssuedToken;
@@ -21,7 +21,7 @@ import java.util.UUID;
 public class SessionServiceImpl implements SessionService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final SessionStoreService sessionStoreService;
-    private final SessionManagementTokenService sessionManagementTokenService;
+    private final SessionManagementTokenStoreService sessionManagementTokenStoreService;
 
     @Value("${quickbite.jwt.refresh-token-expiry}")
     private String refreshTokenExpiry;
@@ -32,10 +32,10 @@ public class SessionServiceImpl implements SessionService {
     public SessionServiceImpl(
             RefreshTokenRepository refreshTokenRepository,
             SessionStoreService sessionStoreService,
-            SessionManagementTokenService sessionManagementTokenService) {
+            SessionManagementTokenStoreService sessionManagementTokenStoreService) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.sessionStoreService = sessionStoreService;
-        this.sessionManagementTokenService = sessionManagementTokenService;
+        this.sessionManagementTokenStoreService = sessionManagementTokenStoreService;
     }
 
     @Override
@@ -124,7 +124,7 @@ public class SessionServiceImpl implements SessionService {
         long activeCount = sessionStoreService.getActiveSessionsCount(userId);
 
         if (activeCount >= maxConcurrentSessions) {
-            String sessionManagementToken = sessionManagementTokenService.createToken(userId);
+            String sessionManagementToken = sessionManagementTokenStoreService.createToken(userId);
             throw new MaxSessionException(sessionManagementToken, maxConcurrentSessions);
         }
     }

@@ -1,6 +1,6 @@
 package com.quickbite.quickbite.dtos.auth;
 
-public record RefreshRequestDto(
+public record RefreshRequest(
         String refreshToken
 ) {
 }
