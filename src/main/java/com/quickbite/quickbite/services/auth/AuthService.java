@@ -12,7 +12,9 @@ public interface AuthService {
     AuthResponse login(LoginRequest loginRequest, DeviceInfo deviceInfo);
     AuthResponse refresh(String rawRefreshToken);
     AuthResponse claimSession(String sessionManagementToken, DeviceInfo deviceInfo);
-    User register(RegisterRequest registerRequest);
+    User registerCustomer(RegisterRequest registerRequest);
+    User registerDeliveryPartner(RegisterRequest registerRequest);
+    User registerRestaurant(RegisterRequest registerRequest);
     void logoutCurrentSession(UUID userId, UUID familyId);
     void logoutAllSessions(UUID userId);
 }

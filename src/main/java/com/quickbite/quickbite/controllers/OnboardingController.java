@@ -16,8 +16,13 @@ public class OnboardingController {
     }
 
     @PostMapping("/restaurant")
-    public ResponseEntity<OnboardRestaurantResponse> submitApplication(@RequestBody OnboardRestaurantRequest request) {
+    public ResponseEntity<OnboardRestaurantResponse> submitRestaurantApplication(@RequestBody OnboardRestaurantRequest request) {
         OnboardRestaurantResponse resp = onboardingService.submitRestaurantApplication(request);
         return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/delivery-partner")
+    public void submitDeliveryPartnerApplication(@RequestBody OnboardRestaurantRequest request) {
+
     }
 }

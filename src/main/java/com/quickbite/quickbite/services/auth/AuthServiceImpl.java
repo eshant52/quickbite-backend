@@ -61,8 +61,7 @@ public class AuthServiceImpl implements AuthService {
         IssuedToken issuedRotatedToken = sessionService.validateAndRotate(rawRefreshToken);
 
         // Avoid LazyInitializationException by reloading the user in this service layer
-        User userProxy = issuedRotatedToken.user();
-        java.util.UUID userId = userProxy.getId();
+        UUID userId = issuedRotatedToken.userId();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationException("User not found for refresh token"));
 
@@ -123,7 +122,7 @@ public class AuthServiceImpl implements AuthService {
 
     private User registerUser(RegisterRequest registerRequest) {
         userRepository.findUserByEmail(registerRequest.email())
-                .ifPresent(user -> {
+                .ifPresent(_ -> {
                     throw new AuthenticationException("Email is already registered");
                 });
 

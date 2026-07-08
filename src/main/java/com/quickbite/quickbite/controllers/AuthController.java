@@ -49,10 +49,22 @@ public class AuthController {
         this.userAgentParser = userAgentParser;
     }
 
-    @PostMapping("/register")
+    @PostMapping("/register/customer")
     public ResponseEntity<UserResponseDto> register(@RequestBody @Valid RegisterRequest registerRequest) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(UserResponseDto.toDto(authService.register(registerRequest)));
+                .body(UserResponseDto.toDto(authService.registerCustomer(registerRequest)));
+    }
+
+    @PostMapping("/register/delivery-partner")
+    public ResponseEntity<UserResponseDto> deliveryPartner(@RequestBody @Valid RegisterRequest registerRequest) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(UserResponseDto.toDto(authService.registerDeliveryPartner(registerRequest)));
+    }
+
+    @PostMapping("/register/restaurant")
+    public ResponseEntity<UserResponseDto> restaurant(@RequestBody @Valid RegisterRequest registerRequest) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(UserResponseDto.toDto(authService.registerRestaurant(registerRequest)));
     }
 
     @PostMapping("/login")

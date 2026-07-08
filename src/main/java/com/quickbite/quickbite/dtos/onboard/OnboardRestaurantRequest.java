@@ -3,11 +3,6 @@ package com.quickbite.quickbite.dtos.onboard;
 import java.util.List;
 
 public record OnboardRestaurantRequest(
-        String ownerName,
-        String ownerEmail,
-        String ownerPhone,
-        String password,
-
         String restaurantName,
         String description,
         String street,

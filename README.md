@@ -15,3 +15,12 @@ Quick Bite Backend is a backend service for the Quick Bite application, which pr
 
 ## Installation and Configuration
 Please refer to the [Installation and Configuration](docs/installation.md) guide for detailed instructions on setting up the Quick Bite Backend service, including prerequisites, installation steps, and configuration options.
+
+## Plans todo
+
+- [X] Setup models
+- [X] Setup redis and kafka
+- [X] Implement authentication and authorization using JWT
+- [ ] Implement CRUD operations for restaurants, menus, and orders
+- [ ] Implement real-time order tracking
+- [ ] Write unit and integration tests

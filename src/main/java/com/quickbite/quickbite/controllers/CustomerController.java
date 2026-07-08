@@ -8,19 +8,24 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/users/me")
-public class UserController {
+@RequestMapping("/api/v1/customer")
+public class CustomerController {
     private final UserService userService;
 
-    public UserController(UserService userService) {
+    public CustomerController(UserService userService) {
         this.userService = userService;
     }
 
-    @GetMapping()
+    @GetMapping("/me")
     public UserResponseDto getUser(@AuthenticationPrincipal Jwt jwt) {
-        return UserResponseDto.toDto(userService.getUserById(UUID.fromString(jwt.getSubject())));
+        return UserResponseDto.toDto(
+                userService.getUserById(
+                        UUID.fromString(Objects.requireNonNull(jwt.getSubject()))
+                )
+        );
     }
 }

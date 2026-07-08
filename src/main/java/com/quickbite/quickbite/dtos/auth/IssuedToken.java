@@ -7,6 +7,6 @@ import java.util.UUID;
 public record IssuedToken(
         String rawToken,
         UUID familyId,
-        User user
+        UUID userId
 ) {
 }

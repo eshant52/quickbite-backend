@@ -55,7 +55,7 @@ public class SessionServiceImpl implements SessionService {
             persistToken(user, familyId, rawToken, deviceInfo);
             sessionStoreService.addSession(userId, familyId, Duration.parse(refreshTokenExpiry));
 
-            return new IssuedToken(rawToken, familyId, user);
+            return new IssuedToken(rawToken, familyId, user.getId());
         } finally {
             sessionStoreService.releaseSessionCreationLock(userId);
         }
@@ -94,7 +94,7 @@ public class SessionServiceImpl implements SessionService {
         existing.setLastUsedAt(Instant.now());
         DeviceInfo deviceInfo = new DeviceInfo(existing.getDeviceName(), existing.getOs(), existing.getClientType());
         persistToken(existing.getUser(), existing.getFamilyId(), newRawToken, deviceInfo);
-        return new IssuedToken(newRawToken, existing.getFamilyId(), existing.getUser());
+        return new IssuedToken(newRawToken, existing.getFamilyId(), existing.getUser().getId());
     }
 
     @Override
