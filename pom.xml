@@ -214,11 +214,8 @@
                 <artifactId>flyway-maven-plugin</artifactId>
                 <version>12.4.0</version>
                 <configuration>
-                    <url>jdbc:postgresql://localhost:5430/quickbite</url>
-                    <user>${env.DB_USERNAME}</user>
-                    <password>${env.DB_PASSWORD}</password>
+                    <configFiles>src/main/resources/flyway.conf</configFiles>
                     <driver>org.postgresql.Driver</driver>
-                    <locations>filesystem:src/main/resources/db/migration</locations>
                     <baselineOnMigrate>true</baselineOnMigrate>
                 </configuration>
                 <dependencies>

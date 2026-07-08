@@ -24,7 +24,7 @@ public class DeliveryAgentDocument extends Base {
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     @JdbcTypeCode(SqlTypes.ENUM)
-    @Column(columnDefinition = "document_type", nullable = false)
+    @Column(columnDefinition = "delivery_agent_document_type", nullable = false)
     private DeliveryAgentDocumentType type;
 
     @Size(max = 500, message = "Description must be at most 500 characters")

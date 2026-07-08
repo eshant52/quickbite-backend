@@ -50,7 +50,7 @@ public class User extends Base {
     private UserRole role;
 
     @Column(nullable = false)
-    private boolean isActive;
+    private boolean isActive = true;
 
     private Instant lastLoginAt;
 }

@@ -28,22 +28,22 @@ This document provides instructions for installing and configuring the QuickBite
 
 4. Create Kafka topics manually when you want explicit local setup:
    ```bash
-   docker exec -it my-kafka kafka-topics.sh \
+   docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh \
      --bootstrap-server localhost:9092 --create \
      --topic quickbite.order.events \
      --partitions 3 --replication-factor 1
 
-   docker exec -it my-kafka kafka-topics.sh \
+   docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh \
      --bootstrap-server localhost:9092 --create \
      --topic quickbite.notification.events \
      --partitions 3 --replication-factor 1
 
-   docker exec -it my-kafka kafka-topics.sh \
+   docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh \
      --bootstrap-server localhost:9092 --create \
      --topic quickbite.delivery.events \
      --partitions 3 --replication-factor 1
 
-   docker exec -it my-kafka kafka-topics.sh \
+   docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh \
      --bootstrap-server localhost:9092 --create \
      --topic quickbite.order.events.DLQ \
      --partitions 1 --replication-factor 1
