@@ -90,8 +90,17 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(registerRequest.email());
         user.setPhoneNumber(registerRequest.phoneNumber());
         user.setPasswordHash(passwordEncoder.encode(registerRequest.password()));
-        user.setRole(UserRole.CUSTOMER);
-        user.setActive(true);
+
+        // Role handling: default to CUSTOMER. Do not allow self-registration as privileged roles.
+        UserRole requestedRole = registerRequest.role();
+        if (requestedRole == null || requestedRole == UserRole.CUSTOMER) {
+            user.setRole(UserRole.CUSTOMER);
+            user.setActive(true);
+        } else {
+            // For now, disallow self-assigning DELIVERY_AGENT or RESTAURANT.
+            // Instead, user should apply for partner onboarding. Create inactive account if desired.
+            throw new AuthenticationException("Cannot self-register as '" + requestedRole + "'. Please use partner onboarding.");
+        }
 
         return userRepository.save(user);
     }
