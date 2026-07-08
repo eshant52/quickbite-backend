@@ -60,7 +60,12 @@ public class AuthServiceImpl implements AuthService {
     public AuthResponse refresh(String rawRefreshToken) {
         IssuedToken issuedRotatedToken = sessionService.validateAndRotate(rawRefreshToken);
 
-        User user = issuedRotatedToken.user();
+        // Avoid LazyInitializationException by reloading the user in this service layer
+        User userProxy = issuedRotatedToken.user();
+        java.util.UUID userId = userProxy.getId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AuthenticationException("User not found for refresh token"));
+
         String accessToken = jwtUtil.generateAccessToken(user, issuedRotatedToken.familyId());
 
         return new AuthResponse(accessToken, issuedRotatedToken.rawToken(), issuedRotatedToken.familyId(), "Bearer");
@@ -80,27 +85,28 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public User register(RegisterRequest registerRequest) {
-        userRepository.findUserByEmail(registerRequest.email()).ifPresent(_ -> {
-            throw new AuthenticationException("Email is already registered");
-        });
+    public User registerCustomer(RegisterRequest registerRequest) {
+        User user = registerUser(registerRequest);
+        user.setRole(UserRole.CUSTOMER);
+        user.setActive(true);
 
-        User user = new User();
-        user.setName(registerRequest.name());
-        user.setEmail(registerRequest.email());
-        user.setPhoneNumber(registerRequest.phoneNumber());
-        user.setPasswordHash(passwordEncoder.encode(registerRequest.password()));
+        return userRepository.save(user);
+    }
 
-        // Role handling: default to CUSTOMER. Do not allow self-registration as privileged roles.
-        UserRole requestedRole = registerRequest.role();
-        if (requestedRole == null || requestedRole == UserRole.CUSTOMER) {
-            user.setRole(UserRole.CUSTOMER);
-            user.setActive(true);
-        } else {
-            // For now, disallow self-assigning DELIVERY_AGENT or RESTAURANT.
-            // Instead, user should apply for partner onboarding. Create inactive account if desired.
-            throw new AuthenticationException("Cannot self-register as '" + requestedRole + "'. Please use partner onboarding.");
-        }
+    @Override
+    public User registerRestaurant(RegisterRequest registerRequest) {
+        User user = registerUser(registerRequest);
+        user.setRole(UserRole.RESTAURANT_OWNER);
+        user.setActive(false);
+
+        return userRepository.save(user);
+    }
+
+    @Override
+    public User registerDeliveryPartner(RegisterRequest registerRequest) {
+        User user = registerUser(registerRequest);
+        user.setRole(UserRole.DELIVERY_AGENT);
+        user.setActive(false);
 
         return userRepository.save(user);
     }
@@ -113,5 +119,23 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logoutAllSessions(UUID userId) {
         sessionService.revokeAllSessions(userId);
+    }
+
+    private User registerUser(RegisterRequest registerRequest) {
+        userRepository.findUserByEmail(registerRequest.email())
+                .ifPresent(user -> {
+                    throw new AuthenticationException("Email is already registered");
+                });
+
+        User user = new User();
+
+        user.setName(registerRequest.name());
+        user.setEmail(registerRequest.email());
+        user.setPhoneNumber(registerRequest.phoneNumber());
+        user.setPasswordHash(passwordEncoder.encode(registerRequest.password()));
+        user.setRole(UserRole.DELIVERY_AGENT);
+        user.setActive(false);
+
+        return user;
     }
 }
