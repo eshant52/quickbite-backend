@@ -34,7 +34,8 @@ public class JwtUtil {
                 .expiresAt(now.plusSeconds(Duration.parse(accessTokenExpiry).getSeconds()))
                 .subject(user.getId().toString())
                 .claim("email", user.getEmail())
-                .claim("role", user.getRole())
+                // Store role as a stable string value
+                .claim("role", user.getRole().name())
                 .claim("family_id", familyId.toString())
                 .build();
 
