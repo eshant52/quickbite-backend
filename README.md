@@ -13,6 +13,10 @@ Quick Bite Backend is a backend service for the Quick Bite application, which pr
 - Integration with Kafka for event streaming
 - Dockerized for easy deployment
 
+## Prerequisites
+- Docker and Docker Compose installed on your machine.
+- Java Development Kit (JDK) 17 or higher installed on your machine.
+
 ## Installation and Configuration
 Please refer to the [Installation and Configuration](docs/installation.md) guide for detailed instructions on setting up the Quick Bite Backend service, including prerequisites, installation steps, and configuration options.
 

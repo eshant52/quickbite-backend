@@ -2,11 +2,6 @@
 
 This document provides instructions for installing and configuring the QuickBite application.
 
-## Prerequisites
-
-- Docker and Docker Compose installed on your machine.
-- Java Development Kit (JDK) 17 or higher installed on your machine.
-
 ## Installation Steps
 
 1. Clone the repository:

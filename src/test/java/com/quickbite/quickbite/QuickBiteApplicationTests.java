@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 
-import com.quickbite.quickbite.config.KafkaConfig;
-import com.quickbite.quickbite.config.RedisConfig;
-import com.quickbite.quickbite.events.QuickBiteTopics;
+import com.quickbite.quickbite.common.config.KafkaConfig;
+import com.quickbite.quickbite.common.config.RedisConfig;
+import com.quickbite.quickbite.common.event.QuickBiteTopics;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
