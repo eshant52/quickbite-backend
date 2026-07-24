@@ -1,0 +1,1 @@
+ALTER TABLE refresh_tokens ADD COLUMN generation INTEGER NOT NULL DEFAULT 1;
