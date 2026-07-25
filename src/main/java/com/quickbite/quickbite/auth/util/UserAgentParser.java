@@ -4,29 +4,33 @@ import com.quickbite.quickbite.auth.dto.DeviceInfo;
 import com.quickbite.quickbite.auth.model.ClientType;
 import com.quickbite.quickbite.common.exception.BadRequestException;
 import jakarta.servlet.http.HttpServletRequest;
+import nl.basjes.parse.useragent.UserAgent;
+import nl.basjes.parse.useragent.UserAgentAnalyzer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import ua_parser.Client;
-import ua_parser.Parser;
 
 /**
- * Parses User-Agent headers into structured {@link DeviceInfo}.
+ * Parses User-Agent headers into structured {@link DeviceInfo} using the Yauaa library.
  * <p>
  * Client type detection priority:
  * <ol>
  *   <li>Explicit {@code X-Client-Type} header (if the client sends one)</li>
- *   <li>User-Agent heuristics: if a known browser family is detected → WEB_BROWSER, otherwise MOBILE_APP</li>
+ *   <li>User-Agent heuristics via Yauaa device class and agent name</li>
  * </ol>
  */
 @Component
 public class UserAgentParser {
     private static final String X_CLIENT_TYPE = "X-Client-Type";
 
-    private final Parser parser;
+    private final UserAgentAnalyzer uaa;
 
     public UserAgentParser() {
-        this.parser = new Parser();
+        this.uaa = UserAgentAnalyzer
+                .newBuilder()
+                .hideMatcherLoadStats()
+                .withCache(1000)
+                .build();
     }
 
     /**
@@ -37,7 +41,7 @@ public class UserAgentParser {
      */
     public DeviceInfo parse(HttpServletRequest request) {
         String clientTypeHeader = request.getHeader(X_CLIENT_TYPE);
-        String userAgent = request.getHeader(HttpHeaders.USER_AGENT);
+        String userAgentString = request.getHeader(HttpHeaders.USER_AGENT);
         String ip = extractIpAddress(request);
 
         // Enforce strict X-Client-Type header presence and values for this project.
@@ -45,18 +49,18 @@ public class UserAgentParser {
             throw new BadRequestException("Missing required header " + X_CLIENT_TYPE + ". Allowed values: 'mobile_app', 'web_browser'");
         }
 
-        if (userAgent == null || userAgent.isBlank()) {
-            return new DeviceInfo("Unknown", "Unknown", "Unknown", resolveClientType(null, clientTypeHeader), ip, userAgent);
+        if (userAgentString == null || userAgentString.isBlank()) {
+            return new DeviceInfo("Unknown", "Unknown", "Unknown", resolveClientType(null, clientTypeHeader), ip, userAgentString);
         }
 
-        Client client = parser.parse(userAgent);
+        UserAgent userAgent = uaa.parse(userAgentString);
 
-        String deviceName = buildDeviceName(client);
-        String os = buildOs(client);
-        String osVersion = buildOsVersion(client);
-        ClientType clientType = resolveClientType(client, clientTypeHeader);
+        String deviceName = buildDeviceName(userAgent);
+        String os = buildOs(userAgent);
+        String osVersion = buildOsVersion(userAgent);
+        ClientType clientType = resolveClientType(userAgent, clientTypeHeader);
 
-        return new DeviceInfo(deviceName, os, osVersion, clientType, ip, userAgent);
+        return new DeviceInfo(deviceName, os, osVersion, clientType, ip, userAgentString);
     }
 
     private String extractIpAddress(HttpServletRequest request) {
@@ -67,47 +71,46 @@ public class UserAgentParser {
         return request.getRemoteAddr();
     }
 
-    private String buildDeviceName(Client client) {
-        if (client.device != null && client.device.family != null
-                && !"Other".equalsIgnoreCase(client.device.family)) {
-            // Physical device name available (e.g. "iPhone", "Samsung Galaxy S24")
-            return client.device.family;
-        }
-        // Fall back to browser/user-agent family (e.g. "Chrome", "Firefox")
-        if (client.userAgent != null && client.userAgent.family != null) {
-            String name = client.userAgent.family;
-            if (client.userAgent.major != null) {
-                name += " " + client.userAgent.major;
+    private String buildDeviceName(UserAgent agent) {
+        String deviceName = agent.getValue(UserAgent.DEVICE_NAME);
+        String deviceBrand = agent.getValue(UserAgent.DEVICE_BRAND);
+
+        if (deviceName != null && !deviceName.isBlank() && !"Unknown".equalsIgnoreCase(deviceName)) {
+            if (deviceBrand != null && !deviceBrand.isBlank() && !"Unknown".equalsIgnoreCase(deviceBrand) && !deviceName.startsWith(deviceBrand)) {
+                return deviceBrand + " " + deviceName;
             }
-            return name;
+            return deviceName;
+        }
+
+        String agentName = agent.getValue(UserAgent.AGENT_NAME);
+        String agentVersion = agent.getValue(UserAgent.AGENT_VERSION_MAJOR);
+        if (agentName != null && !agentName.isBlank() && !"Unknown".equalsIgnoreCase(agentName)) {
+            if (agentVersion != null && !agentVersion.isBlank() && !"Unknown".equalsIgnoreCase(agentVersion)) {
+                return agentName + " " + agentVersion;
+            }
+            return agentName;
         }
         return "Unknown";
     }
 
-    private String buildOs(Client client) {
-        if (client.os == null || client.os.family == null) {
+    private String buildOs(UserAgent agent) {
+        String osName = agent.getValue(UserAgent.OPERATING_SYSTEM_NAME);
+        if (osName == null || osName.isBlank()) {
             return "Unknown";
         }
-        return client.os.family;
+        return osName;
     }
 
-    private String buildOsVersion(Client client) {
-        if (client.os == null || client.os.major == null) {
+    private String buildOsVersion(UserAgent agent) {
+        String osVersion = agent.getValue(UserAgent.OPERATING_SYSTEM_VERSION);
+        if (osVersion == null || osVersion.isBlank()) {
             return "Unknown";
         }
-        String version = client.os.major;
-        if (client.os.minor != null) {
-            version += "." + client.os.minor;
-            if (client.os.patch != null && !client.os.patch.isBlank()) {
-                version += "." + client.os.patch;
-            }
-        }
-        return version;
+        return osVersion;
     }
 
-    private ClientType resolveClientType(Client client, String clientTypeHeader) {
+    private ClientType resolveClientType(UserAgent agent, String clientTypeHeader) {
         // 1. Explicit header takes precedence
-        // Strict header mapping: only accept exact values
         if (clientTypeHeader != null && !clientTypeHeader.isBlank()) {
             String normalized = clientTypeHeader.trim();
             return switch (normalized) {
@@ -117,14 +120,10 @@ public class UserAgentParser {
             };
         }
 
-        // 2. Heuristic: if ua-parser detects a known browser family → WEB_BROWSER
-        if (client != null && client.userAgent != null && client.userAgent.family != null) {
-            String family = client.userAgent.family.toLowerCase();
-            if (family.contains("chrome") || family.contains("firefox")
-                    || family.contains("safari") || family.contains("edge")
-                    || family.contains("opera") || family.contains("ie")
-                    || family.contains("brave") || family.contains("vivaldi")
-                    || family.contains("samsung") || family.contains("uc browser")) {
+        // 2. Heuristic via Yauaa device class
+        if (agent != null) {
+            String deviceClass = agent.getValue(UserAgent.DEVICE_CLASS);
+            if ("Desktop".equalsIgnoreCase(deviceClass) || "Anonymized".equalsIgnoreCase(deviceClass)) {
                 return ClientType.WEB_BROWSER;
             }
         }
