@@ -26,5 +26,8 @@ Please refer to the [Installation and Configuration](docs/installation.md) guide
 - [X] Setup redis and kafka
 - [X] Implement authentication and authorization using JWT
 - [ ] Implement CRUD operations for restaurants, menus, and orders
+- [ ] Implement notification system for order updates
 - [ ] Implement real-time order tracking
+- [ ] Implement caching for frequently accessed data
+- [ ] Implement payment processing and integration with payment gateways
 - [ ] Write unit and integration tests
