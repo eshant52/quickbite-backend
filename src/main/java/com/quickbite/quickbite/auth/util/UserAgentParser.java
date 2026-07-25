@@ -1,5 +1,7 @@
 package com.quickbite.quickbite.auth.util;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.quickbite.quickbite.auth.dto.DeviceInfo;
 import com.quickbite.quickbite.auth.model.ClientType;
 import com.quickbite.quickbite.common.exception.BadRequestException;
@@ -10,8 +12,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
+
 /**
- * Parses User-Agent headers into structured {@link DeviceInfo} using the Yauaa library.
+ * Parses User-Agent headers into structured {@link DeviceInfo} using the Yauaa library
+ * wrapped with a high-performance Caffeine cache.
  * <p>
  * Client type detection priority:
  * <ol>
@@ -24,12 +29,26 @@ public class UserAgentParser {
     private static final String X_CLIENT_TYPE = "X-Client-Type";
 
     private final UserAgentAnalyzer uaa;
+    private final Cache<String, UserAgent> cache;
 
     public UserAgentParser() {
+        // Build Yauaa analyzer without internal cache and restricted only to fields we extract
         this.uaa = UserAgentAnalyzer
                 .newBuilder()
                 .hideMatcherLoadStats()
-                .withCache(1000)
+                .withField(UserAgent.DEVICE_NAME)
+                .withField(UserAgent.DEVICE_BRAND)
+                .withField(UserAgent.OPERATING_SYSTEM_NAME)
+                .withField(UserAgent.OPERATING_SYSTEM_VERSION)
+                .withField(UserAgent.AGENT_NAME)
+                .withField(UserAgent.AGENT_VERSION_MAJOR)
+                .withField(UserAgent.DEVICE_CLASS)
+                .build();
+
+        // High-performance Caffeine cache with W-TinyLFU eviction policy
+        this.cache = Caffeine.newBuilder()
+                .maximumSize(10_000)
+                .expireAfterAccess(Duration.ofHours(24))
                 .build();
     }
 
@@ -53,7 +72,8 @@ public class UserAgentParser {
             return new DeviceInfo("Unknown", "Unknown", "Unknown", resolveClientType(null, clientTypeHeader), ip, userAgentString);
         }
 
-        UserAgent userAgent = uaa.parse(userAgentString);
+        // Fast atomic read-through from Caffeine cache
+        UserAgent userAgent = cache.get(userAgentString, uaa::parse);
 
         String deviceName = buildDeviceName(userAgent);
         String os = buildOs(userAgent);
