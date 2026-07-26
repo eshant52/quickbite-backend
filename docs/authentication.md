@@ -303,6 +303,7 @@ public record DeviceInfo(
 2. **User-Agent Parsing**: Uses `Yauaa` to identify:
    - Operating System & Version (e.g., `macOS 14.5`, `Android 13`).
    - Browser & Major Version (e.g., `Chrome 126`, `Safari 17`).
+   - For wrapping a heavy tool like Yauaa, Caffeine is the clear winner. Its W-TinyLFU algorithm handles repetitive User-Agent spikes better than standard LRU, and its lower memory overhead helps offset Yauaa's heavy footprint.
 3. **Client Classification**: Maps raw device categories into `ClientType` (`WEB`, `MOBILE_APP`, `TABLET`, `DESKTOP`).
 
 ---
