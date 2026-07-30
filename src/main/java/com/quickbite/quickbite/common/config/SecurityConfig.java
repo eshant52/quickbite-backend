@@ -5,12 +5,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,11 +23,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.GrantedAuthority;
-
 import java.util.ArrayList;
 import java.util.List;
+
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -34,9 +33,9 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity https,
-            Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter) {
-        https
+            HttpSecurity http,
+            Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter) throws Exception {
+        return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
@@ -44,8 +43,11 @@ public class SecurityConfig {
                                 "/api/v1/auth/register/**",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh-token",
-                                "/actuator/**"
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info"
                         ).permitAll()
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers(
                                 "/api/v1/auth/claim-session",
                                 "/api/v1/auth/sessions",
@@ -55,23 +57,17 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/customer/**").hasRole("CUSTOMER")
                         .requestMatchers("/api/v1/restaurant/**").hasRole("RESTAURANT_OWNER")
                         .requestMatchers("/api/v1/delivery-partner/**").hasRole("DELIVERY_AGENT")
-                        .anyRequest()
-                        .hasAuthority("SCOPE_API"))
+                        .anyRequest().hasAuthority("SCOPE_API"))
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
-                    jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)
-                ))
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .headers(headers -> headers
                         .contentTypeOptions(Customizer.withDefaults())
-                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin).xssProtection(
-                                xss -> xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK)
-                        ).contentSecurityPolicy(
-                                cps -> cps.policyDirectives("script-src 'self'")
-                        )
-                );
-        return https.build();
+                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
+                        .xssProtection(xss -> xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("script-src 'self'")))
+                .build();
     }
 
     @Bean
@@ -90,7 +86,6 @@ public class SecurityConfig {
                 authorities.add(new SimpleGrantedAuthority("SCOPE_AUTH"));
             } else if (audiences != null && audiences.contains(authProperties.jwt().accessTokenAudience())) {
                 authorities.add(new SimpleGrantedAuthority("SCOPE_API"));
-                
                 String role = jwt.getClaimAsString("role");
                 if (role != null && !role.isBlank()) {
                     authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
@@ -104,11 +99,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource(AuthProperties authProperties) {
         CorsConfiguration configuration = new CorsConfiguration();
-        
+
         List<String> allowedOrigins = (authProperties.cors() != null && authProperties.cors().allowedOrigins() != null)
                 ? authProperties.cors().allowedOrigins()
                 : List.of("http://localhost:*", "https://localhost:*");
-                
+
         configuration.setAllowedOriginPatterns(allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Client-Type", "X-Session-Management-Token"));
