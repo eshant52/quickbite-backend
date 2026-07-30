@@ -12,7 +12,6 @@ import com.quickbite.quickbite.auth.model.ClientType;
  * @param clientType  Whether the client is a web browser or mobile app
  * @param ip          The IP address of the client making the request
  * @param userAgent   The raw User-Agent header string sent by the client
- * @see com.quickbite.quickbite.auth.util.UserAgentParser
  */
 public record DeviceInfo(
         String deviceName,
