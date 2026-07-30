@@ -2,6 +2,7 @@ package com.quickbite.quickbite.auth.controller;
 
 import com.quickbite.quickbite.auth.dto.AuthResponse;
 import com.quickbite.quickbite.auth.dto.AuthenticatedSession;
+import com.quickbite.quickbite.auth.dto.ClientRequestMetadata;
 import com.quickbite.quickbite.auth.dto.DeviceInfo;
 import com.quickbite.quickbite.auth.dto.LoginRequest;
 import com.quickbite.quickbite.auth.dto.RefreshRequest;
@@ -11,8 +12,8 @@ import com.quickbite.quickbite.auth.exception.AuthenticationException;
 import com.quickbite.quickbite.auth.model.ClientType;
 import com.quickbite.quickbite.auth.service.AuthCookieService;
 import com.quickbite.quickbite.auth.service.AuthService;
-import com.quickbite.quickbite.auth.service.AuthenticatedSessionResolver;
-import com.quickbite.quickbite.auth.util.UserAgentParser;
+import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
+import com.quickbite.quickbite.auth.util.DeviceInfoResolver;
 import com.quickbite.quickbite.user.dto.UserResponseDto;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -33,18 +34,18 @@ public class AuthController {
     private final AuthService authService;
     private final AuthCookieService authCookieService;
     private final AuthenticatedSessionResolver authenticatedSessionResolver;
-    private final UserAgentParser userAgentParser;
+    private final DeviceInfoResolver deviceInfoResolver;
 
 
     public AuthController(
             AuthService authService,
             AuthCookieService authCookieService,
             AuthenticatedSessionResolver authenticatedSessionResolver,
-            UserAgentParser userAgentParser) {
+            DeviceInfoResolver deviceInfoResolver) {
         this.authService = authService;
         this.authCookieService = authCookieService;
         this.authenticatedSessionResolver = authenticatedSessionResolver;
-        this.userAgentParser = userAgentParser;
+        this.deviceInfoResolver = deviceInfoResolver;
     }
 
 
@@ -74,7 +75,7 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(
             @RequestBody @Valid LoginRequest loginRequest,
             HttpServletRequest request) {
-        DeviceInfo deviceInfo = userAgentParser.parse(request);
+        DeviceInfo deviceInfo = deviceInfo(request);
         return authResponse(authService.login(loginRequest, deviceInfo), deviceInfo.clientType());
     }
 
@@ -93,7 +94,7 @@ public class AuthController {
             @AuthenticationPrincipal Jwt jwt,
             HttpServletRequest request) {
         UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        DeviceInfo deviceInfo = userAgentParser.parse(request);
+        DeviceInfo deviceInfo = deviceInfo(request);
         return authResponse(
                 authService.claimSession(userId, deviceInfo),
                 deviceInfo.clientType());
@@ -114,7 +115,7 @@ public class AuthController {
     public ResponseEntity<AuthResponse> refreshToken(
             @RequestBody(required = false) RefreshRequest refreshRequest,
             HttpServletRequest request) {
-        DeviceInfo deviceInfo = userAgentParser.parse(request);
+        DeviceInfo deviceInfo = deviceInfo(request);
 
         String rawRefreshToken = switch (deviceInfo.clientType()) {
             case MOBILE_APP -> {
@@ -173,5 +174,12 @@ public class AuthController {
         }
 
         return ResponseEntity.ok(response);
+    }
+
+    private DeviceInfo deviceInfo(HttpServletRequest request) {
+        return deviceInfoResolver.resolve(new ClientRequestMetadata(
+                request.getHeader(HttpHeaders.USER_AGENT),
+                request.getHeader("X-Client-Type"),
+                request.getRemoteAddr()));
     }
 }

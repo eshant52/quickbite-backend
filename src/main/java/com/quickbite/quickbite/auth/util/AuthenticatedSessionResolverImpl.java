@@ -1,4 +1,4 @@
-package com.quickbite.quickbite.auth.service;
+package com.quickbite.quickbite.auth.util;
 
 import com.quickbite.quickbite.auth.dto.AuthenticatedSession;
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
