@@ -3,12 +3,13 @@ package com.quickbite.quickbite.auth.util;
 import com.quickbite.quickbite.auth.dto.AuthenticatedSession;
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 import java.util.UUID;
 
-@Service
+@Component
 public class AuthenticatedSessionResolverImpl implements AuthenticatedSessionResolver {
     public AuthenticatedSessionResolverImpl() {}
 
