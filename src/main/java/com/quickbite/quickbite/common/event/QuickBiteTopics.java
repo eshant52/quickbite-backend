@@ -7,6 +7,11 @@ public final class QuickBiteTopics {
     public static final String DELIVERY_EVENTS = "quickbite.delivery.events";
     public static final String ORDER_EVENTS_DLQ = "quickbite.order.events.DLQ";
 
+    // Restaurant onboarding events
+    public static final String RESTAURANT_APPLICATION_SUBMITTED = "quickbite.restaurant.application.submitted";
+    public static final String RESTAURANT_APPROVED = "quickbite.restaurant.approved";
+    public static final String RESTAURANT_REJECTED = "quickbite.restaurant.rejected";
+
     private QuickBiteTopics() {
     }
 }

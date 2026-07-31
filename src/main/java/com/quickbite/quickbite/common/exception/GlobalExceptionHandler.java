@@ -2,7 +2,8 @@ package com.quickbite.quickbite.common.exception;
 
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
 import com.quickbite.quickbite.auth.exception.MaxSessionException;
-import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
+import com.quickbite.quickbite.onboarding.exception.ApplicationNotFoundException;
+import com.quickbite.quickbite.onboarding.exception.ApplicationStateException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -68,6 +69,22 @@ public class GlobalExceptionHandler {
                         "session_limit_exceeded",
                         ex.getSessionManagementToken(),
                         ex.getMaxSessions()));
+    }
+
+    @ExceptionHandler(ApplicationNotFoundException.class)
+    public ProblemDetail handleApplicationNotFoundException(ApplicationNotFoundException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problemDetail.setTitle("Application Not Found");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(ApplicationStateException.class)
+    public ProblemDetail handleApplicationStateException(ApplicationStateException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problemDetail.setTitle("Invalid Application State");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
     }
 
     // Unknown exception

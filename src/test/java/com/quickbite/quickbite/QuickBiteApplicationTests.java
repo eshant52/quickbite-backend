@@ -79,8 +79,12 @@ class QuickBiteApplicationTests {
                         QuickBiteTopics.ORDER_EVENTS,
                         QuickBiteTopics.NOTIFICATION_EVENTS,
                         QuickBiteTopics.DELIVERY_EVENTS,
-                        QuickBiteTopics.ORDER_EVENTS_DLQ);
+                        QuickBiteTopics.ORDER_EVENTS_DLQ,
+                        QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED,
+                        QuickBiteTopics.RESTAURANT_APPROVED,
+                        QuickBiteTopics.RESTAURANT_REJECTED);
 
+        // DLQ topics use 1 partition; all other topics use 3 partitions
         assertThat(topics.values())
                 .filteredOn(topic -> !QuickBiteTopics.ORDER_EVENTS_DLQ.equals(topic.name()))
                 .allSatisfy(topic -> {
@@ -96,6 +100,7 @@ class QuickBiteApplicationTests {
                     assertThat(topic.replicationFactor()).isEqualTo((short) 1);
                 });
     }
+
 
     @Configuration
     @EnableConfigurationProperties(KafkaProperties.class)

@@ -1,17 +1,16 @@
 package com.quickbite.quickbite.common.config;
 
-import java.util.Map;
-
+import com.quickbite.quickbite.common.event.QuickBiteTopics;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.ConsumerFactory;
-import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
-import org.springframework.kafka.core.DefaultKafkaProducerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.*;
+
+import java.util.Map;
 
 @Configuration
 @EnableKafka
@@ -41,5 +40,46 @@ public class KafkaConfig {
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         return factory;
+    }
+
+    // -------------------------------------------------------------------------
+    // Topic declarations — Kafka auto-creates these on first use if missing,
+    // but declaring them explicitly ensures the correct partition/replication
+    // settings are applied in all environments.
+    // -------------------------------------------------------------------------
+
+    @Bean
+    public NewTopic orderEventsTopic() {
+        return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic notificationEventsTopic() {
+        return TopicBuilder.name(QuickBiteTopics.NOTIFICATION_EVENTS).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic deliveryEventsTopic() {
+        return TopicBuilder.name(QuickBiteTopics.DELIVERY_EVENTS).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic orderEventsDlqTopic() {
+        return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS_DLQ).partitions(1).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic restaurantApplicationSubmittedTopic() {
+        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic restaurantApprovedTopic() {
+        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPROVED).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic restaurantRejectedTopic() {
+        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_REJECTED).partitions(3).replicas(1).build();
     }
 }
