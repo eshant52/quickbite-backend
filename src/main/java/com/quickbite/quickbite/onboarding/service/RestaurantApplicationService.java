@@ -1,9 +1,8 @@
 package com.quickbite.quickbite.onboarding.service;
 
+import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.onboarding.dto.*;
 import com.quickbite.quickbite.onboarding.model.ApplicationStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.util.UUID;
 
@@ -35,7 +34,7 @@ public interface RestaurantApplicationService {
     ApplicationResponse reopenApplication(UUID appId, UUID ownerId);
 
     // Admin operations
-    Page<ApplicationSummaryResponse> listApplications(ApplicationStatus status, Pageable pageable);
+    CursorPage<ApplicationSummaryResponse> listApplications(ApplicationStatus status, UUID cursor, int size);
 
     ApplicationResponse getApplicationAsAdmin(UUID appId);
 

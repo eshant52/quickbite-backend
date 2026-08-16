@@ -12,6 +12,9 @@ public final class QuickBiteTopics {
     public static final String RESTAURANT_APPROVED = "quickbite.restaurant.approved";
     public static final String RESTAURANT_REJECTED = "quickbite.restaurant.rejected";
 
+    // Dead-letter topics (DLT) — messages land here after all retries are exhausted
+    public static final String NOTIFICATION_DLT = "quickbite.notification.DLT";
+
     private QuickBiteTopics() {
     }
 }

@@ -2,6 +2,7 @@ package com.quickbite.quickbite;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Map;
 
 import com.quickbite.quickbite.common.config.KafkaConfig;
@@ -82,23 +83,26 @@ class QuickBiteApplicationTests {
                         QuickBiteTopics.ORDER_EVENTS_DLQ,
                         QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED,
                         QuickBiteTopics.RESTAURANT_APPROVED,
-                        QuickBiteTopics.RESTAURANT_REJECTED);
+                        QuickBiteTopics.RESTAURANT_REJECTED,
+                        QuickBiteTopics.NOTIFICATION_DLT);
 
-        // DLQ topics use 1 partition; all other topics use 3 partitions
+        // DLQ / DLT topics use 1 partition; all other topics use 3
+        var singlePartitionTopics = List.of(QuickBiteTopics.ORDER_EVENTS_DLQ, QuickBiteTopics.NOTIFICATION_DLT);
         assertThat(topics.values())
-                .filteredOn(topic -> !QuickBiteTopics.ORDER_EVENTS_DLQ.equals(topic.name()))
+                .filteredOn(topic -> !singlePartitionTopics.contains(topic.name()))
                 .allSatisfy(topic -> {
                     assertThat(topic.numPartitions()).isEqualTo(3);
                     assertThat(topic.replicationFactor()).isEqualTo((short) 1);
                 });
 
         assertThat(topics.values())
-                .filteredOn(topic -> QuickBiteTopics.ORDER_EVENTS_DLQ.equals(topic.name()))
-                .singleElement()
-                .satisfies(topic -> {
+                .filteredOn(topic -> singlePartitionTopics.contains(topic.name()))
+                .hasSize(2)
+                .allSatisfy(topic -> {
                     assertThat(topic.numPartitions()).isEqualTo(1);
                     assertThat(topic.replicationFactor()).isEqualTo((short) 1);
                 });
+
     }
 
 

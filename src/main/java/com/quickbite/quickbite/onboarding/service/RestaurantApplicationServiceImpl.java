@@ -1,7 +1,12 @@
 package com.quickbite.quickbite.onboarding.service;
 
+import com.quickbite.quickbite.common.event.QuickBiteTopics;
+import com.quickbite.quickbite.common.event.RestaurantApplicationSubmittedEvent;
+import com.quickbite.quickbite.common.event.RestaurantApplicationApprovedEvent;
+import com.quickbite.quickbite.common.event.RestaurantApplicationRejectedEvent;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
 import com.quickbite.quickbite.common.model.DocumentVerificationStatus;
+import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.onboarding.dto.*;
 import com.quickbite.quickbite.onboarding.exception.ApplicationNotFoundException;
 import com.quickbite.quickbite.onboarding.exception.ApplicationStateException;
@@ -17,8 +22,8 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Limit;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +63,7 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
     private final RestaurantImageRepository restaurantImageRepository;
     private final RestaurantDocumentRepository restaurantDocumentRepository;
     private final RestaurantVerificationStatusHistoryRepository statusHistoryRepository;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public RestaurantApplicationServiceImpl(
             RestaurantApplicationRepository applicationRepository,
@@ -70,7 +76,8 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
             RestaurantHoursRepository restaurantHoursRepository,
             RestaurantImageRepository restaurantImageRepository,
             RestaurantDocumentRepository restaurantDocumentRepository,
-            RestaurantVerificationStatusHistoryRepository statusHistoryRepository) {
+            RestaurantVerificationStatusHistoryRepository statusHistoryRepository,
+            KafkaTemplate<String, Object> kafkaTemplate) {
         this.applicationRepository = applicationRepository;
         this.hoursRepository = hoursRepository;
         this.imageRepository = imageRepository;
@@ -82,6 +89,7 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         this.restaurantImageRepository = restaurantImageRepository;
         this.restaurantDocumentRepository = restaurantDocumentRepository;
         this.statusHistoryRepository = statusHistoryRepository;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     // -------------------------------------------------------------------------
@@ -247,8 +255,18 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         }
 
         app.setStatus(ApplicationStatus.SUBMITTED);
-        // TODO: publish RestaurantApplicationSubmittedEvent to Kafka once event DTOs are defined
-        return ApplicationResponse.from(applicationRepository.save(app));
+        ApplicationResponse saved = ApplicationResponse.from(applicationRepository.save(app));
+        kafkaTemplate.send(
+                QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED,
+                app.getId().toString(),
+                new RestaurantApplicationSubmittedEvent(
+                        app.getId(),
+                        app.getOwner().getId(),
+                        app.getOwner().getEmail(),
+                        app.getOwner().getName(),
+                        app.getName(),
+                        Instant.now()));
+        return saved;
     }
 
     @Override
@@ -271,9 +289,14 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ApplicationSummaryResponse> listApplications(ApplicationStatus status, Pageable pageable) {
-        return applicationRepository.findByStatus(status, pageable)
-                .map(ApplicationSummaryResponse::from);
+    public CursorPage<ApplicationSummaryResponse> listApplications(ApplicationStatus status, UUID cursor, int size) {
+        int pageSize = Math.clamp(size, 1, 100);
+        List<RestaurantApplication> fetched =
+                applicationRepository.findByStatusWithCursor(status, cursor, Limit.of(pageSize + 1));
+        return CursorPage.of(
+                fetched.stream().map(ApplicationSummaryResponse::from).toList(),
+                pageSize,
+                ApplicationSummaryResponse::id);
     }
 
     @Override
@@ -300,9 +323,21 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         app.setRestaurant(restaurant);
         app.setStatus(ApplicationStatus.APPROVED);
         app.setReviewedBy(admin);
-        app.setReviewedAt(Instant.now());
+        Instant approvedAt = Instant.now();
+        app.setReviewedAt(approvedAt);
         applicationRepository.save(app);
-        // TODO: publish RestaurantApprovedEvent to Kafka
+        kafkaTemplate.send(
+                QuickBiteTopics.RESTAURANT_APPROVED,
+                restaurant.getId().toString(),
+                new RestaurantApplicationApprovedEvent(
+                        app.getId(),
+                        restaurant.getId(),
+                        app.getOwner().getId(),
+                        app.getOwner().getEmail(),
+                        app.getOwner().getName(),
+                        restaurant.getName(),
+                        admin.getId(),
+                        approvedAt));
     }
 
     @Override
@@ -319,9 +354,21 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         app.setStatus(ApplicationStatus.REJECTED);
         app.setRejectionRemarks(remarks);
         app.setReviewedBy(admin);
-        app.setReviewedAt(Instant.now());
+        Instant rejectedAt = Instant.now();
+        app.setReviewedAt(rejectedAt);
         applicationRepository.save(app);
-        // TODO: publish RestaurantRejectedEvent to Kafka
+        kafkaTemplate.send(
+                QuickBiteTopics.RESTAURANT_REJECTED,
+                app.getId().toString(),
+                new RestaurantApplicationRejectedEvent(
+                        app.getId(),
+                        app.getOwner().getId(),
+                        app.getOwner().getEmail(),
+                        app.getOwner().getName(),
+                        app.getName(),
+                        admin.getId(),
+                        remarks,
+                        rejectedAt));
     }
 
     // -------------------------------------------------------------------------
@@ -335,19 +382,7 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
      */
     private Restaurant promoteToRestaurant(RestaurantApplication app, User admin) {
         // 1. Create Address from embedded application fields
-        Address address = new Address();
-        address.setUser(app.getOwner());
-        address.setLabel("Restaurant Address");
-        address.setStreet(app.getAddressStreet());
-        address.setCity(app.getAddressCity());
-        address.setState(app.getAddressState());
-        address.setCountry(app.getAddressCountry());
-        address.setPostalCode(app.getAddressPostalCode());
-        address.setHouseNumber(app.getAddressHouseNumber());
-        address.setBuildingName(app.getAddressBuildingName());
-        address.setLandmark(app.getAddressLandmark());
-        address.setLocation(app.getAddressLocation());
-        address.setIsDefault(false);
+        Address address = createAddress(app);
         address = addressRepository.save(address);
 
         // 2. Create Restaurant
@@ -412,6 +447,23 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         statusHistoryRepository.save(history);
 
         return savedRestaurant;
+    }
+
+    private static Address createAddress(RestaurantApplication app) {
+        Address address = new Address();
+        address.setUser(app.getOwner());
+        address.setLabel("Restaurant Address");
+        address.setStreet(app.getAddressStreet());
+        address.setCity(app.getAddressCity());
+        address.setState(app.getAddressState());
+        address.setCountry(app.getAddressCountry());
+        address.setPostalCode(app.getAddressPostalCode());
+        address.setHouseNumber(app.getAddressHouseNumber());
+        address.setBuildingName(app.getAddressBuildingName());
+        address.setLandmark(app.getAddressLandmark());
+        address.setLocation(app.getAddressLocation());
+        address.setIsDefault(false);
+        return address;
     }
 
     private User loadUser(UUID userId) {

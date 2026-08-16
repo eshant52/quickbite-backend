@@ -1,15 +1,13 @@
 package com.quickbite.quickbite.onboarding.controller;
 
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
+import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.onboarding.dto.AdminRejectRequest;
 import com.quickbite.quickbite.onboarding.dto.ApplicationResponse;
 import com.quickbite.quickbite.onboarding.dto.ApplicationSummaryResponse;
 import com.quickbite.quickbite.onboarding.model.ApplicationStatus;
 import com.quickbite.quickbite.onboarding.service.RestaurantApplicationService;
 import jakarta.validation.Valid;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,15 +35,23 @@ public class AdminRestaurantApplicationController {
     }
 
     /**
-     * List applications filtered by status.
+     * List applications filtered by status using cursor-based pagination.
+     * <p>
      * Defaults to SUBMITTED (the queue admins normally work from).
-     * Supports Spring Data pagination: ?page=0&size=20&sort=updatedAt,desc
+     *
+     * <pre>
+     *   First page:  GET /api/v1/admin/restaurant/applications?status=SUBMITTED&size=20
+     *   Next pages:  GET /api/v1/admin/restaurant/applications?status=SUBMITTED&cursor=&lt;nextCursor&gt;&size=20
+     * </pre>
+     *
+     * Results are ordered by application ID (= creation time, since IDs are UUIDv7).
      */
     @GetMapping
-    public ResponseEntity<Page<ApplicationSummaryResponse>> listApplications(
+    public ResponseEntity<CursorPage<ApplicationSummaryResponse>> listApplications(
             @RequestParam(defaultValue = "SUBMITTED") ApplicationStatus status,
-            @PageableDefault(size = 20, sort = "updatedAt") Pageable pageable) {
-        return ResponseEntity.ok(applicationService.listApplications(status, pageable));
+            @RequestParam(required = false) UUID cursor,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(applicationService.listApplications(status, cursor, size));
     }
 
     /** Get the full detail of any application regardless of status. */
