@@ -2,6 +2,7 @@ package com.quickbite.quickbite.common.exception;
 
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
 import com.quickbite.quickbite.auth.exception.MaxSessionException;
+import com.quickbite.quickbite.cart.exception.CartConflictException;
 import com.quickbite.quickbite.onboarding.exception.ApplicationNotFoundException;
 import com.quickbite.quickbite.onboarding.exception.ApplicationStateException;
 
@@ -14,7 +15,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.HashMap;
 import java.util.Map;
-import com.quickbite.quickbite.common.exception.BadRequestException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -85,6 +85,11 @@ public class GlobalExceptionHandler {
         problemDetail.setTitle("Invalid Application State");
         problemDetail.setDetail(ex.getMessage());
         return problemDetail;
+    }
+
+    @ExceptionHandler(CartConflictException.class)
+    public ProblemDetail handleCartConflictException(CartConflictException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     // Unknown exception

@@ -2,8 +2,6 @@ package com.quickbite.quickbite.menu.model;
 
 import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
-import com.quickbite.quickbite.menu.model.Cuisine;
-import com.quickbite.quickbite.menu.model.MenuItemImage;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -16,6 +14,7 @@ import org.hibernate.envers.NotAudited;
 import org.hibernate.envers.RelationTargetAuditMode;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -38,9 +37,9 @@ public class MenuItem extends Base {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String description;
 
-    @OneToMany(mappedBy = "menuItem")
+    @OneToMany(mappedBy = "menuItem", cascade = CascadeType.ALL, orphanRemoval = true)
     @NotAudited
-    private List<MenuItemImage> images;
+    private List<MenuItemImage> images = new ArrayList<>();
 
     @ManyToOne
     @Audited(targetAuditMode = RelationTargetAuditMode.NOT_AUDITED)
@@ -59,4 +58,18 @@ public class MenuItem extends Base {
 
     @Column(nullable = false)
     private boolean isAvailable;
+
+    public void addImage(MenuItemImage image) {
+        if (this.images == null) {
+            this.images = new ArrayList<>();
+        }
+        this.images.add(image);
+        image.setMenuItem(this);
+    }
+
+    public void removeImage(MenuItemImage image) {
+        if (this.images == null) return;
+        this.images.remove(image);
+        image.setMenuItem(null);
+    }
 }

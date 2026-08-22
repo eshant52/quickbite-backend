@@ -12,6 +12,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -27,8 +28,8 @@ public class Cart extends Base {
     @JoinColumn(nullable = false)
     private Restaurant restaurant;
 
-    @OneToMany(mappedBy = "cart")
-    private List<CartItem> items;
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CartItem> items = new ArrayList<>();
 
     @Column(precision = 10, scale = 2, nullable = false)
     @Digits(integer = 8, fraction = 2, message = "Total price must have up to 8 digits and 2 decimal places")
@@ -37,4 +38,18 @@ public class Cart extends Base {
 
     @Column(nullable = false)
     private Instant expiresAt;
+
+    public void addItem(CartItem item) {
+        if (this.items == null) {
+            this.items = new ArrayList<>();
+        }
+        this.items.add(item);
+        item.setCart(this);
+    }
+
+    public void removeItem(CartItem item) {
+        if (this.items == null) return;
+        this.items.remove(item);
+        item.setCart(null);
+    }
 }
