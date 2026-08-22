@@ -1,11 +1,11 @@
-package com.quickbite.quickbite.common.event;
+package com.quickbite.quickbite.common.event.restaurantapplication;
 
 import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Published to {@link QuickBiteTopics#RESTAURANT_APPROVED} when an admin approves
- * a restaurant onboarding application and the Restaurant entity is created.
+ * Published when an admin approves a restaurant onboarding application
+ * and the Restaurant entity is created.
  */
 public record RestaurantApplicationApprovedEvent(
         UUID applicationId,

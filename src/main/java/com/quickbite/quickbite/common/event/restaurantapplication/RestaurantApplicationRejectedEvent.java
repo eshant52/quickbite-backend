@@ -1,11 +1,11 @@
-package com.quickbite.quickbite.common.event;
+package com.quickbite.quickbite.common.event.restaurantapplication;
 
 import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Published to {@link QuickBiteTopics#RESTAURANT_REJECTED} when an admin rejects
- * a restaurant onboarding application. The owner can reopen and resubmit.
+ * Published when an admin rejects a restaurant onboarding application.
+ * The owner can reopen and resubmit.
  */
 public record RestaurantApplicationRejectedEvent(
         UUID applicationId,

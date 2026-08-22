@@ -107,17 +107,32 @@ public class KafkaConfig {
     }
 
     @Bean
-    public NewTopic restaurantApprovedTopic() {
-        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPROVED).partitions(3).replicas(1).build();
+    public NewTopic restaurantApplicationApprovedTopic() {
+        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_APPROVED).partitions(3).replicas(1).build();
     }
 
     @Bean
-    public NewTopic restaurantRejectedTopic() {
-        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_REJECTED).partitions(3).replicas(1).build();
+    public NewTopic restaurantApplicationRejectedTopic() {
+        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_REJECTED).partitions(3).replicas(1).build();
     }
 
     @Bean
     public NewTopic notificationDltTopic() {
         return TopicBuilder.name(QuickBiteTopics.NOTIFICATION_DLT).partitions(1).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic cuisineRequestedTopic() {
+        return TopicBuilder.name(QuickBiteTopics.CUISINE_REQUESTED).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic cuisineApprovedTopic() {
+        return TopicBuilder.name(QuickBiteTopics.CUISINE_APPROVED).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic cuisineRejectedTopic() {
+        return TopicBuilder.name(QuickBiteTopics.CUISINE_REJECTED).partitions(3).replicas(1).build();
     }
 }

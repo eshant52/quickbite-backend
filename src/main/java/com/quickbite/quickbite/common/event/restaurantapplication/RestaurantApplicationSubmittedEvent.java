@@ -1,11 +1,10 @@
-package com.quickbite.quickbite.common.event;
+package com.quickbite.quickbite.common.event.restaurantapplication;
 
 import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Published to {@link QuickBiteTopics#RESTAURANT_APPLICATION_SUBMITTED} when an
- * owner submits their onboarding application for admin review.
+ * Published when an owner submits their onboarding application for admin review.
  */
 public record RestaurantApplicationSubmittedEvent(
         UUID applicationId,

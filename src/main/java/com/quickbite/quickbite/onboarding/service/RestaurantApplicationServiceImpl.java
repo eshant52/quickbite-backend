@@ -1,9 +1,9 @@
 package com.quickbite.quickbite.onboarding.service;
 
 import com.quickbite.quickbite.common.event.QuickBiteTopics;
-import com.quickbite.quickbite.common.event.RestaurantApplicationSubmittedEvent;
-import com.quickbite.quickbite.common.event.RestaurantApplicationApprovedEvent;
-import com.quickbite.quickbite.common.event.RestaurantApplicationRejectedEvent;
+import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationSubmittedEvent;
+import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationApprovedEvent;
+import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationRejectedEvent;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
 import com.quickbite.quickbite.common.model.DocumentVerificationStatus;
 import com.quickbite.quickbite.common.dto.CursorPage;
@@ -255,18 +255,20 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         }
 
         app.setStatus(ApplicationStatus.SUBMITTED);
-        ApplicationResponse saved = ApplicationResponse.from(applicationRepository.save(app));
+        RestaurantApplication savedApp = applicationRepository.save(app);
+
         kafkaTemplate.send(
                 QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED,
-                app.getId().toString(),
+                savedApp.getId().toString(),
                 new RestaurantApplicationSubmittedEvent(
-                        app.getId(),
-                        app.getOwner().getId(),
-                        app.getOwner().getEmail(),
-                        app.getOwner().getName(),
-                        app.getName(),
+                        savedApp.getId(),
+                        savedApp.getOwner().getId(),
+                        savedApp.getOwner().getEmail(),
+                        savedApp.getOwner().getName(),
+                        savedApp.getName(),
                         Instant.now()));
-        return saved;
+
+        return ApplicationResponse.from(savedApp);
     }
 
     @Override
@@ -327,7 +329,7 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         app.setReviewedAt(approvedAt);
         applicationRepository.save(app);
         kafkaTemplate.send(
-                QuickBiteTopics.RESTAURANT_APPROVED,
+                QuickBiteTopics.RESTAURANT_APPLICATION_APPROVED,
                 restaurant.getId().toString(),
                 new RestaurantApplicationApprovedEvent(
                         app.getId(),
@@ -358,7 +360,7 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         app.setReviewedAt(rejectedAt);
         applicationRepository.save(app);
         kafkaTemplate.send(
-                QuickBiteTopics.RESTAURANT_REJECTED,
+                QuickBiteTopics.RESTAURANT_APPLICATION_REJECTED,
                 app.getId().toString(),
                 new RestaurantApplicationRejectedEvent(
                         app.getId(),
