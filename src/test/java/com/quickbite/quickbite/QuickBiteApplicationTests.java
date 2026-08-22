@@ -82,8 +82,8 @@ class QuickBiteApplicationTests {
                         QuickBiteTopics.DELIVERY_EVENTS,
                         QuickBiteTopics.ORDER_EVENTS_DLQ,
                         QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED,
-                        QuickBiteTopics.RESTAURANT_APPROVED,
-                        QuickBiteTopics.RESTAURANT_REJECTED,
+                        QuickBiteTopics.RESTAURANT_APPLICATION_APPROVED,
+                        QuickBiteTopics.RESTAURANT_APPLICATION_REJECTED,
                         QuickBiteTopics.NOTIFICATION_DLT);
 
         // DLQ / DLT topics use 1 partition; all other topics use 3
