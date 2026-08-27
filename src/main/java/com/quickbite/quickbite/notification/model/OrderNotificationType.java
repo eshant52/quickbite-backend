@@ -1,6 +1,8 @@
 package com.quickbite.quickbite.notification.model;
 
 public enum OrderNotificationType {
+    AWAITING_PAYMENT,
+    PAYMENT_FAILED,
     ACCEPTED,
     CANCELLED,
     DECLINED,

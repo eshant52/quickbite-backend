@@ -1,6 +1,5 @@
 package com.quickbite.quickbite.onboarding.service;
 
-import com.quickbite.quickbite.common.event.QuickBiteTopics;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationSubmittedEvent;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationApprovedEvent;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationRejectedEvent;
@@ -24,7 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
@@ -60,7 +59,8 @@ class RestaurantApplicationServiceImplTest {
     @Mock RestaurantImageRepository restaurantImageRepository;
     @Mock RestaurantDocumentRepository restaurantDocumentRepository;
     @Mock RestaurantVerificationStatusHistoryRepository statusHistoryRepository;
-    @Mock KafkaTemplate<String, Object> kafkaTemplate;
+    @Mock ApplicationEventPublisher eventPublisher;
+    @Mock com.quickbite.quickbite.allotment.service.AdminAllotmentService adminAllotmentService;
 
     private RestaurantApplicationServiceImpl service;
 
@@ -80,7 +80,7 @@ class RestaurantApplicationServiceImplTest {
                 documentRepository, userRepository, addressRepository,
                 restaurantRepository, restaurantHoursRepository,
                 restaurantImageRepository, restaurantDocumentRepository,
-                statusHistoryRepository, kafkaTemplate);
+                statusHistoryRepository, eventPublisher, adminAllotmentService);
 
         ownerId = UUID.randomUUID();
         adminId = UUID.randomUUID();
@@ -434,10 +434,7 @@ class RestaurantApplicationServiceImplTest {
             assertThat(response.status()).isEqualTo(ApplicationStatus.SUBMITTED);
 
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(kafkaTemplate).send(
-                    eq(QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED),
-                    eq(appId.toString()),
-                    eventCaptor.capture());
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
 
             RestaurantApplicationSubmittedEvent event =
                     (RestaurantApplicationSubmittedEvent) eventCaptor.getValue();
@@ -457,7 +454,7 @@ class RestaurantApplicationServiceImplTest {
                     .isInstanceOf(ApplicationStateException.class)
                     .hasMessageContaining("incomplete");
 
-            verify(kafkaTemplate, never()).send(anyString(), any(), any());
+            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test
@@ -470,7 +467,7 @@ class RestaurantApplicationServiceImplTest {
             assertThatThrownBy(() -> service.submitApplication(appId, ownerId))
                     .isInstanceOf(ApplicationStateException.class);
 
-            verify(kafkaTemplate, never()).send(anyString(), any(), any());
+            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test
@@ -555,10 +552,7 @@ class RestaurantApplicationServiceImplTest {
             assertThat(captor.getValue().getReviewedBy()).isEqualTo(admin);
 
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(kafkaTemplate).send(
-                    eq(QuickBiteTopics.RESTAURANT_APPLICATION_REJECTED),
-                    eq(appId.toString()),
-                    eventCaptor.capture());
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
             RestaurantApplicationRejectedEvent event = (RestaurantApplicationRejectedEvent) eventCaptor.getValue();
             assertThat(event.applicationId()).isEqualTo(appId);
             assertThat(event.rejectionRemarks()).isEqualTo("Incomplete FSSAI license");
@@ -587,7 +581,7 @@ class RestaurantApplicationServiceImplTest {
                     .isInstanceOf(ApplicationStateException.class)
                     .hasMessageContaining("SUBMITTED or UNDER_REVIEW");
 
-            verify(kafkaTemplate, never()).send(anyString(), any(), any());
+            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test
@@ -648,10 +642,7 @@ class RestaurantApplicationServiceImplTest {
 
             // Kafka event published to RESTAURANT_APPROVED topic
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(kafkaTemplate).send(
-                    eq(QuickBiteTopics.RESTAURANT_APPLICATION_APPROVED),
-                    eq(savedRestaurant.getId().toString()),
-                    eventCaptor.capture());
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
             RestaurantApplicationApprovedEvent event = (RestaurantApplicationApprovedEvent) eventCaptor.getValue();
             assertThat(event.applicationId()).isEqualTo(appId);
             assertThat(event.ownerId()).isEqualTo(ownerId);
@@ -668,7 +659,7 @@ class RestaurantApplicationServiceImplTest {
                     .hasMessageContaining("SUBMITTED or UNDER_REVIEW");
 
             verify(restaurantRepository, never()).save(any());
-            verify(kafkaTemplate, never()).send(anyString(), any(), any());
+            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test

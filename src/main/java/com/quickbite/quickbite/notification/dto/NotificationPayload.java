@@ -26,17 +26,26 @@ import com.quickbite.quickbite.user.model.User;
  * <h3>Current permitted implementations</h3>
  * <ul>
  *   <li>{@link RestaurantApplicationNotificationPayload}</li>
+ *   <li>{@link OrderNotificationPayload}</li>
+ *   <li>{@link PaymentNotificationPayload}</li>
  * </ul>
  */
-public sealed interface NotificationPayload permits RestaurantApplicationNotificationPayload {
+public sealed interface NotificationPayload permits RestaurantApplicationNotificationPayload,
+        OrderNotificationPayload, PaymentNotificationPayload, CuisineNotificationPayload {
 
-    /** The user who should receive this notification. */
+    /**
+     * The user who should receive this notification.
+     */
     User recipient();
 
-    /** Short subject line — max 200 chars (matches the DB column length). */
+    /**
+     * Short subject line — max 200 chars (matches the DB column length).
+     */
     String title();
 
-    /** Full body text — max 1000 chars. */
+    /**
+     * Full body text — max 1000 chars.
+     */
     String message();
 
     /**

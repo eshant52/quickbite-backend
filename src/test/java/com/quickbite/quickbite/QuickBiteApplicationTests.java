@@ -34,13 +34,6 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 })
 @TestPropertySource(properties = {
         "app.cache.default-ttl=PT10M",
-        "app.kafka.topics.order-events=quickbite.order.events",
-        "app.kafka.topics.notification-events=quickbite.notification.events",
-        "app.kafka.topics.delivery-events=quickbite.delivery.events",
-        "app.kafka.topics.order-events-dlq=quickbite.order.events.DLQ",
-        "app.kafka.topics.partitions=3",
-        "app.kafka.topics.dlq-partitions=1",
-        "app.kafka.topics.replication-factor=1",
         "spring.kafka.bootstrap-servers=localhost:9092"
 })
 class QuickBiteApplicationTests {
@@ -58,6 +51,9 @@ class QuickBiteApplicationTests {
     private ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory;
 
     @Autowired
+    private ConcurrentKafkaListenerContainerFactory<String, String> stringKafkaListenerContainerFactory;
+
+    @Autowired
     private Map<String, NewTopic> topics;
 
     @Test
@@ -70,6 +66,7 @@ class QuickBiteApplicationTests {
         assertThat(redisTemplate).isNotNull();
         assertThat(kafkaTemplate).isNotNull();
         assertThat(kafkaListenerContainerFactory).isNotNull();
+        assertThat(stringKafkaListenerContainerFactory).isNotNull();
     }
 
     @Test
@@ -78,33 +75,37 @@ class QuickBiteApplicationTests {
                 .extracting(NewTopic::name)
                 .containsExactlyInAnyOrder(
                         QuickBiteTopics.ORDER_EVENTS,
-                        QuickBiteTopics.NOTIFICATION_EVENTS,
-                        QuickBiteTopics.DELIVERY_EVENTS,
-                        QuickBiteTopics.ORDER_EVENTS_DLQ,
-                        QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED,
-                        QuickBiteTopics.RESTAURANT_APPLICATION_APPROVED,
-                        QuickBiteTopics.RESTAURANT_APPLICATION_REJECTED,
-                        QuickBiteTopics.NOTIFICATION_DLT);
+                        QuickBiteTopics.ORDER_EVENTS + QuickBiteTopics.DLT_SUFFIX,
+                        QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS,
+                        QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX,
+                        QuickBiteTopics.CUISINE_EVENTS,
+                        QuickBiteTopics.CUISINE_EVENTS + QuickBiteTopics.DLT_SUFFIX,
+                        QuickBiteTopics.PAYMENT_EVENTS,
+                        QuickBiteTopics.PAYMENT_EVENTS + QuickBiteTopics.DLT_SUFFIX);
 
-        // DLQ / DLT topics use 1 partition; all other topics use 3
-        var singlePartitionTopics = List.of(QuickBiteTopics.ORDER_EVENTS_DLQ, QuickBiteTopics.NOTIFICATION_DLT);
+        // DLT topics use 1 partition; domain aggregate streams use 3
+        var dltTopics = List.of(
+                QuickBiteTopics.ORDER_EVENTS + QuickBiteTopics.DLT_SUFFIX,
+                QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX,
+                QuickBiteTopics.CUISINE_EVENTS + QuickBiteTopics.DLT_SUFFIX,
+                QuickBiteTopics.PAYMENT_EVENTS + QuickBiteTopics.DLT_SUFFIX
+        );
+
         assertThat(topics.values())
-                .filteredOn(topic -> !singlePartitionTopics.contains(topic.name()))
+                .filteredOn(topic -> !dltTopics.contains(topic.name()))
                 .allSatisfy(topic -> {
                     assertThat(topic.numPartitions()).isEqualTo(3);
                     assertThat(topic.replicationFactor()).isEqualTo((short) 1);
                 });
 
         assertThat(topics.values())
-                .filteredOn(topic -> singlePartitionTopics.contains(topic.name()))
-                .hasSize(2)
+                .filteredOn(topic -> dltTopics.contains(topic.name()))
+                .hasSize(4)
                 .allSatisfy(topic -> {
                     assertThat(topic.numPartitions()).isEqualTo(1);
                     assertThat(topic.replicationFactor()).isEqualTo((short) 1);
                 });
-
     }
-
 
     @Configuration
     @EnableConfigurationProperties(KafkaProperties.class)
@@ -140,5 +141,4 @@ class QuickBiteApplicationTests {
             };
         }
     }
-
 }

@@ -1,6 +1,8 @@
 package com.quickbite.quickbite.onboarding.service;
 
-import com.quickbite.quickbite.common.event.QuickBiteTopics;
+import com.quickbite.quickbite.allotment.model.AdminAllotment;
+import com.quickbite.quickbite.allotment.model.AllotmentReferenceType;
+import com.quickbite.quickbite.allotment.service.AdminAllotmentService;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationSubmittedEvent;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationApprovedEvent;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationRejectedEvent;
@@ -22,8 +24,8 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Limit;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,7 +65,8 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
     private final RestaurantImageRepository restaurantImageRepository;
     private final RestaurantDocumentRepository restaurantDocumentRepository;
     private final RestaurantVerificationStatusHistoryRepository statusHistoryRepository;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final ApplicationEventPublisher eventPublisher;
+    private final AdminAllotmentService adminAllotmentService;
 
     public RestaurantApplicationServiceImpl(
             RestaurantApplicationRepository applicationRepository,
@@ -77,7 +80,8 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
             RestaurantImageRepository restaurantImageRepository,
             RestaurantDocumentRepository restaurantDocumentRepository,
             RestaurantVerificationStatusHistoryRepository statusHistoryRepository,
-            KafkaTemplate<String, Object> kafkaTemplate) {
+            ApplicationEventPublisher eventPublisher,
+            AdminAllotmentService adminAllotmentService) {
         this.applicationRepository = applicationRepository;
         this.hoursRepository = hoursRepository;
         this.imageRepository = imageRepository;
@@ -89,7 +93,8 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         this.restaurantImageRepository = restaurantImageRepository;
         this.restaurantDocumentRepository = restaurantDocumentRepository;
         this.statusHistoryRepository = statusHistoryRepository;
-        this.kafkaTemplate = kafkaTemplate;
+        this.eventPublisher = eventPublisher;
+        this.adminAllotmentService = adminAllotmentService;
     }
 
     // -------------------------------------------------------------------------
@@ -257,16 +262,21 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         app.setStatus(ApplicationStatus.SUBMITTED);
         RestaurantApplication savedApp = applicationRepository.save(app);
 
-        kafkaTemplate.send(
-                QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED,
-                savedApp.getId().toString(),
-                new RestaurantApplicationSubmittedEvent(
-                        savedApp.getId(),
-                        savedApp.getOwner().getId(),
-                        savedApp.getOwner().getEmail(),
-                        savedApp.getOwner().getName(),
-                        savedApp.getName(),
-                        Instant.now()));
+        // Allot request to workload-balanced admins
+        List<AdminAllotment> adminAllotments = adminAllotmentService.allot(savedApp.getId(), AllotmentReferenceType.RESTAURANT_APPLICATION);
+
+        // Registered for AFTER_COMMIT — RestaurantApplicationKafkaEventPublisher sends to Kafka
+        // only after this transaction has durably committed.
+        eventPublisher.publishEvent(new RestaurantApplicationSubmittedEvent(
+                savedApp.getId(),
+                savedApp.getOwner().getId(),
+                savedApp.getOwner().getEmail(),
+                savedApp.getOwner().getName(),
+                savedApp.getName(),
+                adminAllotments.stream()
+                        .map(a -> a.getAdmin().getId())
+                        .toList(),
+                Instant.now()));
 
         return ApplicationResponse.from(savedApp);
     }
@@ -328,18 +338,17 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         Instant approvedAt = Instant.now();
         app.setReviewedAt(approvedAt);
         applicationRepository.save(app);
-        kafkaTemplate.send(
-                QuickBiteTopics.RESTAURANT_APPLICATION_APPROVED,
-                restaurant.getId().toString(),
-                new RestaurantApplicationApprovedEvent(
-                        app.getId(),
-                        restaurant.getId(),
-                        app.getOwner().getId(),
-                        app.getOwner().getEmail(),
-                        app.getOwner().getName(),
-                        restaurant.getName(),
-                        admin.getId(),
-                        approvedAt));
+
+        // Fires after this @Transactional commits — restaurant row is guaranteed visible
+        eventPublisher.publishEvent(new RestaurantApplicationApprovedEvent(
+                app.getId(),
+                restaurant.getId(),
+                app.getOwner().getId(),
+                app.getOwner().getEmail(),
+                app.getOwner().getName(),
+                restaurant.getName(),
+                admin.getId(),
+                approvedAt));
     }
 
     @Override
@@ -359,18 +368,17 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
         Instant rejectedAt = Instant.now();
         app.setReviewedAt(rejectedAt);
         applicationRepository.save(app);
-        kafkaTemplate.send(
-                QuickBiteTopics.RESTAURANT_APPLICATION_REJECTED,
-                app.getId().toString(),
-                new RestaurantApplicationRejectedEvent(
-                        app.getId(),
-                        app.getOwner().getId(),
-                        app.getOwner().getEmail(),
-                        app.getOwner().getName(),
-                        app.getName(),
-                        admin.getId(),
-                        remarks,
-                        rejectedAt));
+
+        // Fires after this @Transactional commits
+        eventPublisher.publishEvent(new RestaurantApplicationRejectedEvent(
+                app.getId(),
+                app.getOwner().getId(),
+                app.getOwner().getEmail(),
+                app.getOwner().getName(),
+                app.getName(),
+                admin.getId(),
+                remarks,
+                rejectedAt));
     }
 
     // -------------------------------------------------------------------------

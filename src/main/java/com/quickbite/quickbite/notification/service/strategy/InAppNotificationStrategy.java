@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Delivers a notification by persisting it to the database for in-app display.
- *
+ * <p>
  * Intentionally domain-agnostic — it simply calls {@code payload.toNotification()}
  * and saves the result. The specific entity type (RestaurantApplicationNotification,
  * OrderNotification, etc.) is determined entirely by the payload implementation.
@@ -23,6 +23,7 @@ public class InAppNotificationStrategy implements NotificationDeliveryStrategy {
 
     @Override
     public void deliver(NotificationPayload payload) {
+        // TODO: Some ws realtime notification to notify web app of specific user in the future.
         notificationRepository.save(payload.toNotification());
     }
 

@@ -1,42 +1,26 @@
 package com.quickbite.quickbite.menu.model;
 
 import com.quickbite.quickbite.common.model.Base;
-import com.quickbite.quickbite.user.model.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcType;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
-import org.hibernate.type.SqlTypes;
 
-import java.time.Instant;
-
+/**
+ * Pure master catalog entity representing a global cuisine type (e.g., "Italian", "North Indian").
+ * <p>
+ * Does not contain transient workflow metadata (such as review remarks or status).
+ * User requests to add new cuisines are handled via {@link CuisineRequest}.
+ */
 @Getter
 @Setter
 @Entity
 @Table(name = "cuisines")
 public class Cuisine extends Base {
+
     @NotBlank(message = "Cuisine name is required")
     @Size(min = 2, max = 100, message = "Cuisine name must be between 2 and 100 characters")
     @Column(length = 100, nullable = false, unique = true)
     private String name;
-
-    @Enumerated(EnumType.STRING)
-    @JdbcType(PostgreSQLEnumJdbcType.class)
-    @JdbcTypeCode(SqlTypes.ENUM)
-    @Column(columnDefinition = "cuisine_status", nullable = false)
-    private CuisineStatus status;
-
-    @ManyToOne
-    @JoinColumn(nullable = true)
-    private User reviewedBy;
-
-    private Instant reviewedAt;
-
-    @Size(max = 500, message = "Remarks must be at most 500 characters")
-    @Column(columnDefinition = "TEXT")
-    private String remarks;
 }

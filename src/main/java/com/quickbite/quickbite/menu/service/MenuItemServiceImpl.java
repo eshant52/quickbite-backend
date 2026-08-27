@@ -220,12 +220,8 @@ public class MenuItemServiceImpl implements MenuItemService {
      * @throws BadRequestException       if the cuisine is not approved
      */
     private Cuisine loadApprovedCuisine(UUID cuisineId) {
-        Cuisine c = cuisineRepository.findById(cuisineId)
+        return cuisineRepository.findById(cuisineId)
                 .orElseThrow(() -> new CuisineNotFoundException("Cuisine not found"));
-        if (c.getStatus() != CuisineStatus.APPROVED) {
-            throw new BadRequestException("Cuisine is not approved");
-        }
-        return c;
     }
 
     /**

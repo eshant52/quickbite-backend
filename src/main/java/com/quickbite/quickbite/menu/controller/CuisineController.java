@@ -2,6 +2,7 @@ package com.quickbite.quickbite.menu.controller;
 
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.menu.dto.CuisineRequest;
+import com.quickbite.quickbite.menu.dto.CuisineRequestResponse;
 import com.quickbite.quickbite.menu.dto.CuisineResponse;
 import com.quickbite.quickbite.menu.service.CuisineService;
 import jakarta.validation.Valid;
@@ -36,7 +37,7 @@ public class CuisineController {
 
     @PostMapping
     @PreAuthorize("hasRole('RESTAURANT_OWNER')")
-    public ResponseEntity<CuisineResponse> requestCuisine(
+    public ResponseEntity<CuisineRequestResponse> requestCuisine(
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody @Valid CuisineRequest cuisineRequest) {
         UUID requesterId = authenticatedSessionResolver.userIdFromJwt(jwt);

@@ -4,10 +4,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record CuisineRejectedEvent(
-        UUID cuisineId,
+        UUID requestId,
         String cuisineName,
+        UUID requesterId,
         UUID adminId,
         String rejectionRemarks,
         Instant rejectedAt
-) {
-}
+) implements CuisineEvent {}

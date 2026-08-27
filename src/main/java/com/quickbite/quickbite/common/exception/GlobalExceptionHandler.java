@@ -92,6 +92,73 @@ public class GlobalExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 
+    @ExceptionHandler(com.quickbite.quickbite.cart.exception.CartExpiredException.class)
+    public ProblemDetail handleCartExpiredException(com.quickbite.quickbite.cart.exception.CartExpiredException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problemDetail.setTitle("Cart Expired");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(com.quickbite.quickbite.order.exception.OrderNotFoundException.class)
+    public ProblemDetail handleOrderNotFoundException(com.quickbite.quickbite.order.exception.OrderNotFoundException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problemDetail.setTitle("Order Not Found");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(com.quickbite.quickbite.order.exception.OrderStateException.class)
+    public ProblemDetail handleOrderStateException(com.quickbite.quickbite.order.exception.OrderStateException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problemDetail.setTitle("Invalid Order State");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(com.quickbite.quickbite.payment.exception.PaymentNotFoundException.class)
+    public ProblemDetail handlePaymentNotFoundException(com.quickbite.quickbite.payment.exception.PaymentNotFoundException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problemDetail.setTitle("Payment Not Found");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(com.quickbite.quickbite.allotment.exception.AllotmentNotFoundException.class)
+    public ProblemDetail handleAllotmentNotFoundException(com.quickbite.quickbite.allotment.exception.AllotmentNotFoundException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problemDetail.setTitle("Allotment Not Found");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(com.quickbite.quickbite.allotment.exception.AllotmentAlreadyClaimedException.class)
+    public ProblemDetail handleAllotmentAlreadyClaimedException(com.quickbite.quickbite.allotment.exception.AllotmentAlreadyClaimedException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problemDetail.setTitle("Allotment Already Claimed");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(com.quickbite.quickbite.allotment.exception.AllotmentAlreadyExistsException.class)
+    public ProblemDetail handleAllotmentAlreadyExistsException(com.quickbite.quickbite.allotment.exception.AllotmentAlreadyExistsException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problemDetail.setTitle("Allotment Already Exists");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler({
+            org.springframework.dao.OptimisticLockingFailureException.class,
+            jakarta.persistence.OptimisticLockException.class
+    })
+    public ProblemDetail handleOptimisticLockingFailure(Exception ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problemDetail.setTitle("Concurrent Modification Conflict");
+        problemDetail.setDetail("The resource was modified by another operation. Please retry.");
+        return problemDetail;
+    }
+
     // Unknown exception
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleException(Exception e) {

@@ -5,5 +5,13 @@ public enum PaymentMethod {
     CARD,
     NET_BANKING,
     COD,
-    WALLET
+    WALLET;
+
+    /**
+     * Returns {@code true} for all methods that require an online payment gateway
+     * (i.e. everything except Cash on Delivery).
+     */
+    public boolean isOnline() {
+        return this != COD;
+    }
 }

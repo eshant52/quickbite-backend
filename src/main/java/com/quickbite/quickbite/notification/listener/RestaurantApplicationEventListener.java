@@ -1,16 +1,15 @@
 package com.quickbite.quickbite.notification.listener;
 
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import com.quickbite.quickbite.common.event.QuickBiteTopics;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationApprovedEvent;
-import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationSubmittedEvent;
+import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationEvent;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationRejectedEvent;
+import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationSubmittedEvent;
 import com.quickbite.quickbite.notification.dto.RestaurantApplicationNotificationPayload;
 import com.quickbite.quickbite.notification.model.RestaurantApplicationNotificationType;
 import com.quickbite.quickbite.notification.service.NotificationService;
 import com.quickbite.quickbite.user.model.User;
-import com.quickbite.quickbite.user.model.UserRole;
 import com.quickbite.quickbite.user.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,14 +19,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * Consumes restaurant application lifecycle events from Kafka and converts
- * them into notifications delivered through all registered channels
- * (in-app, email, push — see {@link com.quickbite.quickbite.notification.service.strategy}).
- *
- * Uses {@code containerFactory = "stringKafkaListenerContainerFactory"} to receive
- * raw JSON strings, which are then explicitly deserialized with {@link ObjectMapper}.
- * This keeps listeners decoupled from type-header configuration and makes the
- * deserialization contract visible at the call site.
+ * Consumes restaurant application lifecycle events from the {@link QuickBiteTopics#RESTAURANT_APPLICATION_EVENTS}
+ * stream and converts them into notifications delivered through registered channels.
  */
 @Component
 public class RestaurantApplicationEventListener {
@@ -46,29 +39,33 @@ public class RestaurantApplicationEventListener {
         this.objectMapper = objectMapper;
     }
 
-    // -------------------------------------------------------------------------
-    // APPLICATION_SUBMITTED — notify all admins
-    // -------------------------------------------------------------------------
-
     @KafkaListener(
-            topics = QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED,
+            topics = QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS,
             groupId = "quickbite-notification-group",
             containerFactory = "stringKafkaListenerContainerFactory"
     )
-    public void onApplicationSubmitted(String rawEvent) {
-        RestaurantApplicationSubmittedEvent event = deserialize(rawEvent, RestaurantApplicationSubmittedEvent.class);
+    public void onApplicationEvent(String rawEvent) {
+        RestaurantApplicationEvent event = deserialize(rawEvent, RestaurantApplicationEvent.class);
         if (event == null) return;
 
-        List<User> admins = userRepository.findByRole(UserRole.ADMIN);
+        switch (event) {
+            case RestaurantApplicationSubmittedEvent submitted -> handleApplicationSubmitted(submitted);
+            case RestaurantApplicationApprovedEvent approved -> handleApplicationApproved(approved);
+            case RestaurantApplicationRejectedEvent rejected -> handleApplicationRejected(rejected);
+        }
+    }
+
+    private void handleApplicationSubmitted(RestaurantApplicationSubmittedEvent event) {
+        List<User> admins = userRepository.findAllById(event.allottedAdminIds());
         if (admins.isEmpty()) {
-            log.warn("[NOTIFICATION] No admins found to notify for application={}", event.applicationId());
+            log.warn("[NOTIFICATION] No allotted admins found for application={}", event.applicationId());
             return;
         }
 
         admins.forEach(admin -> notificationService.send(new RestaurantApplicationNotificationPayload(
                 admin,
-                "New Restaurant Application",
-                event.ownerName() + " submitted an application for \"" + event.restaurantName() + "\". Review it now.",
+                "Restaurant Application Assigned for Review",
+                event.ownerName() + " submitted an application for \"" + event.restaurantName() + "\". You have been allotted to review this request.",
                 RestaurantApplicationNotificationType.APPLICATION_SUBMITTED,
                 event.applicationId(),
                 event.restaurantName()
@@ -77,19 +74,7 @@ public class RestaurantApplicationEventListener {
         log.info("[NOTIFICATION] Notified {} admin(s) for application={}", admins.size(), event.applicationId());
     }
 
-    // -------------------------------------------------------------------------
-    // APPLICATION_APPROVED — notify the restaurant owner
-    // -------------------------------------------------------------------------
-
-    @KafkaListener(
-            topics = QuickBiteTopics.RESTAURANT_APPLICATION_APPROVED,
-            groupId = "quickbite-notification-group",
-            containerFactory = "stringKafkaListenerContainerFactory"
-    )
-    public void onRestaurantApproved(String rawEvent) {
-        RestaurantApplicationApprovedEvent event = deserialize(rawEvent, RestaurantApplicationApprovedEvent.class);
-        if (event == null) return;
-
+    private void handleApplicationApproved(RestaurantApplicationApprovedEvent event) {
         userRepository.findById(event.ownerId()).ifPresentOrElse(
                 owner -> {
                     notificationService.send(new RestaurantApplicationNotificationPayload(
@@ -106,19 +91,7 @@ public class RestaurantApplicationEventListener {
         );
     }
 
-    // -------------------------------------------------------------------------
-    // APPLICATION_REJECTED — notify the restaurant owner
-    // -------------------------------------------------------------------------
-
-    @KafkaListener(
-            topics = QuickBiteTopics.RESTAURANT_APPLICATION_REJECTED,
-            groupId = "quickbite-notification-group",
-            containerFactory = "stringKafkaListenerContainerFactory"
-    )
-    public void onRestaurantRejected(String rawEvent) {
-        RestaurantApplicationRejectedEvent event = deserialize(rawEvent, RestaurantApplicationRejectedEvent.class);
-        if (event == null) return;
-
+    private void handleApplicationRejected(RestaurantApplicationRejectedEvent event) {
         userRepository.findById(event.ownerId()).ifPresentOrElse(
                 owner -> {
                     notificationService.send(new RestaurantApplicationNotificationPayload(
@@ -137,16 +110,12 @@ public class RestaurantApplicationEventListener {
         );
     }
 
-    // -------------------------------------------------------------------------
-    // Helper
-    // -------------------------------------------------------------------------
-
     private <T> T deserialize(String rawEvent, Class<T> type) {
         try {
             return objectMapper.readValue(rawEvent, type);
-        } catch (JacksonException ex) {
+        } catch (Exception ex) {
             log.error("[NOTIFICATION] Failed to deserialize Kafka event as {}: {}", type.getSimpleName(), ex.getMessage(), ex);
-            return null;
+            throw new RuntimeException("Failed to deserialize event", ex);
         }
     }
 }

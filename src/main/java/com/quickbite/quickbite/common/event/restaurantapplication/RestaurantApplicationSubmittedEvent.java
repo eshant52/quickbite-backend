@@ -1,6 +1,7 @@
 package com.quickbite.quickbite.common.event.restaurantapplication;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -12,5 +13,6 @@ public record RestaurantApplicationSubmittedEvent(
         String ownerEmail,
         String ownerName,
         String restaurantName,
+        List<UUID> allottedAdminIds,
         Instant submittedAt
-) {}
+) implements RestaurantApplicationEvent {}

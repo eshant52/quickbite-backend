@@ -16,4 +16,4 @@ public record RestaurantApplicationApprovedEvent(
         String restaurantName,
         UUID adminId,
         Instant approvedAt
-) {}
+) implements RestaurantApplicationEvent {}

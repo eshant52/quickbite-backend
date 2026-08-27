@@ -4,8 +4,6 @@ import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.delivery.model.DeliveryAgent;
-import com.quickbite.quickbite.order.model.OrderItem;
-import com.quickbite.quickbite.order.model.OrderStatusHistory;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -92,7 +90,7 @@ public class Order extends Base {
     @Column(columnDefinition = "order_status", nullable = false)
     private OrderStatus currentStatus = OrderStatus.PLACED;
 
-    @OneToMany(mappedBy = "order")
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @NotAudited
     private List<OrderItem> items;
 

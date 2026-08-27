@@ -3,6 +3,7 @@ package com.quickbite.quickbite.menu.controller;
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.menu.dto.AdminRejectRequest;
+import com.quickbite.quickbite.menu.dto.CuisineRequestResponse;
 import com.quickbite.quickbite.menu.dto.CuisineResponse;
 import com.quickbite.quickbite.menu.model.CuisineStatus;
 import com.quickbite.quickbite.menu.service.CuisineService;
@@ -32,12 +33,12 @@ public class AdminCuisineController {
     }
 
     @GetMapping
-    public ResponseEntity<CursorPage<CuisineResponse>> getAdminCuisines(
+    public ResponseEntity<CursorPage<CuisineRequestResponse>> getAdminCuisines(
             @RequestParam(defaultValue = "PENDING") CuisineStatus status,
             @RequestParam(required = false) UUID cursor,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(cuisineService.listByStatus(status, cursor, size));
+        return ResponseEntity.ok(cuisineService.listRequestsByStatus(status, cursor, size));
     }
 
     @PostMapping("/{id}/approve")
@@ -50,7 +51,7 @@ public class AdminCuisineController {
     }
 
     @PostMapping("/{id}/reject")
-    public ResponseEntity<CuisineResponse> rejectCuisine(
+    public ResponseEntity<CuisineRequestResponse> rejectCuisine(
             @RequestBody @Valid AdminRejectRequest rejectRequest,
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt

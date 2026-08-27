@@ -11,6 +11,7 @@ import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.util.backoff.FixedBackOff;
 
@@ -47,13 +48,8 @@ public class KafkaConfig {
     }
 
     /**
-     * A separate consumer factory that deserializes Kafka message values as raw
-     * UTF-8 strings. Used by {@link com.quickbite.quickbite.notification.listener.RestaurantApplicationEventListener}
-     * which then manually deserializes the JSON with {@code ObjectMapper}.
-     * <p>
-     * This is more explicit than relying on {@code JacksonJsonDeserializer} with a
-     * global default type, and makes each listener fully responsible for its own
-     * deserialization contract.
+     * A consumer factory that deserializes Kafka message values as raw UTF-8 strings.
+     * Listeners manually deserialize the polymorphic JSON payloads.
      */
     @Bean
     public ConsumerFactory<String, String> stringConsumerFactory(KafkaProperties kafkaProperties) {
@@ -62,77 +58,71 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
+    /**
+     * Container factory for string consumers with automatic Dead Letter Topic (DLT) recovery.
+     * Retries up to 3 times with a 1-second fixed delay before publishing the unrecoverable
+     * poisoned record to &lt;topic&gt;.DLT.
+     */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> stringKafkaListenerContainerFactory(
-            ConsumerFactory<String, String> stringConsumerFactory) {
+            ConsumerFactory<String, String> stringConsumerFactory,
+            KafkaTemplate<String, Object> kafkaTemplate) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(stringConsumerFactory);
-        // Retry up to 3 times with a 1-second fixed delay before sending to the DLT.
-        // The DLT is declared below as a NewTopic bean so Kafka auto-creates it.
-        factory.setCommonErrorHandler(
-                new DefaultErrorHandler(new FixedBackOff(1_000L, 3)));
+
+        var recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
+        var errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(1_000L, 3));
+        factory.setCommonErrorHandler(errorHandler);
+
         return factory;
     }
 
     // -------------------------------------------------------------------------
-    // Topic declarations — Kafka auto-creates these on first use if missing,
-    // but declaring them explicitly ensures the correct partition/replication
-    // settings are applied in all environments.
+    // Topic declarations — Domain Aggregate Streams & Dead Letter Queues
     // -------------------------------------------------------------------------
 
+    // 1. Order Stream
     @Bean
     public NewTopic orderEventsTopic() {
         return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS).partitions(3).replicas(1).build();
     }
 
     @Bean
-    public NewTopic notificationEventsTopic() {
-        return TopicBuilder.name(QuickBiteTopics.NOTIFICATION_EVENTS).partitions(3).replicas(1).build();
+    public NewTopic orderEventsDltTopic() {
+        return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS + QuickBiteTopics.DLT_SUFFIX).partitions(1).replicas(1).build();
+    }
+
+    // 2. Restaurant Application Stream
+    @Bean
+    public NewTopic restaurantApplicationEventsTopic() {
+        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS).partitions(3).replicas(1).build();
     }
 
     @Bean
-    public NewTopic deliveryEventsTopic() {
-        return TopicBuilder.name(QuickBiteTopics.DELIVERY_EVENTS).partitions(3).replicas(1).build();
+    public NewTopic restaurantApplicationEventsDltTopic() {
+        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX).partitions(1).replicas(1).build();
+    }
+
+    // 3. Cuisine Stream
+    @Bean
+    public NewTopic cuisineEventsTopic() {
+        return TopicBuilder.name(QuickBiteTopics.CUISINE_EVENTS).partitions(3).replicas(1).build();
     }
 
     @Bean
-    public NewTopic orderEventsDlqTopic() {
-        return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS_DLQ).partitions(1).replicas(1).build();
+    public NewTopic cuisineEventsDltTopic() {
+        return TopicBuilder.name(QuickBiteTopics.CUISINE_EVENTS + QuickBiteTopics.DLT_SUFFIX).partitions(1).replicas(1).build();
+    }
+
+    // 4. Payment Stream
+    @Bean
+    public NewTopic paymentEventsTopic() {
+        return TopicBuilder.name(QuickBiteTopics.PAYMENT_EVENTS).partitions(3).replicas(1).build();
     }
 
     @Bean
-    public NewTopic restaurantApplicationSubmittedTopic() {
-        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_SUBMITTED).partitions(3).replicas(1).build();
-    }
-
-    @Bean
-    public NewTopic restaurantApplicationApprovedTopic() {
-        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_APPROVED).partitions(3).replicas(1).build();
-    }
-
-    @Bean
-    public NewTopic restaurantApplicationRejectedTopic() {
-        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_REJECTED).partitions(3).replicas(1).build();
-    }
-
-    @Bean
-    public NewTopic notificationDltTopic() {
-        return TopicBuilder.name(QuickBiteTopics.NOTIFICATION_DLT).partitions(1).replicas(1).build();
-    }
-
-    @Bean
-    public NewTopic cuisineRequestedTopic() {
-        return TopicBuilder.name(QuickBiteTopics.CUISINE_REQUESTED).partitions(3).replicas(1).build();
-    }
-
-    @Bean
-    public NewTopic cuisineApprovedTopic() {
-        return TopicBuilder.name(QuickBiteTopics.CUISINE_APPROVED).partitions(3).replicas(1).build();
-    }
-
-    @Bean
-    public NewTopic cuisineRejectedTopic() {
-        return TopicBuilder.name(QuickBiteTopics.CUISINE_REJECTED).partitions(3).replicas(1).build();
+    public NewTopic paymentEventsDltTopic() {
+        return TopicBuilder.name(QuickBiteTopics.PAYMENT_EVENTS + QuickBiteTopics.DLT_SUFFIX).partitions(1).replicas(1).build();
     }
 }

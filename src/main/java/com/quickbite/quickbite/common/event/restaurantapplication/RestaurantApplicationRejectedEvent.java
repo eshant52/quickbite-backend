@@ -16,4 +16,4 @@ public record RestaurantApplicationRejectedEvent(
         UUID adminId,
         String rejectionRemarks,
         Instant rejectedAt
-) {}
+) implements RestaurantApplicationEvent {}

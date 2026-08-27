@@ -196,8 +196,8 @@ Use for transparently adding behavior (logging, caching, metrics) to existing se
 
 ### I — Interface Segregation
 - **Already followed well**: `AuthService`, `SessionService`, `SessionStoreService`, `AuthCookieService`, `TokenService` are all narrow, focused interfaces.
-- When adding new features, prefer small interfaces (`OrderQueryService`, `OrderCommandService`) over a single fat `OrderService` with 20+ methods.
-- ❌ **Anti-pattern to avoid**: A single `OrderService` interface that forces implementations to provide methods for placement, tracking, history, analytics, and admin operations.
+- When adding new features, prefer small interfaces (`OrderQueryService`, `OrderCommandService`) over a single fat `CustomerOrderService` with 20+ methods.
+- ❌ **Anti-pattern to avoid**: A single `CustomerOrderService` interface that forces implementations to provide methods for placement, tracking, history, analytics, and admin operations.
 
 ### D — Dependency Inversion
 - **Already followed**: Controllers depend on service interfaces, not implementations. `SessionStoreService` (interface) is implemented by `SessionRedisStoreService`.
