@@ -69,15 +69,15 @@ public class Restaurant extends Base {
     @OneToMany(mappedBy = "restaurant")
     private List<MenuItem> menuItems;
 
-    @OneToMany(mappedBy = "restaurant")
+    @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true)
     @NotAudited
     private List<RestaurantImage> restaurantImages;
 
-    @OneToMany(mappedBy = "restaurant")
+    @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true)
     @NotAudited
     private List<RestaurantHours> restaurantHours;
 
-    @OneToMany(mappedBy = "restaurant")
+    @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true)
     @NotAudited
     private List<RestaurantDocument> documents;
 

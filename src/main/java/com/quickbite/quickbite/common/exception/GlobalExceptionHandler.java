@@ -100,6 +100,14 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(com.quickbite.quickbite.restaurant.exception.RestaurantNotFoundException.class)
+    public ProblemDetail handleRestaurantNotFoundException(com.quickbite.quickbite.restaurant.exception.RestaurantNotFoundException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problemDetail.setTitle("Restaurant Not Found");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
     @ExceptionHandler(com.quickbite.quickbite.order.exception.OrderNotFoundException.class)
     public ProblemDetail handleOrderNotFoundException(com.quickbite.quickbite.order.exception.OrderNotFoundException ex) {
         ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
