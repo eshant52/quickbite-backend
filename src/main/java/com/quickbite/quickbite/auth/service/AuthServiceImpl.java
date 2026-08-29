@@ -3,20 +3,26 @@ package com.quickbite.quickbite.auth.service;
 import com.quickbite.quickbite.auth.dto.*;
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
 import com.quickbite.quickbite.auth.service.token.AccessTokenService;
+import com.quickbite.quickbite.delivery.model.DeliveryAgent;
+import com.quickbite.quickbite.delivery.model.DeliveryAgentVerificationStatus;
+import com.quickbite.quickbite.delivery.repository.DeliveryAgentRepository;
 import com.quickbite.quickbite.user.dto.UserResponseDto;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.model.UserRole;
 import com.quickbite.quickbite.user.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 @Service
+@Transactional
 public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
+    private final DeliveryAgentRepository deliveryAgentRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccessTokenService accessTokenService;
     private final SessionService sessionService;
@@ -24,10 +30,12 @@ public class AuthServiceImpl implements AuthService {
 
     public AuthServiceImpl(
             UserRepository userRepository,
+            DeliveryAgentRepository deliveryAgentRepository,
             PasswordEncoder passwordEncoder,
             AccessTokenService accessTokenService,
             SessionService sessionService) {
         this.userRepository = userRepository;
+        this.deliveryAgentRepository = deliveryAgentRepository;
         this.passwordEncoder = passwordEncoder;
         this.accessTokenService = accessTokenService;
         this.sessionService = sessionService;
@@ -56,11 +64,22 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public UserResponseDto registerDeliveryPartner(RegisterRequest registerRequest) {
+        // Register the user first
         User user = registerUser(registerRequest);
         user.setRole(UserRole.DELIVERY_AGENT);
         user.setActive(false);
 
-        return UserResponseDto.toDto(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+
+        // Create a DeliveryAgent entity and associate it with the saved user
+        DeliveryAgent agent = new DeliveryAgent();
+        agent.setUser(savedUser);
+        agent.setAvailable(false);
+        agent.setCurrentStatus(DeliveryAgentVerificationStatus.PENDING);
+
+        deliveryAgentRepository.save(agent);
+
+        return UserResponseDto.toDto(savedUser);
     }
 
 
@@ -97,6 +116,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<SessionResponse> getActiveSessionsForUser(UUID userId) {
         return sessionService.listActiveSessionsForUser(userId);
     }

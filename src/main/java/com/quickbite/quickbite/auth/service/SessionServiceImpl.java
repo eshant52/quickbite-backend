@@ -160,6 +160,7 @@ public class SessionServiceImpl implements SessionService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<SessionResponse> listActiveSessionsForUser(UUID userId) {
         List<Session> sessions = sessionRepository.findActiveByUserId(userId);
         return sessions.stream()
