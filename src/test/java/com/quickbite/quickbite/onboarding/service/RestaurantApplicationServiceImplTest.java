@@ -3,12 +3,15 @@ package com.quickbite.quickbite.onboarding.service;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationSubmittedEvent;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationApprovedEvent;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationRejectedEvent;
+import com.quickbite.quickbite.common.exception.BadRequestException;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
-import com.quickbite.quickbite.onboarding.dto.*;
+import com.quickbite.quickbite.onboarding.dto.restaurant.*;
 import com.quickbite.quickbite.onboarding.exception.ApplicationNotFoundException;
 import com.quickbite.quickbite.onboarding.exception.ApplicationStateException;
 import com.quickbite.quickbite.onboarding.model.*;
+import com.quickbite.quickbite.onboarding.model.restaurant.*;
 import com.quickbite.quickbite.onboarding.repository.*;
+import com.quickbite.quickbite.onboarding.service.restaurant.RestaurantApplicationServiceImpl;
 import com.quickbite.quickbite.restaurant.model.*;
 import com.quickbite.quickbite.restaurant.repository.*;
 import com.quickbite.quickbite.user.model.Address;
@@ -112,6 +115,9 @@ class RestaurantApplicationServiceImplTest {
         completeApp.setHoursComplete(true);
         completeApp.setImagesComplete(true);
         completeApp.setDocumentsComplete(true);
+
+        lenient().when(imageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     // =========================================================================
@@ -128,7 +134,7 @@ class RestaurantApplicationServiceImplTest {
             when(applicationRepository.existsByOwnerAndStatusIn(eq(owner), anyList())).thenReturn(false);
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            ApplicationResponse response = service.startApplication(ownerId);
+            RestaurantApplicationResponse response = service.startApplication(ownerId);
 
             assertThat(response.status()).isEqualTo(ApplicationStatus.DRAFT);
             verify(applicationRepository).save(argThat(app ->
@@ -172,12 +178,11 @@ class RestaurantApplicationServiceImplTest {
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new ApplicationDetailsRequest("Spice Route", "Best curry in town");
-            ApplicationResponse response = service.saveDetails(appId, ownerId, request);
+            var request = new RestaurantApplicationDetailsRequest("Spice Route", "Best curry in town");
+            RestaurantApplicationDetailsResponse response = service.saveDetails(appId, ownerId, request);
 
             assertThat(response.name()).isEqualTo("Spice Route");
             assertThat(response.description()).isEqualTo("Best curry in town");
-            assertThat(response.detailsComplete()).isTrue();
         }
 
         @Test
@@ -187,7 +192,7 @@ class RestaurantApplicationServiceImplTest {
             when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
 
-            var request = new ApplicationDetailsRequest("Name", "Desc");
+            var request = new RestaurantApplicationDetailsRequest("Name", "Desc");
 
             assertThatThrownBy(() -> service.saveDetails(appId, ownerId, request))
                     .isInstanceOf(ApplicationStateException.class)
@@ -202,8 +207,22 @@ class RestaurantApplicationServiceImplTest {
             when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.saveDetails(appId, ownerId, new ApplicationDetailsRequest("N", "D")))
+            assertThatThrownBy(() -> service.saveDetails(appId, ownerId, new RestaurantApplicationDetailsRequest("N", "D")))
                     .isInstanceOf(ApplicationNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("getDetails returns details response")
+        void getDetailsReturnsResponse() {
+            draftApp.setName("Tasty Hub");
+            draftApp.setDescription("Great food");
+            when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+            when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
+
+            RestaurantApplicationDetailsResponse response = service.getDetails(appId, ownerId);
+
+            assertThat(response.name()).isEqualTo("Tasty Hub");
+            assertThat(response.description()).isEqualTo("Great food");
         }
     }
 
@@ -215,22 +234,37 @@ class RestaurantApplicationServiceImplTest {
     class SaveAddressTests {
 
         @Test
+        @DisplayName("getAddress returns address response")
+        void getAddressReturnsResponse() {
+            draftApp.setAddressStreet("Park Street");
+            draftApp.setAddressCity("Kolkata");
+            when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+            when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
+
+            RestaurantApplicationAddressResponse response = service.getAddress(appId, ownerId);
+
+            assertThat(response).isNotNull();
+            assertThat(response.city()).isEqualTo("Kolkata");
+            assertThat(response.street()).isEqualTo("Park Street");
+        }
+
+        @Test
         @DisplayName("saves address fields and marks addressComplete=true")
         void savesAddressFields() {
             when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new ApplicationAddressRequest(
+            var request = new RestaurantApplicationAddressRequest(
                     "MG Road", "Bengaluru", "Karnataka", "India",
                     "560001", "12", "Brigade Tower", "Near Metro",
                     12.9716, 77.5946);
 
-            ApplicationResponse response = service.saveAddress(appId, ownerId, request);
+            RestaurantApplicationAddressResponse response = service.saveAddress(appId, ownerId, request);
 
-            assertThat(response.addressComplete()).isTrue();
-            assertThat(response.address()).isNotNull();
-            assertThat(response.address().city()).isEqualTo("Bengaluru");
+            assertThat(response).isNotNull();
+            assertThat(response.city()).isEqualTo("Bengaluru");
+            assertThat(response.street()).isEqualTo("MG Road");
         }
 
         @Test
@@ -240,7 +274,7 @@ class RestaurantApplicationServiceImplTest {
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new ApplicationAddressRequest(
+            var request = new RestaurantApplicationAddressRequest(
                     "Street", "City", "State", "India",
                     "560001", null, null, null, 12.9716, 77.5946);
 
@@ -262,15 +296,33 @@ class RestaurantApplicationServiceImplTest {
     class SaveHoursTests {
 
         @Test
+        @DisplayName("getHours returns hours list")
+        void getHoursReturnsList() {
+            RestaurantApplicationHours h = new RestaurantApplicationHours();
+            h.setDayOfWeek(DayOfWeek.MONDAY);
+            h.setOpenTime(LocalTime.of(9, 0));
+            h.setCloseTime(LocalTime.of(22, 0));
+
+            when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+            when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
+            when(hoursRepository.findByApplication(draftApp)).thenReturn(List.of(h));
+
+            List<RestaurantApplicationHoursResponse> result = service.getHours(appId, ownerId);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().dayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
+        }
+
+        @Test
         @DisplayName("deletes existing hours and saves new ones, sets hoursComplete=true")
         void replacesHoursAndSetsFlag() {
             when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new ApplicationHoursRequest(List.of(
-                    new ApplicationHoursRequest.HourEntry(DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(22, 0)),
-                    new ApplicationHoursRequest.HourEntry(DayOfWeek.TUESDAY, LocalTime.of(9, 0), LocalTime.of(22, 0))
+            var request = new RestaurantApplicationHoursRequest(List.of(
+                    new RestaurantApplicationHoursRequest.HourEntry(DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(22, 0)),
+                    new RestaurantApplicationHoursRequest.HourEntry(DayOfWeek.TUESDAY, LocalTime.of(9, 0), LocalTime.of(22, 0))
             ));
 
             service.saveHours(appId, ownerId, request);
@@ -290,7 +342,7 @@ class RestaurantApplicationServiceImplTest {
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new ApplicationHoursRequest(List.of());
+            var request = new RestaurantApplicationHoursRequest(List.of());
 
             service.saveHours(appId, ownerId, request);
 
@@ -308,6 +360,23 @@ class RestaurantApplicationServiceImplTest {
     class ImageTests {
 
         @Test
+        @DisplayName("getImage returns image list")
+        void getImageReturnsList() {
+            RestaurantApplicationImage img = new RestaurantApplicationImage();
+            img.setImageUrl("https://s3/pic.jpg");
+            img.setDisplayOrder(1);
+
+            when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+            when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
+            when(imageRepository.findByApplicationOrderByDisplayOrderAsc(draftApp)).thenReturn(List.of(img));
+
+            List<RestaurantApplicationImageResponse> result = service.getImage(appId, ownerId);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().imageUrl()).isEqualTo("https://s3/pic.jpg");
+        }
+
+        @Test
         @DisplayName("saves image and sets imagesComplete=true when at least one image exists")
         void addsImageAndSetsFlag() {
             when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
@@ -315,17 +384,17 @@ class RestaurantApplicationServiceImplTest {
             when(imageRepository.countByApplication(draftApp)).thenReturn(1L);
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new ApplicationImageRequest("https://s3.example.com/img.jpg", 0);
-            ApplicationResponse response = service.addImage(appId, ownerId, request);
+            var request = new RestaurantApplicationImageRequest("https://s3.example.com/img.jpg", 0);
+            RestaurantApplicationImageResponse response = service.addImage(appId, ownerId, request);
 
-            assertThat(response.imagesComplete()).isTrue();
-            verify(imageRepository).save(any(ApplicationImage.class));
+            assertThat(response.imageUrl()).isEqualTo("https://s3.example.com/img.jpg");
+            verify(imageRepository).save(any(RestaurantApplicationImage.class));
         }
 
         @Test
         @DisplayName("sets imagesComplete=false after removing the last image")
         void setsIncompleteAfterLastImageRemoved() {
-            ApplicationImage image = new ApplicationImage();
+            RestaurantApplicationImage image = new RestaurantApplicationImage();
             image.setId(UUID.randomUUID());
 
             when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
@@ -362,6 +431,23 @@ class RestaurantApplicationServiceImplTest {
     class AddDocumentTests {
 
         @Test
+        @DisplayName("getDocuments returns document list")
+        void getDocumentsReturnsList() {
+            RestaurantApplicationDocument doc = new RestaurantApplicationDocument();
+            doc.setType(RestaurantDocumentType.FSSAI_LICENSE);
+            doc.setUrl("https://s3/fssai.pdf");
+
+            when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+            when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
+            when(documentRepository.findByApplication(draftApp)).thenReturn(List.of(doc));
+
+            List<RestaurantApplicationDocumentResponse> result = service.getDocuments(appId, ownerId);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().type()).isEqualTo(RestaurantDocumentType.FSSAI_LICENSE);
+        }
+
+        @Test
         @DisplayName("marks documentsComplete=true when all 4 mandatory types are present")
         void setsCompleteWhenAllMandatoryPresent() {
             when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
@@ -370,10 +456,11 @@ class RestaurantApplicationServiceImplTest {
             when(documentRepository.existsByApplicationAndType(eq(draftApp), any())).thenReturn(true);
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new ApplicationDocumentRequest(RestaurantDocumentType.FSSAI_LICENSE, "https://s3/fssai.pdf");
-            ApplicationResponse response = service.addDocument(appId, ownerId, request);
+            var request = new RestaurantApplicationDocumentRequest(RestaurantDocumentType.FSSAI_LICENSE, "https://s3/fssai.pdf");
+            RestaurantApplicationDocumentResponse response = service.addDocument(appId, ownerId, request);
 
-            assertThat(response.documentsComplete()).isTrue();
+            assertThat(response.type()).isEqualTo(RestaurantDocumentType.FSSAI_LICENSE);
+            assertThat(response.url()).isEqualTo("https://s3/fssai.pdf");
         }
 
         @Test
@@ -390,17 +477,18 @@ class RestaurantApplicationServiceImplTest {
             lenient().when(documentRepository.existsByApplicationAndType(eq(draftApp), eq(RestaurantDocumentType.BANK_PROOF))).thenReturn(true);
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new ApplicationDocumentRequest(RestaurantDocumentType.FSSAI_LICENSE, "https://s3/fssai.pdf");
-            ApplicationResponse response = service.addDocument(appId, ownerId, request);
+            var request = new RestaurantApplicationDocumentRequest(RestaurantDocumentType.FSSAI_LICENSE, "https://s3/fssai.pdf");
+            RestaurantApplicationDocumentResponse response = service.addDocument(appId, ownerId, request);
 
-            assertThat(response.documentsComplete()).isFalse();
+            assertThat(response.type()).isEqualTo(RestaurantDocumentType.FSSAI_LICENSE);
+            assertThat(draftApp.isDocumentsComplete()).isFalse();
         }
 
 
         @Test
         @DisplayName("upserts document — deletes existing entry for same type before inserting")
         void upsertDeletesExistingType() {
-            ApplicationDocument existing = new ApplicationDocument();
+            RestaurantApplicationDocument existing = new RestaurantApplicationDocument();
             when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
             when(documentRepository.findByApplicationAndType(draftApp, RestaurantDocumentType.PAN))
@@ -408,10 +496,10 @@ class RestaurantApplicationServiceImplTest {
             when(documentRepository.existsByApplicationAndType(any(), any())).thenReturn(true);
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            service.addDocument(appId, ownerId, new ApplicationDocumentRequest(RestaurantDocumentType.PAN, "new.pdf"));
+            service.addDocument(appId, ownerId, new RestaurantApplicationDocumentRequest(RestaurantDocumentType.PAN, "new.pdf"));
 
             verify(documentRepository).delete(existing);
-            verify(documentRepository).save(any(ApplicationDocument.class));
+            verify(documentRepository).save(any(RestaurantApplicationDocument.class));
         }
     }
 
@@ -429,7 +517,7 @@ class RestaurantApplicationServiceImplTest {
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(completeApp));
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            ApplicationResponse response = service.submitApplication(appId, ownerId);
+            RestaurantApplicationResponse response = service.submitApplication(appId, ownerId);
 
             assertThat(response.status()).isEqualTo(ApplicationStatus.SUBMITTED);
 
@@ -499,7 +587,7 @@ class RestaurantApplicationServiceImplTest {
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            ApplicationResponse response = service.reopenApplication(appId, ownerId);
+            RestaurantApplicationResponse response = service.reopenApplication(appId, ownerId);
 
             assertThat(response.status()).isEqualTo(ApplicationStatus.DRAFT);
             assertThat(response.rejectionRemarks()).isNull();
@@ -572,14 +660,13 @@ class RestaurantApplicationServiceImplTest {
         }
 
         @Test
-        @DisplayName("throws ApplicationStateException when application is already APPROVED")
+        @DisplayName("throws BadRequestException when application is already APPROVED")
         void throwsWhenAlreadyApproved() {
             completeApp.setStatus(ApplicationStatus.APPROVED);
             when(applicationRepository.findById(appId)).thenReturn(Optional.of(completeApp));
 
             assertThatThrownBy(() -> service.rejectApplication(appId, adminId, "remarks"))
-                    .isInstanceOf(ApplicationStateException.class)
-                    .hasMessageContaining("SUBMITTED or UNDER_REVIEW");
+                    .isInstanceOf(BadRequestException.class);
 
             verify(eventPublisher, never()).publishEvent(any());
         }
@@ -681,18 +768,18 @@ class RestaurantApplicationServiceImplTest {
         @DisplayName("migrates hours, images and documents from application to restaurant")
         void migratesAllCollections() {
             // Set up collections on the application
-            ApplicationHours h = new ApplicationHours();
+            RestaurantApplicationHours h = new RestaurantApplicationHours();
             h.setDayOfWeek(DayOfWeek.MONDAY);
             h.setOpenTime(LocalTime.of(9, 0));
             h.setCloseTime(LocalTime.of(22, 0));
             completeApp.getHours().add(h);
 
-            ApplicationImage img = new ApplicationImage();
+            RestaurantApplicationImage img = new RestaurantApplicationImage();
             img.setImageUrl("https://s3/img.jpg");
             img.setDisplayOrder(0);
             completeApp.getImages().add(img);
 
-            ApplicationDocument doc = new ApplicationDocument();
+            RestaurantApplicationDocument doc = new RestaurantApplicationDocument();
             doc.setType(RestaurantDocumentType.FSSAI_LICENSE);
             doc.setUrl("https://s3/fssai.pdf");
             completeApp.getDocuments().add(doc);

@@ -66,6 +66,7 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     private final RestaurantRepository restaurantRepository;
     private final OrderCreationService orderCreationService;
     private final PaymentService paymentService;
+    private final com.quickbite.quickbite.delivery.service.DeliveryService deliveryService;
     private final ApplicationEventPublisher eventPublisher;
 
     public OrderServiceImpl(
@@ -75,6 +76,7 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
             RestaurantRepository restaurantRepository,
             OrderCreationService orderCreationService,
             PaymentService paymentService,
+            com.quickbite.quickbite.delivery.service.DeliveryService deliveryService,
             ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
@@ -82,6 +84,7 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
         this.restaurantRepository = restaurantRepository;
         this.orderCreationService = orderCreationService;
         this.paymentService = paymentService;
+        this.deliveryService = deliveryService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -225,8 +228,9 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     @Transactional
     public OrderResponse markReadyForPickup(UUID orderId, UUID restaurantId, UUID ownerId) {
         Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
-        return OrderResponse.from(
-                transition(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP));
+        Order updated = transition(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP);
+        deliveryService.autoAssign(updated);
+        return OrderResponse.from(updated);
     }
 
     // ──────────────────────────────────────────────────────────────────────────

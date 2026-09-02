@@ -80,8 +80,4 @@ public class Restaurant extends Base {
     @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true)
     @NotAudited
     private List<RestaurantDocument> documents;
-
-    @OneToMany(mappedBy = "restaurant")
-    @NotAudited
-    private List<RestaurantVerificationStatusHistory> statusHistory;
 }

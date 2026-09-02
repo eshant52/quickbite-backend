@@ -52,4 +52,12 @@ public record CursorPage<T>(
         UUID nextCursor = hasMore ? idExtractor.apply(content.getLast()) : null;
         return new CursorPage<>(content, nextCursor, hasMore, content.size());
     }
+
+    /**
+     * Maps the items of this page using the given mapper function.
+     */
+    public <R> CursorPage<R> map(Function<T, R> mapper) {
+        List<R> mappedContent = this.content.stream().map(mapper).toList();
+        return new CursorPage<>(mappedContent, this.nextCursor, this.hasMore, this.size);
+    }
 }

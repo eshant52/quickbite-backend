@@ -3,9 +3,6 @@ package com.quickbite.quickbite.auth.service;
 import com.quickbite.quickbite.auth.dto.*;
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
 import com.quickbite.quickbite.auth.service.token.AccessTokenService;
-import com.quickbite.quickbite.delivery.model.DeliveryAgent;
-import com.quickbite.quickbite.delivery.model.DeliveryAgentVerificationStatus;
-import com.quickbite.quickbite.delivery.repository.DeliveryAgentRepository;
 import com.quickbite.quickbite.user.dto.UserResponseDto;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.model.UserRole;
@@ -22,7 +19,6 @@ import java.util.UUID;
 @Transactional
 public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
-    private final DeliveryAgentRepository deliveryAgentRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccessTokenService accessTokenService;
     private final SessionService sessionService;
@@ -30,12 +26,10 @@ public class AuthServiceImpl implements AuthService {
 
     public AuthServiceImpl(
             UserRepository userRepository,
-            DeliveryAgentRepository deliveryAgentRepository,
             PasswordEncoder passwordEncoder,
             AccessTokenService accessTokenService,
             SessionService sessionService) {
         this.userRepository = userRepository;
-        this.deliveryAgentRepository = deliveryAgentRepository;
         this.passwordEncoder = passwordEncoder;
         this.accessTokenService = accessTokenService;
         this.sessionService = sessionService;
@@ -69,17 +63,7 @@ public class AuthServiceImpl implements AuthService {
         user.setRole(UserRole.DELIVERY_AGENT);
         user.setActive(false);
 
-        User savedUser = userRepository.save(user);
-
-        // Create a DeliveryAgent entity and associate it with the saved user
-        DeliveryAgent agent = new DeliveryAgent();
-        agent.setUser(savedUser);
-        agent.setAvailable(false);
-        agent.setCurrentStatus(DeliveryAgentVerificationStatus.PENDING);
-
-        deliveryAgentRepository.save(agent);
-
-        return UserResponseDto.toDto(savedUser);
+        return UserResponseDto.toDto(userRepository.save(user));
     }
 
 

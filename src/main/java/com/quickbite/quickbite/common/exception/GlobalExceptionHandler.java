@@ -140,6 +140,22 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(com.quickbite.quickbite.delivery.exception.DeliveryAgentNotFoundException.class)
+    public ProblemDetail handleDeliveryAgentNotFoundException(com.quickbite.quickbite.delivery.exception.DeliveryAgentNotFoundException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problemDetail.setTitle("Delivery Agent Not Found");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(com.quickbite.quickbite.delivery.exception.NoAvailableDeliveryAgentException.class)
+    public ProblemDetail handleNoAvailableDeliveryAgentException(com.quickbite.quickbite.delivery.exception.NoAvailableDeliveryAgentException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE);
+        problemDetail.setTitle("No Delivery Agent Available");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
     @ExceptionHandler(com.quickbite.quickbite.allotment.exception.AllotmentAlreadyClaimedException.class)
     public ProblemDetail handleAllotmentAlreadyClaimedException(com.quickbite.quickbite.allotment.exception.AllotmentAlreadyClaimedException ex) {
         ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
@@ -152,6 +168,30 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleAllotmentAlreadyExistsException(com.quickbite.quickbite.allotment.exception.AllotmentAlreadyExistsException ex) {
         ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
         problemDetail.setTitle("Allotment Already Exists");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(com.quickbite.quickbite.review.exception.ReviewNotFoundException.class)
+    public ProblemDetail handleReviewNotFoundException(com.quickbite.quickbite.review.exception.ReviewNotFoundException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problemDetail.setTitle("Review Not Found");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(com.quickbite.quickbite.review.exception.DuplicateReviewException.class)
+    public ProblemDetail handleDuplicateReviewException(com.quickbite.quickbite.review.exception.DuplicateReviewException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problemDetail.setTitle("Duplicate Review");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(com.quickbite.quickbite.review.exception.InvalidReviewException.class)
+    public ProblemDetail handleInvalidReviewException(com.quickbite.quickbite.review.exception.InvalidReviewException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problemDetail.setTitle("Invalid Review Request");
         problemDetail.setDetail(ex.getMessage());
         return problemDetail;
     }

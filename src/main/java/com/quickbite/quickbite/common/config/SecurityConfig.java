@@ -55,7 +55,9 @@ public class SecurityConfig {
                                 "/api/v1/restaurants",
                                 "/api/v1/restaurants/*",
                                 "/api/v1/restaurants/*/menu-items",
-                                "/api/v1/restaurants/*/menu-items/**"
+                                "/api/v1/restaurants/*/menu-items/**",
+                                "/api/v1/restaurants/*/reviews",
+                                "/api/v1/restaurants/*/reviews/**"
                         ).permitAll()
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers(
@@ -66,7 +68,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/customer/**").hasRole("CUSTOMER")
                         .requestMatchers("/api/v1/restaurant/**").hasRole("RESTAURANT_OWNER")
-                        .requestMatchers("/api/v1/delivery-partner/**").hasRole("DELIVERY_AGENT")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/delivery-agent/register").hasAuthority("SCOPE_API")
+                        .requestMatchers(
+                                "/api/v1/delivery-partner/**",
+                                "/api/v1/delivery-agent/**"
+                        ).hasRole("DELIVERY_AGENT")
                         .anyRequest().hasAuthority("SCOPE_API"))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))

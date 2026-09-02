@@ -16,16 +16,22 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "vehicles")
 public class Vehicle extends Base {
+
+    @NotBlank(message = "VIN / Chassis number is required")
+    @Size(min = 6, max = 30, message = "VIN / Chassis number must be between 6 and 30 characters")
+    @Column(name = "vin_number", length = 30, nullable = false, unique = true)
+    private String vinNumber;
+
+    @NotBlank(message = "Number plate is required")
+    @Size(min = 3, max = 20, message = "Number plate must be between 3 and 20 characters")
+    @Column(length = 20, nullable = false)
+    private String numberPlate;
+
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     @JdbcTypeCode(SqlTypes.ENUM)
     @Column(columnDefinition = "vehicle_type", nullable = false)
     private VehicleType vehicleType;
-
-    @NotBlank(message = "Number plate is required")
-    @Size(min = 3, max = 20, message = "Number plate must be between 3 and 20 characters")
-    @Column(length = 20, unique = true, nullable = false)
-    private String numberPlate;
 
     @NotBlank(message = "Brand is required")
     @Size(max = 50, message = "Brand must be at most 50 characters")

@@ -85,44 +85,100 @@ public class KafkaConfig {
     // 1. Order Stream
     @Bean
     public NewTopic orderEventsTopic() {
-        return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS).partitions(3).replicas(1).build();
+        return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS)
+                .partitions(3)
+                .replicas(1)
+                .build();
     }
 
     @Bean
     public NewTopic orderEventsDltTopic() {
-        return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS + QuickBiteTopics.DLT_SUFFIX).partitions(1).replicas(1).build();
+        return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS + QuickBiteTopics.DLT_SUFFIX)
+                .partitions(1)
+                .replicas(1)
+                .build();
     }
 
     // 2. Restaurant Application Stream
     @Bean
     public NewTopic restaurantApplicationEventsTopic() {
-        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS).partitions(3).replicas(1).build();
+        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS)
+                .partitions(3)
+                .replicas(1)
+                .build();
     }
 
     @Bean
     public NewTopic restaurantApplicationEventsDltTopic() {
-        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX).partitions(1).replicas(1).build();
+        return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX)
+                .partitions(1)
+                .replicas(1)
+                .build();
     }
 
     // 3. Cuisine Stream
     @Bean
     public NewTopic cuisineEventsTopic() {
-        return TopicBuilder.name(QuickBiteTopics.CUISINE_EVENTS).partitions(3).replicas(1).build();
+        return TopicBuilder.name(QuickBiteTopics.CUISINE_EVENTS)
+                .partitions(3)
+                .replicas(1)
+                .build();
     }
 
     @Bean
     public NewTopic cuisineEventsDltTopic() {
-        return TopicBuilder.name(QuickBiteTopics.CUISINE_EVENTS + QuickBiteTopics.DLT_SUFFIX).partitions(1).replicas(1).build();
+        return TopicBuilder.name(QuickBiteTopics.CUISINE_EVENTS + QuickBiteTopics.DLT_SUFFIX)
+                .partitions(1)
+                .replicas(1)
+                .build();
     }
 
     // 4. Payment Stream
     @Bean
     public NewTopic paymentEventsTopic() {
-        return TopicBuilder.name(QuickBiteTopics.PAYMENT_EVENTS).partitions(3).replicas(1).build();
+        return TopicBuilder.name(QuickBiteTopics.PAYMENT_EVENTS)
+                .partitions(3)
+                .replicas(1)
+                .build();
     }
 
     @Bean
     public NewTopic paymentEventsDltTopic() {
-        return TopicBuilder.name(QuickBiteTopics.PAYMENT_EVENTS + QuickBiteTopics.DLT_SUFFIX).partitions(1).replicas(1).build();
+        return TopicBuilder.name(QuickBiteTopics.PAYMENT_EVENTS + QuickBiteTopics.DLT_SUFFIX)
+                .partitions(1)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic deliveryAgentApplicationEventsTopic() {
+        return TopicBuilder.name(QuickBiteTopics.DELIVERY_AGENT_APPLICATION_EVENTS)
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic deliveryAgentApplicationEventsDltTopic() {
+        return TopicBuilder.name(QuickBiteTopics.DELIVERY_AGENT_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX)
+                .partitions(1)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic vehicleApplicationEventsTopic() {
+        return TopicBuilder.name(QuickBiteTopics.VEHICLE_APPLICATION_EVENTS)
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic vehicleApplicationEventsDltTopic() {
+        return TopicBuilder.name(QuickBiteTopics.VEHICLE_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX)
+                .partitions(1)
+                .replicas(1)
+                .build();
     }
 }

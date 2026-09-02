@@ -4,8 +4,6 @@ import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.vehicle.model.Vehicle;
 import com.quickbite.quickbite.vehicle.model.VehicleOwnership;
-import com.quickbite.quickbite.delivery.model.DeliveryAgentDocument;
-import com.quickbite.quickbite.delivery.model.DeliveryAgentVerificationHistory;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -55,8 +53,4 @@ public class DeliveryAgent extends Base {
     @OneToMany(mappedBy = "deliveryAgent")
     @NotAudited
     private List<DeliveryAgentDocument> documents;
-
-    @OneToMany(mappedBy = "deliveryAgent")
-    @NotAudited
-    private List<DeliveryAgentVerificationHistory> verificationHistory;
 }

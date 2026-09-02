@@ -1,7 +1,7 @@
 package com.quickbite.quickbite.onboarding.repository;
 
 import com.quickbite.quickbite.onboarding.model.ApplicationStatus;
-import com.quickbite.quickbite.onboarding.model.RestaurantApplication;
+import com.quickbite.quickbite.onboarding.model.restaurant.RestaurantApplication;
 import com.quickbite.quickbite.user.model.User;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;

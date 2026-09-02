@@ -3,10 +3,10 @@ package com.quickbite.quickbite.onboarding.controller;
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.onboarding.dto.AdminRejectRequest;
-import com.quickbite.quickbite.onboarding.dto.ApplicationResponse;
-import com.quickbite.quickbite.onboarding.dto.ApplicationSummaryResponse;
+import com.quickbite.quickbite.onboarding.dto.restaurant.RestaurantApplicationResponse;
+import com.quickbite.quickbite.onboarding.dto.restaurant.RestaurantApplicationSummaryResponse;
 import com.quickbite.quickbite.onboarding.model.ApplicationStatus;
-import com.quickbite.quickbite.onboarding.service.RestaurantApplicationService;
+import com.quickbite.quickbite.onboarding.service.restaurant.AdminRestaurantApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,10 +25,10 @@ import java.util.UUID;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminRestaurantApplicationController {
 
-    private final RestaurantApplicationService applicationService;
+    private final AdminRestaurantApplicationService applicationService;
     private final AuthenticatedSessionResolver sessionResolver;
 
-    public AdminRestaurantApplicationController(RestaurantApplicationService applicationService,
+    public AdminRestaurantApplicationController(AdminRestaurantApplicationService applicationService,
                                                 AuthenticatedSessionResolver sessionResolver) {
         this.applicationService = applicationService;
         this.sessionResolver = sessionResolver;
@@ -47,7 +47,7 @@ public class AdminRestaurantApplicationController {
      * Results are ordered by application ID (= creation time, since IDs are UUIDv7).
      */
     @GetMapping
-    public ResponseEntity<CursorPage<ApplicationSummaryResponse>> listApplications(
+    public ResponseEntity<CursorPage<RestaurantApplicationSummaryResponse>> listApplications(
             @RequestParam(defaultValue = "SUBMITTED") ApplicationStatus status,
             @RequestParam(required = false) UUID cursor,
             @RequestParam(defaultValue = "20") int size) {
@@ -56,7 +56,7 @@ public class AdminRestaurantApplicationController {
 
     /** Get the full detail of any application regardless of status. */
     @GetMapping("/{id}")
-    public ResponseEntity<ApplicationResponse> getApplication(@PathVariable UUID id) {
+    public ResponseEntity<RestaurantApplicationResponse> getApplication(@PathVariable UUID id) {
         return ResponseEntity.ok(applicationService.getApplicationAsAdmin(id));
     }
 
