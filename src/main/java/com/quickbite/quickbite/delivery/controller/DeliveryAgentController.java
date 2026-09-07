@@ -2,6 +2,7 @@ package com.quickbite.quickbite.delivery.controller;
 
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.delivery.dto.DeliveryAgentResponse;
+import com.quickbite.quickbite.delivery.dto.UpdateAvailabilityRequest;
 import com.quickbite.quickbite.delivery.dto.UpdateLocationRequest;
 import com.quickbite.quickbite.delivery.service.DeliveryService;
 import com.quickbite.quickbite.order.dto.OrderResponse;
@@ -36,6 +37,15 @@ public class DeliveryAgentController {
     ) {
         UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
         return ResponseEntity.ok(deliveryService.getMyProfile(userId));
+    }
+
+    @PatchMapping("/availability")
+    public ResponseEntity<DeliveryAgentResponse> updateAvailability(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody @Valid UpdateAvailabilityRequest request
+    ) {
+        UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
+        return ResponseEntity.ok(deliveryService.updateAvailability(userId, request.available()));
     }
 
     @PutMapping("/location")

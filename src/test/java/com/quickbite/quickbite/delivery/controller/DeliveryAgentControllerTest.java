@@ -2,6 +2,7 @@ package com.quickbite.quickbite.delivery.controller;
 
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.delivery.dto.DeliveryAgentResponse;
+import com.quickbite.quickbite.delivery.dto.UpdateAvailabilityRequest;
 import com.quickbite.quickbite.delivery.dto.UpdateLocationRequest;
 import com.quickbite.quickbite.delivery.model.DeliveryAgentVerificationStatus;
 import com.quickbite.quickbite.delivery.service.DeliveryService;
@@ -91,6 +92,20 @@ class DeliveryAgentControllerTest {
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(res.getBody()).isEqualTo(mockAgentResponse);
+    }
+
+    @Test
+    @DisplayName("updateAvailability updates duty status")
+    void updateAvailability_success() {
+        UpdateAvailabilityRequest req = new UpdateAvailabilityRequest(true);
+        when(authenticatedSessionResolver.userIdFromJwt(jwt)).thenReturn(userId);
+        when(deliveryService.updateAvailability(userId, true)).thenReturn(mockAgentResponse);
+
+        ResponseEntity<DeliveryAgentResponse> res = deliveryAgentController.updateAvailability(jwt, req);
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody()).isEqualTo(mockAgentResponse);
+        verify(deliveryService).updateAvailability(userId, true);
     }
 
     @Test

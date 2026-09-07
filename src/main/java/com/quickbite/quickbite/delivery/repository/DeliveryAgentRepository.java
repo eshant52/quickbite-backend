@@ -25,9 +25,10 @@ public interface DeliveryAgentRepository extends JpaRepository<DeliveryAgent, UU
     @Query(value = """
             SELECT da.* FROM delivery_agents da
             WHERE da.is_available = true
+              AND da.is_assigned = false
               AND da.current_status = 'APPROVED'
               AND da.last_location IS NOT NULL
-            ORDER BY ST_Distance(da.last_location, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)) ASC
+            ORDER BY da.last_location <-> ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
             LIMIT :limit
             """, nativeQuery = true)
     List<DeliveryAgent> findNearestAvailableAgents(

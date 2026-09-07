@@ -14,6 +14,7 @@ public interface DeliveryService {
     // Agent Self-Service
     DeliveryAgentResponse getMyProfile(UUID userId);
     DeliveryAgentResponse updateLocation(UUID userId, UpdateLocationRequest req);
+    DeliveryAgentResponse updateAvailability(UUID userId, boolean available);
 
     // System Assignment
     void autoAssign(Order order);
@@ -21,9 +22,4 @@ public interface DeliveryService {
     // Agent Order Lifecycle
     OrderResponse markOutForDelivery(UUID orderId, UUID agentUserId);
     OrderResponse markDelivered(UUID orderId, UUID agentUserId);
-
-    // Admin Operations
-    DeliveryAgentResponse approveAgent(UUID agentId, UUID adminId);
-    DeliveryAgentResponse rejectAgent(UUID agentId, UUID adminId, String remarks);
-    CursorPage<DeliveryAgentResponse> listAgentsByStatus(DeliveryAgentVerificationStatus status, UUID cursor, int size);
 }

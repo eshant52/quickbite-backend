@@ -2,10 +2,10 @@ package com.quickbite.quickbite.delivery.controller;
 
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.common.dto.CursorPage;
-import com.quickbite.quickbite.delivery.dto.AdminRejectDeliveryAgentRequest;
+import com.quickbite.quickbite.delivery.dto.AdminSuspendDeliveryAgentRequest;
 import com.quickbite.quickbite.delivery.dto.DeliveryAgentResponse;
 import com.quickbite.quickbite.delivery.model.DeliveryAgentVerificationStatus;
-import com.quickbite.quickbite.delivery.service.DeliveryService;
+import com.quickbite.quickbite.delivery.service.AdminDeliveryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.when;
 class AdminDeliveryControllerTest {
 
     @Mock
-    private DeliveryService deliveryService;
+    private AdminDeliveryService adminDeliveryService;
 
     @Mock
     private AuthenticatedSessionResolver authenticatedSessionResolver;
@@ -56,6 +56,7 @@ class AdminDeliveryControllerTest {
                 "bob@delivery.com",
                 "9876543210",
                 false,
+                false,
                 DeliveryAgentVerificationStatus.APPROVED,
                 null,
                 null,
@@ -67,7 +68,7 @@ class AdminDeliveryControllerTest {
     @DisplayName("listAgents returns paginated list of delivery agents")
     void listAgents_success() {
         CursorPage<DeliveryAgentResponse> page = CursorPage.of(List.of(mockAgentResponse), 20, DeliveryAgentResponse::id);
-        when(deliveryService.listAgentsByStatus(DeliveryAgentVerificationStatus.PENDING, null, 20)).thenReturn(page);
+        when(adminDeliveryService.listAgentsByStatus(DeliveryAgentVerificationStatus.PENDING, null, 20)).thenReturn(page);
 
         ResponseEntity<CursorPage<DeliveryAgentResponse>> res = adminDeliveryController.listAgents(
                 DeliveryAgentVerificationStatus.PENDING, null, 20);
@@ -77,27 +78,27 @@ class AdminDeliveryControllerTest {
     }
 
     @Test
-    @DisplayName("approveAgent approves agent and returns 200 OK")
-    void approveAgent_success() {
+    @DisplayName("suspendAgent suspends agent with reason and returns 200 OK")
+    void suspendAgent_success() {
+        AdminSuspendDeliveryAgentRequest req = new AdminSuspendDeliveryAgentRequest("Multiple policy violations");
         when(authenticatedSessionResolver.userIdFromJwt(jwt)).thenReturn(adminId);
-        when(deliveryService.approveAgent(agentId, adminId)).thenReturn(mockAgentResponse);
+        when(adminDeliveryService.suspendAgent(agentId, adminId, "Multiple policy violations")).thenReturn(mockAgentResponse);
 
-        ResponseEntity<DeliveryAgentResponse> res = adminDeliveryController.approveAgent(jwt, agentId);
+        ResponseEntity<DeliveryAgentResponse> res = adminDeliveryController.suspendAgent(jwt, agentId, req);
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(deliveryService).approveAgent(agentId, adminId);
+        verify(adminDeliveryService).suspendAgent(agentId, adminId, "Multiple policy violations");
     }
 
     @Test
-    @DisplayName("rejectAgent rejects agent with remarks and returns 200 OK")
-    void rejectAgent_success() {
-        AdminRejectDeliveryAgentRequest req = new AdminRejectDeliveryAgentRequest("Incomplete KYC");
+    @DisplayName("reinstateAgent reinstates agent and returns 200 OK")
+    void reinstateAgent_success() {
         when(authenticatedSessionResolver.userIdFromJwt(jwt)).thenReturn(adminId);
-        when(deliveryService.rejectAgent(agentId, adminId, "Incomplete KYC")).thenReturn(mockAgentResponse);
+        when(adminDeliveryService.reinstateAgent(agentId, adminId)).thenReturn(mockAgentResponse);
 
-        ResponseEntity<DeliveryAgentResponse> res = adminDeliveryController.rejectAgent(jwt, agentId, req);
+        ResponseEntity<DeliveryAgentResponse> res = adminDeliveryController.reinstateAgent(jwt, agentId);
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(deliveryService).rejectAgent(agentId, adminId, "Incomplete KYC");
+        verify(adminDeliveryService).reinstateAgent(agentId, adminId);
     }
 }

@@ -16,6 +16,7 @@ import org.hibernate.envers.Audited;
 import org.hibernate.envers.NotAudited;
 import org.hibernate.envers.RelationTargetAuditMode;
 
+import java.time.Instant;
 import java.util.List;
 
 @Getter
@@ -33,8 +34,19 @@ public class DeliveryAgent extends Base {
     @JoinColumn(nullable = true)
     private Vehicle currentVehicle;
 
+    /**
+     * Driver-controlled shift/duty status.
+     * true = online and ready to accept deliveries; false = off-duty, on break, or on leave.
+     */
     @Column(nullable = false)
     private boolean isAvailable;
+
+    /**
+     * System-controlled order assignment status.
+     * true = currently carrying an active in-flight delivery; false = idle and ready for dispatch.
+     */
+    @Column(nullable = false)
+    private boolean isAssigned;
 
     @Column(columnDefinition = "GEOMETRY(POINT, 4326)")
     @JdbcTypeCode(SqlTypes.GEOMETRY)
@@ -45,6 +57,9 @@ public class DeliveryAgent extends Base {
     @JdbcTypeCode(SqlTypes.ENUM)
     @Column(columnDefinition = "delivery_agent_verification_status", nullable = false)
     private DeliveryAgentVerificationStatus currentStatus;
+
+    @Column
+    private Instant lastAssignedAt;
 
     @OneToMany(mappedBy = "owner")
     @NotAudited
