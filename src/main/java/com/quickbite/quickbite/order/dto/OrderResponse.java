@@ -20,8 +20,31 @@ public record OrderResponse(
         BigDecimal tipAmount,
         BigDecimal totalAmount,
         OrderStatus currentStatus,
+        /** Road-network distance in metres from restaurant to customer. */
+        Double deliveryDistanceMeters,
+        /** Estimated driving seconds from restaurant to customer. */
+        Long estimatedDeliverySeconds,
         Instant createdAt
-){
+) {
+    public OrderResponse(
+            UUID id,
+            UUID restaurantId,
+            String restaurantName,
+            String deliveryAddress,
+            List<OrderItemResponse> items,
+            BigDecimal subtotal,
+            BigDecimal deliveryFee,
+            BigDecimal taxAmount,
+            BigDecimal tipAmount,
+            BigDecimal totalAmount,
+            OrderStatus currentStatus,
+            Instant createdAt
+    ) {
+        this(id, restaurantId, restaurantName, deliveryAddress, items,
+                subtotal, deliveryFee, taxAmount, tipAmount, totalAmount,
+                currentStatus, null, null, createdAt);
+    }
+
     public static OrderResponse from(Order order) {
         return new OrderResponse(
                 order.getId(),
@@ -37,6 +60,8 @@ public record OrderResponse(
                 order.getTipAmount(),
                 order.getTotalAmount(),
                 order.getCurrentStatus(),
+                order.getDeliveryDistanceMeters(),
+                order.getEstimatedDeliverySeconds(),
                 order.getCreatedAt()
         );
     }

@@ -4,6 +4,7 @@ import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.common.event.order.OrderCancelledEvent;
 import com.quickbite.quickbite.common.event.order.OrderStatusChangedEvent;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
+import com.quickbite.quickbite.delivery.service.DeliveryService;
 import com.quickbite.quickbite.order.dto.OrderResponse;
 import com.quickbite.quickbite.order.dto.OrderSummaryResponse;
 import com.quickbite.quickbite.order.dto.PlaceOrderRequest;
@@ -66,7 +67,7 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     private final RestaurantRepository restaurantRepository;
     private final OrderCreationService orderCreationService;
     private final PaymentService paymentService;
-    private final com.quickbite.quickbite.delivery.service.DeliveryService deliveryService;
+    private final DeliveryService deliveryService;
     private final ApplicationEventPublisher eventPublisher;
 
     public OrderServiceImpl(
@@ -76,7 +77,7 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
             RestaurantRepository restaurantRepository,
             OrderCreationService orderCreationService,
             PaymentService paymentService,
-            com.quickbite.quickbite.delivery.service.DeliveryService deliveryService,
+            DeliveryService deliveryService,
             ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;

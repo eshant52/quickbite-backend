@@ -97,4 +97,12 @@ public class Order extends Base {
     @OneToMany(mappedBy = "order")
     @NotAudited
     private List<OrderStatusHistory> statusHistory;
+
+    /** Road-network delivery distance in metres, resolved at order creation. */
+    @Column
+    private Double deliveryDistanceMeters;
+
+    /** Estimated driving duration from restaurant to customer in seconds. */
+    @Column
+    private Long estimatedDeliverySeconds;
 }
