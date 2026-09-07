@@ -2,6 +2,7 @@ package com.quickbite.quickbite.restaurant.service;
 
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.common.exception.BadRequestException;
+import com.quickbite.quickbite.common.routing.adapter.HaversineFallbackAdapter;
 import com.quickbite.quickbite.restaurant.dto.*;
 import com.quickbite.quickbite.restaurant.exception.RestaurantNotFoundException;
 import com.quickbite.quickbite.restaurant.model.*;
@@ -19,7 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Limit;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -50,6 +50,9 @@ class RestaurantServiceImplTest {
 
     @Mock
     private RestaurantImageRepository restaurantImageRepository;
+
+    @org.mockito.Spy
+    private HaversineFallbackAdapter haversine = new HaversineFallbackAdapter();
 
     @InjectMocks
     private RestaurantServiceImpl restaurantService;
@@ -271,6 +274,19 @@ class RestaurantServiceImplTest {
 
             assertThatThrownBy(() -> restaurantService.getRestaurant(restaurantId))
                     .isInstanceOf(RestaurantNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("Returns nearby approved restaurants with distance")
+        void findNearbyRestaurants_success() {
+            when(restaurantRepository.findNearbyRestaurants(12.9716, 77.5946, 5000, 20, 0))
+                    .thenReturn(List.of(restaurant));
+
+            List<com.quickbite.quickbite.restaurant.dto.NearbyRestaurantResponse> results =
+                    restaurantService.findNearbyRestaurants(12.9716, 77.5946, 5000, 0, 20);
+
+            assertThat(results).hasSize(1);
+            assertThat(results.getFirst().id()).isEqualTo(restaurantId);
         }
     }
 }

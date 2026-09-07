@@ -42,4 +42,55 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
             @Param("cursor") UUID cursor,
             Limit limit
     );
+
+    /**
+     * Finds approved, open restaurants within a given radius of a customer location.
+     * Uses PostGIS {@code ST_DWithin} for radius filtering (uses spatial index)
+     * and {@code ST_Distance} for distance-based ordering.
+     *
+     * <p>{@code ST_DWithin} on geography uses metres as the unit.
+     */
+    @Query(value = """
+            SELECT r.* FROM restaurants r
+            JOIN addresses a ON a.id = r.address_id
+            WHERE r.current_status = 'APPROVED'
+              AND r.is_closed = false
+              AND ST_DWithin(
+                    a.location::geography,
+                    ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
+                    :radiusMeters
+                  )
+            ORDER BY ST_Distance(
+                         a.location::geography,
+                         ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
+                     ) ASC
+            LIMIT :limit OFFSET :offset
+            """, nativeQuery = true)
+    List<Restaurant> findNearbyRestaurants(
+            @Param("lat") double lat,
+            @Param("lng") double lng,
+            @Param("radiusMeters") int radiusMeters,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
+
+    /**
+     * Count of approved, open restaurants within radius — used for pagination metadata.
+     */
+    @Query(value = """
+            SELECT COUNT(*) FROM restaurants r
+            JOIN addresses a ON a.id = r.address_id
+            WHERE r.current_status = 'APPROVED'
+              AND r.is_closed = false
+              AND ST_DWithin(
+                    a.location::geography,
+                    ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
+                    :radiusMeters
+                  )
+            """, nativeQuery = true)
+    long countNearbyRestaurants(
+            @Param("lat") double lat,
+            @Param("lng") double lng,
+            @Param("radiusMeters") int radiusMeters
+    );
 }

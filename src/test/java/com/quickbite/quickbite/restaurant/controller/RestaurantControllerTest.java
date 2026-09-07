@@ -101,6 +101,25 @@ class RestaurantControllerTest {
     }
 
     @Test
+    @DisplayName("findNearbyRestaurants returns list of restaurants within radius")
+    void findNearbyRestaurants_success() {
+        com.quickbite.quickbite.restaurant.dto.NearbyRestaurantResponse nearby =
+                new com.quickbite.quickbite.restaurant.dto.NearbyRestaurantResponse(
+                        restaurantId, "Trattoria Mario", BigDecimal.valueOf(4.8), 100L,
+                        false, RestaurantVerificationStatus.APPROVED, Instant.now(), 1250.0
+                );
+        when(restaurantService.findNearbyRestaurants(12.9716, 77.5946, 5000, 0, 20))
+                .thenReturn(List.of(nearby));
+
+        ResponseEntity<List<com.quickbite.quickbite.restaurant.dto.NearbyRestaurantResponse>> res =
+                restaurantController.findNearbyRestaurants(12.9716, 77.5946, 5000, 0, 20);
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody()).hasSize(1);
+        assertThat(res.getBody().getFirst().distanceMeters()).isEqualTo(1250.0);
+    }
+
+    @Test
     @DisplayName("listMyRestaurants delegates to service with owner ID from JWT")
     void listMyRestaurants_success() {
         when(authenticatedSessionResolver.userIdFromJwt(jwt)).thenReturn(ownerId);

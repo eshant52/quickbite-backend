@@ -16,7 +16,15 @@ public interface RestaurantService {
     RestaurantResponse removeImage(UUID restaurantId, UUID ownerId, UUID imageId);
     RestaurantResponse toggleClosed(UUID restaurantId, UUID ownerId);
 
-    // public restaurant for catalog
+    // public restaurant catalog
     RestaurantResponse getRestaurant(UUID restaurantId);
     CursorPage<RestaurantSummaryResponse> listApproved(UUID cursor, int size);
+
+    /**
+     * Find approved, open restaurants within {@code radiusMeters} of the given coordinate,
+     * ordered by straight-line distance ascending.
+     * Uses PostGIS {@code ST_DWithin} + offset-based pagination.
+     */
+    List<NearbyRestaurantResponse> findNearbyRestaurants(double lat, double lng, int radiusMeters, int page, int size);
 }
+

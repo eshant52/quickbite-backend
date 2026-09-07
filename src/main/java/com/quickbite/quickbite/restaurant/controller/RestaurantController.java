@@ -42,6 +42,17 @@ public class RestaurantController {
         return ResponseEntity.ok(restaurantService.listApproved(cursor, size));
     }
 
+    @GetMapping("/nearby")
+    public ResponseEntity<List<NearbyRestaurantResponse>> findNearbyRestaurants(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "5000") int radius,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(restaurantService.findNearbyRestaurants(lat, lng, radius, page, size));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<RestaurantResponse> getRestaurant(
             @PathVariable UUID id

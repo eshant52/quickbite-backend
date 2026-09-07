@@ -3,6 +3,9 @@ package com.quickbite.quickbite.restaurant.service;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.common.exception.BadRequestException;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
+import com.quickbite.quickbite.common.routing.GeoPoint;
+import com.quickbite.quickbite.common.routing.adapter.HaversineFallbackAdapter;
+import com.quickbite.quickbite.restaurant.dto.NearbyRestaurantResponse;
 import com.quickbite.quickbite.restaurant.dto.RestaurantHoursRequest;
 import com.quickbite.quickbite.restaurant.dto.RestaurantResponse;
 import com.quickbite.quickbite.restaurant.dto.RestaurantSummaryResponse;
@@ -35,17 +38,20 @@ public class RestaurantServiceImpl implements RestaurantService {
     private final RestaurantRepository restaurantRepository;
     private final RestaurantHoursRepository restaurantHoursRepository;
     private final RestaurantImageRepository restaurantImageRepository;
+    private final HaversineFallbackAdapter haversine;
 
     public RestaurantServiceImpl(
             UserRepository userRepository,
             RestaurantRepository restaurantRepository,
             RestaurantHoursRepository restaurantHoursRepository,
-            RestaurantImageRepository restaurantImageRepository
+            RestaurantImageRepository restaurantImageRepository,
+            HaversineFallbackAdapter haversine
     ) {
         this.userRepository = userRepository;
         this.restaurantRepository = restaurantRepository;
         this.restaurantHoursRepository = restaurantHoursRepository;
         this.restaurantImageRepository = restaurantImageRepository;
+        this.haversine = haversine;
     }
 
     @Override
@@ -211,6 +217,33 @@ public class RestaurantServiceImpl implements RestaurantService {
                 pageSize,
                 RestaurantSummaryResponse::id
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<NearbyRestaurantResponse> findNearbyRestaurants(double lat, double lng,
+                                                                int radiusMeters, int page, int size) {
+        int pageSize   = Math.clamp(size, 1, 50);
+        int offset     = Math.max(0, page) * pageSize;
+        GeoPoint query = GeoPoint.of(lat, lng);
+
+        List<Restaurant> restaurants = restaurantRepository.findNearbyRestaurants(
+                lat, lng, radiusMeters, pageSize, offset
+        );
+
+        return restaurants.stream()
+                .map(r -> {
+                    double distMeters = 0.0;
+                    if (r.getAddress() != null && r.getAddress().getLocation() != null) {
+                        GeoPoint rLoc = GeoPoint.of(
+                                r.getAddress().getLocation().getY(),
+                                r.getAddress().getLocation().getX()
+                        );
+                        distMeters = HaversineFallbackAdapter.haversineMeters(query, rLoc);
+                    }
+                    return NearbyRestaurantResponse.from(r, distMeters);
+                })
+                .toList();
     }
 
     private User loadOwner(UUID ownerId) {
