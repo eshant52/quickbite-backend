@@ -1,6 +1,6 @@
 package com.quickbite.quickbite.common.storage;
 
-import com.quickbite.quickbite.common.config.StorageProperties;
+import com.quickbite.quickbite.common.config.property.StorageProperties;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;

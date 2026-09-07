@@ -1,9 +1,8 @@
 package com.quickbite.quickbite.auth.service;
 
-import com.quickbite.quickbite.common.config.AuthProperties;
+import com.quickbite.quickbite.common.config.property.AuthProperties;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.WebUtils;

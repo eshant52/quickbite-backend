@@ -1,5 +1,6 @@
 package com.quickbite.quickbite.common.config;
 
+import com.quickbite.quickbite.common.config.property.StorageProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.regions.Region;

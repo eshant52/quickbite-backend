@@ -1,5 +1,6 @@
 package com.quickbite.quickbite.common.config;
 
+import com.quickbite.quickbite.common.config.property.AuthProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -53,6 +54,7 @@ public class SecurityConfig {
                                 HttpMethod.GET,
                                 "/api/v1/cuisines",
                                 "/api/v1/restaurants",
+                                "/api/v1/restaurants/nearby",
                                 "/api/v1/restaurants/*",
                                 "/api/v1/restaurants/*/menu-items",
                                 "/api/v1/restaurants/*/menu-items/**",

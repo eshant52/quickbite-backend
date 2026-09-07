@@ -13,7 +13,7 @@ import com.quickbite.quickbite.auth.repository.RefreshTokenRepository;
 import com.quickbite.quickbite.auth.repository.SessionRepository;
 import com.quickbite.quickbite.auth.service.token.ChallengeTokenService;
 import com.quickbite.quickbite.auth.util.TokenUtils;
-import com.quickbite.quickbite.common.config.AuthProperties;
+import com.quickbite.quickbite.common.config.property.AuthProperties;
 import com.quickbite.quickbite.user.model.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

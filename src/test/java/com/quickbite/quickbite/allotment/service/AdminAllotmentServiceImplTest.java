@@ -8,7 +8,7 @@ import com.quickbite.quickbite.allotment.model.AllotmentReferenceType;
 import com.quickbite.quickbite.allotment.model.AllotmentStatus;
 import com.quickbite.quickbite.allotment.repository.AdminAllotmentRepository;
 import com.quickbite.quickbite.allotment.service.strategy.AdminSelectionStrategy;
-import com.quickbite.quickbite.common.config.AllotmentProperties;
+import com.quickbite.quickbite.common.config.property.AllotmentProperties;
 import com.quickbite.quickbite.common.exception.BadRequestException;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.repository.UserRepository;

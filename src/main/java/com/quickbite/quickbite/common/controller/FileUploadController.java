@@ -4,7 +4,7 @@ import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.common.dto.FileUploadUrlRequest;
 import com.quickbite.quickbite.common.dto.FileUploadUrlResponse;
 import com.quickbite.quickbite.common.dto.UploadContext;
-import com.quickbite.quickbite.common.config.StorageProperties;
+import com.quickbite.quickbite.common.config.property.StorageProperties;
 import com.quickbite.quickbite.common.storage.PresignedUploadResult;
 import com.quickbite.quickbite.common.storage.StorageService;
 import jakarta.validation.Valid;
