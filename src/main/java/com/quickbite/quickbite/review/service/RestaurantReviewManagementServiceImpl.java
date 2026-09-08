@@ -19,12 +19,12 @@ import java.util.UUID;
 
 @Service
 @Transactional
-public class AdminReviewServiceImpl implements AdminReviewService {
+public class RestaurantReviewManagementServiceImpl implements RestaurantReviewManagementService {
 
     private final ReviewRepository reviewRepository;
     private final RestaurantRepository restaurantRepository;
 
-    public AdminReviewServiceImpl(
+    public RestaurantReviewManagementServiceImpl(
             ReviewRepository reviewRepository,
             RestaurantRepository restaurantRepository
     ) {
@@ -34,8 +34,8 @@ public class AdminReviewServiceImpl implements AdminReviewService {
 
     @Override
     @Transactional(readOnly = true)
-    public CursorPage<ReviewResponse> listAllReviews(UUID restaurantId, UUID cursor, int size) {
-        int fetchSize = Math.max(1, Math.min(size, 50));
+    public CursorPage<ReviewResponse> listReviews(UUID restaurantId, UUID cursor, int size) {
+        int fetchSize = Math.clamp(size, 1, 50);
         List<Review> fetched = reviewRepository.findAllWithCursor(
                 restaurantId,
                 cursor,
@@ -47,14 +47,14 @@ public class AdminReviewServiceImpl implements AdminReviewService {
 
     @Override
     @Transactional(readOnly = true)
-    public ReviewResponse getReviewAsAdmin(UUID reviewId) {
+    public ReviewResponse getReview(UUID reviewId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new ReviewNotFoundException(reviewId));
         return ReviewResponse.from(review);
     }
 
     @Override
-    public void deleteReviewAsAdmin(UUID reviewId) {
+    public void deleteReview(UUID reviewId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new ReviewNotFoundException(reviewId));
 

@@ -30,7 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class AdminReviewServiceImplTest {
+class RestaurantReviewManagementServiceImplTest {
 
     @Mock
     private ReviewRepository reviewRepository;
@@ -39,7 +39,7 @@ class AdminReviewServiceImplTest {
     private RestaurantRepository restaurantRepository;
 
     @InjectMocks
-    private AdminReviewServiceImpl adminReviewService;
+    private RestaurantReviewManagementServiceImpl reviewManagementService;
 
     private User customer;
     private Restaurant restaurant;
@@ -74,46 +74,46 @@ class AdminReviewServiceImplTest {
     }
 
     @Test
-    @DisplayName("listAllReviews - returns cursor page of reviews")
-    void listAllReviews_Success() {
+    @DisplayName("listReviews - returns cursor page of reviews")
+    void listReviews_Success() {
         when(reviewRepository.findAllWithCursor(eq(restaurantId), eq(null), any(Limit.class)))
                 .thenReturn(List.of(review));
 
-        CursorPage<ReviewResponse> page = adminReviewService.listAllReviews(restaurantId, null, 20);
+        CursorPage<ReviewResponse> page = reviewManagementService.listReviews(restaurantId, null, 20);
 
         assertThat(page.content()).hasSize(1);
         assertThat(page.content().getFirst().restaurantName()).isEqualTo("Pasta Palace");
     }
 
     @Test
-    @DisplayName("getReviewAsAdmin - returns review details")
-    void getReviewAsAdmin_Success() {
+    @DisplayName("getReview - returns review details")
+    void getReview_Success() {
         when(reviewRepository.findById(reviewId)).thenReturn(Optional.of(review));
 
-        ReviewResponse response = adminReviewService.getReviewAsAdmin(reviewId);
+        ReviewResponse response = reviewManagementService.getReview(reviewId);
 
         assertThat(response.id()).isEqualTo(reviewId);
         assertThat(response.comment()).isEqualTo("Delicious pasta!");
     }
 
     @Test
-    @DisplayName("getReviewAsAdmin - throws 404 when not found")
-    void getReviewAsAdmin_NotFound() {
+    @DisplayName("getReview - throws 404 when not found")
+    void getReview_NotFound() {
         when(reviewRepository.findById(reviewId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> adminReviewService.getReviewAsAdmin(reviewId))
+        assertThatThrownBy(() -> reviewManagementService.getReview(reviewId))
                 .isInstanceOf(ReviewNotFoundException.class);
     }
 
     @Test
-    @DisplayName("deleteReviewAsAdmin - deletes review and updates restaurant rating aggregate")
-    void deleteReviewAsAdmin_Success() {
+    @DisplayName("deleteReview - deletes review and updates restaurant rating aggregate")
+    void deleteReview_Success() {
         when(reviewRepository.findById(reviewId)).thenReturn(Optional.of(review));
         when(restaurantRepository.findById(restaurantId)).thenReturn(Optional.of(restaurant));
         when(reviewRepository.getAverageRatingForRestaurant(restaurantId)).thenReturn(4.20);
         when(reviewRepository.countByRestaurantId(restaurantId)).thenReturn(8L);
 
-        adminReviewService.deleteReviewAsAdmin(reviewId);
+        reviewManagementService.deleteReview(reviewId);
 
         verify(reviewRepository).delete(review);
         verify(restaurantRepository).save(restaurant);

@@ -4,11 +4,9 @@ import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.order.model.Order;
 import com.quickbite.quickbite.order.model.OrderStatus;
 import com.quickbite.quickbite.order.repository.OrderRepository;
-import com.quickbite.quickbite.restaurant.exception.RestaurantNotFoundException;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
 import com.quickbite.quickbite.restaurant.repository.RestaurantRepository;
 import com.quickbite.quickbite.review.dto.CreateReviewRequest;
-import com.quickbite.quickbite.review.dto.RestaurantRatingSummaryResponse;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
 import com.quickbite.quickbite.review.dto.UpdateReviewRequest;
 import com.quickbite.quickbite.review.exception.DuplicateReviewException;
@@ -40,7 +38,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class ReviewServiceImplTest {
+class CustomerReviewServiceImplTest {
 
     @Mock
     private ReviewRepository reviewRepository;
@@ -55,7 +53,7 @@ class ReviewServiceImplTest {
     private UserRepository userRepository;
 
     @InjectMocks
-    private ReviewServiceImpl reviewService;
+    private CustomerReviewServiceImpl reviewService;
 
     private User customer;
     private Restaurant restaurant;
@@ -218,33 +216,6 @@ class ReviewServiceImplTest {
 
             assertThat(page.content()).hasSize(1);
             assertThat(page.hasMore()).isFalse();
-        }
-    }
-
-    @Nested
-    @DisplayName("getRestaurantReviews & rating summary")
-    class RestaurantReviewTests {
-
-        @Test
-        @DisplayName("Gets restaurant rating summary with star distribution")
-        void getRestaurantRatingSummary_Success() {
-            when(restaurantRepository.findById(restaurantId)).thenReturn(Optional.of(restaurant));
-            List<Object[]> distribution = List.<Object[]>of(
-                    new Object[]{5, 6L},
-                    new Object[]{4, 3L},
-                    new Object[]{1, 1L}
-            );
-            when(reviewRepository.getRatingDistributionForRestaurant(restaurantId)).thenReturn(distribution);
-
-            RestaurantRatingSummaryResponse summary = reviewService.getRestaurantRatingSummary(restaurantId);
-
-            assertThat(summary.restaurantId()).isEqualTo(restaurantId);
-            assertThat(summary.avgRating()).isEqualTo(BigDecimal.valueOf(4.00));
-            assertThat(summary.totalRating()).isEqualTo(10L);
-            assertThat(summary.ratingDistribution().get(5)).isEqualTo(6L);
-            assertThat(summary.ratingDistribution().get(4)).isEqualTo(3L);
-            assertThat(summary.ratingDistribution().get(3)).isEqualTo(0L);
-            assertThat(summary.ratingDistribution().get(1)).isEqualTo(1L);
         }
     }
 

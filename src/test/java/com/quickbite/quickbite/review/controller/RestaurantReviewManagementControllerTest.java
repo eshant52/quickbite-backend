@@ -2,7 +2,7 @@ package com.quickbite.quickbite.review.controller;
 
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
-import com.quickbite.quickbite.review.service.AdminReviewService;
+import com.quickbite.quickbite.review.service.RestaurantReviewManagementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,13 +22,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class AdminReviewControllerTest {
+class RestaurantReviewManagementControllerTest {
 
     @Mock
-    private AdminReviewService adminReviewService;
+    private RestaurantReviewManagementService reviewManagementService;
 
     @InjectMocks
-    private AdminReviewController controller;
+    private RestaurantReviewManagementController controller;
 
     private UUID reviewId;
     private UUID restaurantId;
@@ -54,34 +54,34 @@ class AdminReviewControllerTest {
     }
 
     @Test
-    @DisplayName("listAllReviews - returns HTTP 200 OK with CursorPage")
-    void listAllReviews_Success() {
+    @DisplayName("listReviews - returns HTTP 200 OK with CursorPage")
+    void listReviews_Success() {
         CursorPage<ReviewResponse> mockPage = new CursorPage<>(List.of(mockReview), null, false, 1);
-        when(adminReviewService.listAllReviews(restaurantId, null, 20)).thenReturn(mockPage);
+        when(reviewManagementService.listReviews(restaurantId, null, 20)).thenReturn(mockPage);
 
-        ResponseEntity<CursorPage<ReviewResponse>> response = controller.listAllReviews(restaurantId, null, 20);
+        ResponseEntity<CursorPage<ReviewResponse>> response = controller.listReviews(restaurantId, null, 20);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(mockPage);
     }
 
     @Test
-    @DisplayName("getReviewAsAdmin - returns HTTP 200 OK with ReviewResponse")
-    void getReviewAsAdmin_Success() {
-        when(adminReviewService.getReviewAsAdmin(reviewId)).thenReturn(mockReview);
+    @DisplayName("getReview - returns HTTP 200 OK with ReviewResponse")
+    void getReview_Success() {
+        when(reviewManagementService.getReview(reviewId)).thenReturn(mockReview);
 
-        ResponseEntity<ReviewResponse> response = controller.getReviewAsAdmin(reviewId);
+        ResponseEntity<ReviewResponse> response = controller.getReview(reviewId);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(mockReview);
     }
 
     @Test
-    @DisplayName("deleteReviewAsAdmin - returns HTTP 204 No Content")
-    void deleteReviewAsAdmin_Success() {
-        ResponseEntity<Void> response = controller.deleteReviewAsAdmin(reviewId);
+    @DisplayName("deleteReview - returns HTTP 204 No Content")
+    void deleteReview_Success() {
+        ResponseEntity<Void> response = controller.deleteReview(reviewId);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        verify(adminReviewService).deleteReviewAsAdmin(reviewId);
+        verify(reviewManagementService).deleteReview(reviewId);
     }
 }

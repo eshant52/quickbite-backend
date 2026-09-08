@@ -3,7 +3,7 @@ package com.quickbite.quickbite.review.controller;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.review.dto.RestaurantRatingSummaryResponse;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
-import com.quickbite.quickbite.review.service.ReviewService;
+import com.quickbite.quickbite.review.service.RestaurantReviewQueryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 class RestaurantReviewControllerTest {
 
     @Mock
-    private ReviewService reviewService;
+    private RestaurantReviewQueryService reviewService;
 
     @InjectMocks
     private RestaurantReviewController controller;

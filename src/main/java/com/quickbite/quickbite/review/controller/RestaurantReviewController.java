@@ -3,7 +3,7 @@ package com.quickbite.quickbite.review.controller;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.review.dto.RestaurantRatingSummaryResponse;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
-import com.quickbite.quickbite.review.service.ReviewService;
+import com.quickbite.quickbite.review.service.RestaurantReviewQueryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,10 +13,10 @@ import java.util.UUID;
 @RequestMapping("/api/v1/restaurants/{restaurantId}/reviews")
 public class RestaurantReviewController {
 
-    private final ReviewService reviewService;
+    private final RestaurantReviewQueryService restaurantReviewQueryService;
 
-    public RestaurantReviewController(ReviewService reviewService) {
-        this.reviewService = reviewService;
+    public RestaurantReviewController(RestaurantReviewQueryService restaurantReviewQueryService) {
+        this.restaurantReviewQueryService = restaurantReviewQueryService;
     }
 
     @GetMapping
@@ -25,13 +25,13 @@ public class RestaurantReviewController {
             @RequestParam(value = "cursor", required = false) UUID cursor,
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(reviewService.getRestaurantReviews(restaurantId, cursor, size));
+        return ResponseEntity.ok(restaurantReviewQueryService.getRestaurantReviews(restaurantId, cursor, size));
     }
 
     @GetMapping("/summary")
     public ResponseEntity<RestaurantRatingSummaryResponse> getRestaurantRatingSummary(
             @PathVariable UUID restaurantId
     ) {
-        return ResponseEntity.ok(reviewService.getRestaurantRatingSummary(restaurantId));
+        return ResponseEntity.ok(restaurantReviewQueryService.getRestaurantRatingSummary(restaurantId));
     }
 }

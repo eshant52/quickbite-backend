@@ -5,7 +5,7 @@ import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.review.dto.CreateReviewRequest;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
 import com.quickbite.quickbite.review.dto.UpdateReviewRequest;
-import com.quickbite.quickbite.review.service.ReviewService;
+import com.quickbite.quickbite.review.service.CustomerReviewService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.when;
 class CustomerReviewControllerTest {
 
     @Mock
-    private ReviewService reviewService;
+    private CustomerReviewService reviewService;
 
     @Mock
     private AuthenticatedSessionResolver authenticatedSessionResolver;

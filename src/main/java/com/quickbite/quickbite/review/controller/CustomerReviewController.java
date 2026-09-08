@@ -5,7 +5,7 @@ import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.review.dto.CreateReviewRequest;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
 import com.quickbite.quickbite.review.dto.UpdateReviewRequest;
-import com.quickbite.quickbite.review.service.ReviewService;
+import com.quickbite.quickbite.review.service.CustomerReviewService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,14 +21,14 @@ import java.util.UUID;
 @PreAuthorize("hasRole('CUSTOMER')")
 public class CustomerReviewController {
 
-    private final ReviewService reviewService;
+    private final CustomerReviewService customerReviewService;
     private final AuthenticatedSessionResolver authenticatedSessionResolver;
 
     public CustomerReviewController(
-            ReviewService reviewService,
+            CustomerReviewService customerReviewService,
             AuthenticatedSessionResolver authenticatedSessionResolver
     ) {
-        this.reviewService = reviewService;
+        this.customerReviewService = customerReviewService;
         this.authenticatedSessionResolver = authenticatedSessionResolver;
     }
 
@@ -39,7 +39,7 @@ public class CustomerReviewController {
     ) {
         UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(reviewService.submitReview(customerId, request));
+                .body(customerReviewService.submitReview(customerId, request));
     }
 
     @GetMapping
@@ -49,14 +49,14 @@ public class CustomerReviewController {
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
         UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(reviewService.getMyReviews(customerId, cursor, size));
+        return ResponseEntity.ok(customerReviewService.getMyReviews(customerId, cursor, size));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ReviewResponse> getReview(
             @PathVariable UUID id
     ) {
-        return ResponseEntity.ok(reviewService.getReview(id));
+        return ResponseEntity.ok(customerReviewService.getReview(id));
     }
 
     @PutMapping("/{id}")
@@ -66,7 +66,7 @@ public class CustomerReviewController {
             @RequestBody @Valid UpdateReviewRequest request
     ) {
         UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(reviewService.updateReview(id, customerId, request));
+        return ResponseEntity.ok(customerReviewService.updateReview(id, customerId, request));
     }
 
     @DeleteMapping("/{id}")
@@ -75,7 +75,7 @@ public class CustomerReviewController {
             @PathVariable UUID id
     ) {
         UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        reviewService.deleteReview(id, customerId);
+        customerReviewService.deleteReview(id, customerId);
         return ResponseEntity.noContent().build();
     }
 }
