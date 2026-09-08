@@ -3,8 +3,6 @@ package com.quickbite.quickbite.user.service;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
 import com.quickbite.quickbite.user.dto.AddressResponse;
 import com.quickbite.quickbite.user.dto.CreateAddressRequest;
-import com.quickbite.quickbite.user.dto.UpdateProfileRequest;
-import com.quickbite.quickbite.user.dto.UserProfileResponse;
 import com.quickbite.quickbite.user.model.Address;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.repository.AddressRepository;
@@ -21,47 +19,19 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-public class UserServiceImpl implements UserService {
+@Transactional
+public class UserAddressServiceImpl implements UserAddressService {
+
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
     private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
 
-    public UserServiceImpl(UserRepository userRepository, AddressRepository addressRepository) {
+    public UserAddressServiceImpl(UserRepository userRepository, AddressRepository addressRepository) {
         this.userRepository = userRepository;
         this.addressRepository = addressRepository;
     }
 
-
     @Override
-    @Transactional(readOnly = true)
-    public UserProfileResponse getProfile(UUID userId) {
-        User user = loadUser(userId);
-        return UserProfileResponse.from(user);
-    }
-
-    @Override
-    @Transactional
-    public UserProfileResponse updateProfile(UUID userId, UpdateProfileRequest req) {
-        User user = loadUser(userId);
-
-        if (!req.email().equalsIgnoreCase(user.getEmail())
-                && userRepository.existsByEmailIgnoreCase(req.email())) {
-            throw new ResourceNotFoundException("Email already in use");
-        }
-
-        if (!req.phoneNumber().equalsIgnoreCase(user.getPhoneNumber())
-                && userRepository.existsByPhoneNumber(req.phoneNumber())) {
-            throw new ResourceNotFoundException("Phone number already in use");
-        }
-
-        user.setName(req.name());
-        user.setPhoneNumber(req.phoneNumber());
-        user.setEmail(req.email());
-        return UserProfileResponse.from(userRepository.save(user));
-    }
-
-    @Override
-    @Transactional
     public AddressResponse addAddress(UUID userId, CreateAddressRequest req) {
         User user = loadUser(userId);
 
@@ -73,9 +43,8 @@ public class UserServiceImpl implements UserService {
 
         Address address = new Address();
 
-        if (addressCount == 0) {
-            address.setIsDefault(true);
-        } else if (req.isDefault()) {
+        boolean isDefault = addressCount == 0 || req.isDefault();
+        if (addressCount > 0 && req.isDefault()) {
             addressRepository.clearDefaultForUser(userId);
         }
 
@@ -84,7 +53,7 @@ public class UserServiceImpl implements UserService {
                 : null;
 
         address.setUser(user);
-        return getAddressResponse(req, location, address);
+        return getAddressResponse(req, location, address, isDefault);
     }
 
     @Override
@@ -98,7 +67,6 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Transactional
     public AddressResponse updateAddress(UUID userId, UUID addressId, CreateAddressRequest req) {
         Address address = loadAddressOfUser(addressId, userId);
 
@@ -110,18 +78,16 @@ public class UserServiceImpl implements UserService {
             addressRepository.clearDefaultForUser(userId);
         }
 
-        return getAddressResponse(req, location, address);
+        return getAddressResponse(req, location, address, req.isDefault());
     }
 
     @Override
-    @Transactional
     public void deleteAddress(UUID userId, UUID addressId) {
         Address address = loadAddressOfUser(addressId, userId);
         addressRepository.delete(address);
     }
 
     @Override
-    @Transactional
     public AddressResponse setDefaultAddress(UUID userId, UUID addressId) {
         Address address = loadAddressOfUser(addressId, userId);
         addressRepository.clearDefaultForUser(userId);
@@ -141,7 +107,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @NonNull
-    private AddressResponse getAddressResponse(CreateAddressRequest req, Point location, Address address) {
+    private AddressResponse getAddressResponse(CreateAddressRequest req, Point location, Address address, boolean isDefault) {
         address.setLabel(req.label());
         address.setHouseNumber(req.houseNumber());
         address.setBuildingName(req.buildingName());
@@ -152,7 +118,7 @@ public class UserServiceImpl implements UserService {
         address.setCountry(req.country());
         address.setPostalCode(req.postalCode());
         address.setLocation(location);
-        address.setIsDefault(req.isDefault());
+        address.setIsDefault(isDefault);
 
         return AddressResponse.from(addressRepository.save(address));
     }

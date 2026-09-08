@@ -3,9 +3,7 @@ package com.quickbite.quickbite.user.controller;
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.user.dto.AddressResponse;
 import com.quickbite.quickbite.user.dto.CreateAddressRequest;
-import com.quickbite.quickbite.user.dto.UpdateProfileRequest;
-import com.quickbite.quickbite.user.dto.UserProfileResponse;
-import com.quickbite.quickbite.user.service.UserService;
+import com.quickbite.quickbite.user.service.UserAddressService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,75 +16,57 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/customer/me")
+@RequestMapping("/api/v1/customer/me/addresses")
 @PreAuthorize("hasRole('CUSTOMER')")
-public class CustomerController {
-    private final UserService userService;
+public class CustomerAddressController {
+
+    private final UserAddressService userAddressService;
     private final AuthenticatedSessionResolver authenticatedSessionResolver;
 
-    public CustomerController(
-    UserService userService,
-    AuthenticatedSessionResolver authenticatedSessionResolver) {
-        this.userService = userService;
+    public CustomerAddressController(
+            UserAddressService userAddressService,
+            AuthenticatedSessionResolver authenticatedSessionResolver) {
+        this.userAddressService = userAddressService;
         this.authenticatedSessionResolver = authenticatedSessionResolver;
     }
 
-    // ---------------------------------------
-    // Profile
-    // ---------------------------------------
-
     @GetMapping
-    public ResponseEntity<UserProfileResponse> getProfile(@AuthenticationPrincipal Jwt jwt) {
-       return ResponseEntity.ok(userService.getProfile(authenticatedSessionResolver.userIdFromJwt(jwt)));
-    }
-
-    @PutMapping
-    public ResponseEntity<UserProfileResponse> updateProfile(
-            @AuthenticationPrincipal Jwt jwt,
-            @RequestBody @Valid UpdateProfileRequest req) {
-        UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(userService.updateProfile(userId, req));
-    }
-
-    // ---------------------------------------
-    // Address
-    // ---------------------------------------
-
-    @GetMapping("/addresses")
     public ResponseEntity<List<AddressResponse>> getAddresses(@AuthenticationPrincipal Jwt jwt) {
         UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(userService.getAddresses(userId));
+        return ResponseEntity.ok(userAddressService.getAddresses(userId));
     }
 
-    @PostMapping("/addresses")
+    @PostMapping
     public ResponseEntity<AddressResponse> addAddress(
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody @Valid CreateAddressRequest req) {
         UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.addAddress(userId, req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(userAddressService.addAddress(userId, req));
     }
 
-    @PutMapping("/addresses/{id}")
+    @PutMapping("/{id}")
     public ResponseEntity<AddressResponse> updateAddress(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID id,
             @RequestBody @Valid CreateAddressRequest req) {
         UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(userService.updateAddress(userId, id, req));
+        return ResponseEntity.ok(userAddressService.updateAddress(userId, id, req));
     }
 
-    @DeleteMapping("/addresses/{id}")
-    public ResponseEntity<Void> deleteAddress(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteAddress(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID id) {
         UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        userService.deleteAddress(userId, id);
+        userAddressService.deleteAddress(userId, id);
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping("/addresses/{id}/default")
+    @PutMapping("/{id}/default")
     public ResponseEntity<AddressResponse> setDefaultAddress(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID id) {
         UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(userService.setDefaultAddress(userId, id));
+        return ResponseEntity.ok(userAddressService.setDefaultAddress(userId, id));
     }
 }
