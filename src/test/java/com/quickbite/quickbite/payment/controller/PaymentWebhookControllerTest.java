@@ -2,7 +2,7 @@ package com.quickbite.quickbite.payment.controller;
 
 import com.quickbite.quickbite.payment.dto.WebhookPayloadRequest;
 import com.quickbite.quickbite.payment.model.PaymentStatus;
-import com.quickbite.quickbite.payment.service.PaymentService;
+import com.quickbite.quickbite.payment.service.PaymentWebhookService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,7 +19,7 @@ import static org.mockito.Mockito.verify;
 class PaymentWebhookControllerTest {
 
     @Mock
-    private PaymentService paymentService;
+    private PaymentWebhookService paymentWebhookService;
 
     @InjectMocks
     private PaymentWebhookController paymentWebhookController;
@@ -32,6 +32,6 @@ class PaymentWebhookControllerTest {
         ResponseEntity<Void> response = paymentWebhookController.handleStubWebhook(payload);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(paymentService).handleWebhook("STUB-ABC12345", PaymentStatus.SUCCESS);
+        verify(paymentWebhookService).handleWebhook("STUB-ABC12345", PaymentStatus.SUCCESS);
     }
 }

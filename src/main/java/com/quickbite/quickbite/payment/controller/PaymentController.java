@@ -2,7 +2,7 @@ package com.quickbite.quickbite.payment.controller;
 
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.payment.dto.PaymentResponse;
-import com.quickbite.quickbite.payment.service.PaymentService;
+import com.quickbite.quickbite.payment.service.PaymentQueryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,13 +16,13 @@ import java.util.UUID;
 @PreAuthorize("hasRole('CUSTOMER')")
 public class PaymentController {
 
-    private final PaymentService paymentService;
+    private final PaymentQueryService paymentQueryService;
     private final AuthenticatedSessionResolver authenticatedSessionResolver;
 
     public PaymentController(
-            PaymentService paymentService,
+            PaymentQueryService paymentQueryService,
             AuthenticatedSessionResolver authenticatedSessionResolver) {
-        this.paymentService = paymentService;
+        this.paymentQueryService = paymentQueryService;
         this.authenticatedSessionResolver = authenticatedSessionResolver;
     }
 
@@ -35,6 +35,6 @@ public class PaymentController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID orderId) {
         UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(paymentService.getPaymentByOrderId(orderId, customerId));
+        return ResponseEntity.ok(paymentQueryService.getPaymentByOrderId(orderId, customerId));
     }
 }

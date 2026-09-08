@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-public class PaymentServiceImpl implements PaymentService {
+public class PaymentServiceImpl implements PaymentService, PaymentProcessingService, PaymentQueryService, PaymentWebhookService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentStatusHistoryRepository paymentStatusHistoryRepository;
