@@ -3,9 +3,6 @@ package com.quickbite.quickbite.restaurant.service;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.common.exception.BadRequestException;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
-import com.quickbite.quickbite.common.routing.GeoPoint;
-import com.quickbite.quickbite.common.routing.adapter.HaversineFallbackAdapter;
-import com.quickbite.quickbite.restaurant.dto.NearbyRestaurantResponse;
 import com.quickbite.quickbite.restaurant.dto.RestaurantHoursRequest;
 import com.quickbite.quickbite.restaurant.dto.RestaurantResponse;
 import com.quickbite.quickbite.restaurant.dto.RestaurantSummaryResponse;
@@ -30,7 +27,7 @@ import java.util.UUID;
 
 @Service
 @Transactional
-public class RestaurantServiceImpl implements RestaurantService {
+public class RestaurantOwnerServiceImpl implements RestaurantOwnerService {
 
     private static final int MAX_IMAGES = 10;
 
@@ -38,20 +35,17 @@ public class RestaurantServiceImpl implements RestaurantService {
     private final RestaurantRepository restaurantRepository;
     private final RestaurantHoursRepository restaurantHoursRepository;
     private final RestaurantImageRepository restaurantImageRepository;
-    private final HaversineFallbackAdapter haversine;
 
-    public RestaurantServiceImpl(
+    public RestaurantOwnerServiceImpl(
             UserRepository userRepository,
             RestaurantRepository restaurantRepository,
             RestaurantHoursRepository restaurantHoursRepository,
-            RestaurantImageRepository restaurantImageRepository,
-            HaversineFallbackAdapter haversine
+            RestaurantImageRepository restaurantImageRepository
     ) {
         this.userRepository = userRepository;
         this.restaurantRepository = restaurantRepository;
         this.restaurantHoursRepository = restaurantHoursRepository;
         this.restaurantImageRepository = restaurantImageRepository;
-        this.haversine = haversine;
     }
 
     @Override
@@ -134,14 +128,12 @@ public class RestaurantServiceImpl implements RestaurantService {
             throw new BadRequestException("A restaurant cannot have more than " + MAX_IMAGES + " images");
         }
 
-        // Create and save the new image
         RestaurantImage image = new RestaurantImage();
         image.setRestaurant(restaurant);
         image.setImageUrl(imageUrl);
         image.setDisplayOrder(displayOrder);
         RestaurantImage savedImage = restaurantImageRepository.save(image);
 
-        // Sync in-memory collection
         if (restaurant.getRestaurantImages() != null) {
             restaurant.getRestaurantImages().add(savedImage);
         } else {
@@ -158,12 +150,10 @@ public class RestaurantServiceImpl implements RestaurantService {
         User owner = loadOwner(ownerId);
         Restaurant restaurant = loadOwnerRestaurant(restaurantId, owner);
 
-        // Find and delete the image
         RestaurantImage image = restaurantImageRepository.findByIdAndRestaurant(imageId, restaurant)
                 .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
         restaurantImageRepository.delete(image);
 
-        // Sync in-memory collection
         if (restaurant.getRestaurantImages() != null) {
             restaurant.getRestaurantImages().remove(image);
         }
@@ -176,74 +166,10 @@ public class RestaurantServiceImpl implements RestaurantService {
         User owner = loadOwner(ownerId);
         Restaurant restaurant = loadOwnerRestaurant(restaurantId, owner);
 
-        // Toggle the closed status
         restaurant.setClosed(!restaurant.isClosed());
         Restaurant saved = restaurantRepository.save(restaurant);
 
         return RestaurantResponse.from(saved);
-    }
-
-    // Public facing methods
-
-    @Override
-    @Transactional(readOnly = true)
-    public RestaurantResponse getRestaurant(UUID restaurantId) {
-        Restaurant restaurant = restaurantRepository.findById(restaurantId)
-                .orElseThrow(() -> new RestaurantNotFoundException("Restaurant not found"));
-
-        if (restaurant.getCurrentStatus() != RestaurantVerificationStatus.APPROVED) {
-            throw new RestaurantNotFoundException("Restaurant not found");
-        }
-
-        return RestaurantResponse.from(restaurant);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public CursorPage<RestaurantSummaryResponse> listApproved(UUID cursor, int size) {
-        int pageSize = Math.clamp(size, 1, 100);
-
-        List<Restaurant> restaurants = restaurantRepository
-                .findAllWithCursor(
-                        RestaurantVerificationStatus.APPROVED,
-                        cursor,
-                        Limit.of(pageSize + 1)
-                );
-
-        return CursorPage.of(
-                restaurants.stream()
-                        .map(RestaurantSummaryResponse::from)
-                        .toList(),
-                pageSize,
-                RestaurantSummaryResponse::id
-        );
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<NearbyRestaurantResponse> findNearbyRestaurants(double lat, double lng,
-                                                                int radiusMeters, int page, int size) {
-        int pageSize   = Math.clamp(size, 1, 50);
-        int offset     = Math.max(0, page) * pageSize;
-        GeoPoint query = GeoPoint.of(lat, lng);
-
-        List<Restaurant> restaurants = restaurantRepository.findNearbyRestaurants(
-                lat, lng, radiusMeters, pageSize, offset
-        );
-
-        return restaurants.stream()
-                .map(r -> {
-                    double distMeters = 0.0;
-                    if (r.getAddress() != null && r.getAddress().getLocation() != null) {
-                        GeoPoint rLoc = GeoPoint.of(
-                                r.getAddress().getLocation().getY(),
-                                r.getAddress().getLocation().getX()
-                        );
-                        distMeters = HaversineFallbackAdapter.haversineMeters(query, rLoc);
-                    }
-                    return NearbyRestaurantResponse.from(r, distMeters);
-                })
-                .toList();
     }
 
     private User loadOwner(UUID ownerId) {
