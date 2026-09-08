@@ -4,7 +4,7 @@ import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.common.event.order.OrderCancelledEvent;
 import com.quickbite.quickbite.common.event.order.OrderStatusChangedEvent;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
-import com.quickbite.quickbite.delivery.service.DeliveryService;
+import com.quickbite.quickbite.delivery.service.DeliveryAssignmentService;
 import com.quickbite.quickbite.order.dto.OrderResponse;
 import com.quickbite.quickbite.order.dto.OrderSummaryResponse;
 import com.quickbite.quickbite.order.dto.PlaceOrderRequest;
@@ -16,7 +16,7 @@ import com.quickbite.quickbite.order.model.OrderStatusHistory;
 import com.quickbite.quickbite.order.repository.OrderRepository;
 import com.quickbite.quickbite.order.repository.OrderStatusHistoryRepository;
 import com.quickbite.quickbite.payment.dto.PaymentResult;
-import com.quickbite.quickbite.payment.service.PaymentService;
+import com.quickbite.quickbite.payment.service.PaymentProcessingService;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
 import com.quickbite.quickbite.restaurant.repository.RestaurantRepository;
 import com.quickbite.quickbite.user.model.User;
@@ -66,8 +66,8 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     private final UserRepository userRepository;
     private final RestaurantRepository restaurantRepository;
     private final OrderCreationService orderCreationService;
-    private final PaymentService paymentService;
-    private final DeliveryService deliveryService;
+    private final PaymentProcessingService paymentService;
+    private final DeliveryAssignmentService deliveryAssignmentService;
     private final ApplicationEventPublisher eventPublisher;
 
     public OrderServiceImpl(
@@ -76,8 +76,8 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
             UserRepository userRepository,
             RestaurantRepository restaurantRepository,
             OrderCreationService orderCreationService,
-            PaymentService paymentService,
-            DeliveryService deliveryService,
+            PaymentProcessingService paymentService,
+            DeliveryAssignmentService deliveryAssignmentService,
             ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
@@ -85,7 +85,7 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
         this.restaurantRepository = restaurantRepository;
         this.orderCreationService = orderCreationService;
         this.paymentService = paymentService;
-        this.deliveryService = deliveryService;
+        this.deliveryAssignmentService = deliveryAssignmentService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -230,7 +230,7 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     public OrderResponse markReadyForPickup(UUID orderId, UUID restaurantId, UUID ownerId) {
         Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
         Order updated = transition(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP);
-        deliveryService.autoAssign(updated);
+        deliveryAssignmentService.autoAssign(updated);
         return OrderResponse.from(updated);
     }
 
