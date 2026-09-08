@@ -1,15 +1,13 @@
 package com.quickbite.quickbite.menu.service;
 
-import com.quickbite.quickbite.allotment.model.AdminAllotment;
-import com.quickbite.quickbite.allotment.model.AllotmentReferenceType;
-import com.quickbite.quickbite.allotment.model.AllotmentStatus;
-import com.quickbite.quickbite.allotment.service.AdminAllotmentService;
+import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.common.event.cuisine.CuisineApprovedEvent;
 import com.quickbite.quickbite.common.event.cuisine.CuisineRejectedEvent;
-import com.quickbite.quickbite.common.event.cuisine.CuisineRequestedEvent;
 import com.quickbite.quickbite.common.exception.ResourceConflictException;
+import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
 import com.quickbite.quickbite.menu.dto.CuisineRequestResponse;
 import com.quickbite.quickbite.menu.dto.CuisineResponse;
+import com.quickbite.quickbite.menu.exception.CuisineNotFoundException;
 import com.quickbite.quickbite.menu.model.Cuisine;
 import com.quickbite.quickbite.menu.model.CuisineRequest;
 import com.quickbite.quickbite.menu.model.CuisineStatus;
@@ -27,6 +25,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Limit;
 
 import java.time.Instant;
 import java.util.List;
@@ -36,10 +35,11 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class CuisineServiceImplTest {
+class AdminCuisineServiceImplTest {
 
     @Mock
     private UserRepository userRepository;
@@ -53,11 +53,8 @@ class CuisineServiceImplTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @Mock
-    private AdminAllotmentService adminAllotmentService;
-
     @InjectMocks
-    private CuisineServiceImpl cuisineService;
+    private AdminCuisineServiceImpl adminCuisineService;
 
     private User requester;
     private User admin;
@@ -81,76 +78,27 @@ class CuisineServiceImplTest {
     }
 
     @Nested
-    @DisplayName("request()")
-    class RequestTests {
+    @DisplayName("listRequestsByStatus()")
+    class ListRequestsByStatusTests {
 
         @Test
-        @DisplayName("Successfully creates a cuisine request and triggers allotment + event")
-        void request_success() {
-            com.quickbite.quickbite.menu.dto.CuisineRequest dto =
-                    new com.quickbite.quickbite.menu.dto.CuisineRequest("Tuscan");
+        @DisplayName("Returns paginated cuisine requests by status")
+        void listRequestsByStatus_success() {
+            CuisineRequest req = new CuisineRequest();
+            req.setId(UUID.randomUUID());
+            req.setName("Thai");
+            req.setStatus(CuisineStatus.PENDING);
+            req.setRequestedBy(requester);
 
-            when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
-            when(cuisineRepository.existsByNameIgnoreCase("Tuscan")).thenReturn(false);
-            when(cuisineRequestRepository.existsByNameIgnoreCaseAndStatus("Tuscan", CuisineStatus.PENDING)).thenReturn(false);
+            when(cuisineRequestRepository.findWithCursor(isNull(), eq(CuisineStatus.PENDING), eq(Limit.of(21))))
+                    .thenReturn(List.of(req));
 
-            CuisineRequest savedEntity = new CuisineRequest();
-            savedEntity.setId(UUID.randomUUID());
-            savedEntity.setName("Tuscan");
-            savedEntity.setRequestedBy(requester);
-            savedEntity.setStatus(CuisineStatus.PENDING);
-            savedEntity.setCreatedAt(Instant.now());
+            CursorPage<CuisineRequestResponse> page = adminCuisineService.listRequestsByStatus(
+                    CuisineStatus.PENDING, null, 20);
 
-            when(cuisineRequestRepository.save(any(CuisineRequest.class))).thenReturn(savedEntity);
-
-            AdminAllotment allotment = new AdminAllotment();
-            allotment.setId(UUID.randomUUID());
-            allotment.setAdmin(admin);
-            allotment.setStatus(AllotmentStatus.PENDING);
-            when(adminAllotmentService.allot(savedEntity.getId(), AllotmentReferenceType.CUISINE))
-                    .thenReturn(List.of(allotment));
-
-            CuisineRequestResponse res = cuisineService.request(dto, requesterId);
-
-            assertThat(res.id()).isEqualTo(savedEntity.getId());
-            assertThat(res.name()).isEqualTo("Tuscan");
-            assertThat(res.status()).isEqualTo(CuisineStatus.PENDING);
-            assertThat(res.requestedById()).isEqualTo(requesterId);
-
-            ArgumentCaptor<CuisineRequestedEvent> eventCaptor = ArgumentCaptor.forClass(CuisineRequestedEvent.class);
-            verify(eventPublisher).publishEvent(eventCaptor.capture());
-            CuisineRequestedEvent event = eventCaptor.getValue();
-            assertThat(event.requestId()).isEqualTo(savedEntity.getId());
-            assertThat(event.cuisineName()).isEqualTo("Tuscan");
-            assertThat(event.requesterId()).isEqualTo(requesterId);
-            assertThat(event.allottedAdminIds()).containsExactly(adminId);
-        }
-
-        @Test
-        @DisplayName("Throws conflict when cuisine already exists in master catalog")
-        void request_conflict_catalog() {
-            com.quickbite.quickbite.menu.dto.CuisineRequest dto =
-                    new com.quickbite.quickbite.menu.dto.CuisineRequest("Italian");
-            when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
-            when(cuisineRepository.existsByNameIgnoreCase("Italian")).thenReturn(true);
-
-            assertThatThrownBy(() -> cuisineService.request(dto, requesterId))
-                    .isInstanceOf(ResourceConflictException.class)
-                    .hasMessageContaining("already exists in master catalog");
-        }
-
-        @Test
-        @DisplayName("Throws conflict when pending request exists")
-        void request_conflict_pending() {
-            com.quickbite.quickbite.menu.dto.CuisineRequest dto =
-                    new com.quickbite.quickbite.menu.dto.CuisineRequest("Italian");
-            when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
-            when(cuisineRepository.existsByNameIgnoreCase("Italian")).thenReturn(false);
-            when(cuisineRequestRepository.existsByNameIgnoreCaseAndStatus("Italian", CuisineStatus.PENDING)).thenReturn(true);
-
-            assertThatThrownBy(() -> cuisineService.request(dto, requesterId))
-                    .isInstanceOf(ResourceConflictException.class)
-                    .hasMessageContaining("A pending request for this cuisine already exists");
+            assertThat(page.content()).hasSize(1);
+            assertThat(page.content().get(0).name()).isEqualTo("Thai");
+            assertThat(page.hasMore()).isFalse();
         }
     }
 
@@ -178,7 +126,7 @@ class CuisineServiceImplTest {
             masterCuisine.setCreatedAt(Instant.now());
             when(cuisineRepository.save(any(Cuisine.class))).thenReturn(masterCuisine);
 
-            CuisineResponse res = cuisineService.approve(requestId, adminId);
+            CuisineResponse res = adminCuisineService.approve(requestId, adminId);
 
             assertThat(res.id()).isEqualTo(masterCuisine.getId());
             assertThat(res.name()).isEqualTo("Mexican");
@@ -204,9 +152,34 @@ class CuisineServiceImplTest {
 
             when(cuisineRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
 
-            assertThatThrownBy(() -> cuisineService.approve(requestId, adminId))
+            assertThatThrownBy(() -> adminCuisineService.approve(requestId, adminId))
                     .isInstanceOf(ResourceConflictException.class)
                     .hasMessageContaining("not in a pending state");
+        }
+
+        @Test
+        @DisplayName("Throws CuisineNotFoundException when request does not exist")
+        void approve_requestNotFound() {
+            UUID requestId = UUID.randomUUID();
+            when(cuisineRequestRepository.findById(requestId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> adminCuisineService.approve(requestId, adminId))
+                    .isInstanceOf(CuisineNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("Throws ResourceNotFoundException when admin does not exist")
+        void approve_adminNotFound() {
+            UUID requestId = UUID.randomUUID();
+            CuisineRequest request = new CuisineRequest();
+            request.setId(requestId);
+            request.setStatus(CuisineStatus.PENDING);
+
+            when(cuisineRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+            when(userRepository.findById(adminId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> adminCuisineService.approve(requestId, adminId))
+                    .isInstanceOf(ResourceNotFoundException.class);
         }
     }
 
@@ -228,7 +201,7 @@ class CuisineServiceImplTest {
             when(userRepository.findById(adminId)).thenReturn(Optional.of(admin));
             when(cuisineRequestRepository.save(any(CuisineRequest.class))).thenAnswer(i -> i.getArgument(0));
 
-            CuisineRequestResponse res = cuisineService.reject(requestId, adminId, "Not a valid cuisine category");
+            CuisineRequestResponse res = adminCuisineService.reject(requestId, adminId, "Not a valid cuisine category");
 
             assertThat(res.status()).isEqualTo(CuisineStatus.REJECTED);
             assertThat(res.remarks()).isEqualTo("Not a valid cuisine category");
@@ -241,6 +214,21 @@ class CuisineServiceImplTest {
             assertThat(event.requesterId()).isEqualTo(requesterId);
             assertThat(event.adminId()).isEqualTo(adminId);
             assertThat(event.rejectionRemarks()).isEqualTo("Not a valid cuisine category");
+        }
+
+        @Test
+        @DisplayName("Throws exception when request is not in PENDING state")
+        void reject_notPending() {
+            UUID requestId = UUID.randomUUID();
+            CuisineRequest request = new CuisineRequest();
+            request.setId(requestId);
+            request.setStatus(CuisineStatus.APPROVED);
+
+            when(cuisineRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+
+            assertThatThrownBy(() -> adminCuisineService.reject(requestId, adminId, "Remarks"))
+                    .isInstanceOf(ResourceConflictException.class)
+                    .hasMessageContaining("not in a pending state");
         }
     }
 }

@@ -6,7 +6,7 @@ import com.quickbite.quickbite.menu.dto.AdminRejectRequest;
 import com.quickbite.quickbite.menu.dto.CuisineRequestResponse;
 import com.quickbite.quickbite.menu.dto.CuisineResponse;
 import com.quickbite.quickbite.menu.model.CuisineStatus;
-import com.quickbite.quickbite.menu.service.CuisineService;
+import com.quickbite.quickbite.menu.service.AdminCuisineService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,14 +21,14 @@ import java.util.UUID;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminCuisineController {
 
-    private final CuisineService cuisineService;
+    private final AdminCuisineService adminCuisineService;
     private final AuthenticatedSessionResolver authenticatedSessionResolver;
 
     public AdminCuisineController(
-            CuisineService cuisineService,
+            AdminCuisineService adminCuisineService,
             AuthenticatedSessionResolver authenticatedSessionResolver
     ) {
-        this.cuisineService = cuisineService;
+        this.adminCuisineService = adminCuisineService;
         this.authenticatedSessionResolver = authenticatedSessionResolver;
     }
 
@@ -38,7 +38,7 @@ public class AdminCuisineController {
             @RequestParam(required = false) UUID cursor,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(cuisineService.listRequestsByStatus(status, cursor, size));
+        return ResponseEntity.ok(adminCuisineService.listRequestsByStatus(status, cursor, size));
     }
 
     @PostMapping("/{id}/approve")
@@ -47,7 +47,7 @@ public class AdminCuisineController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         UUID adminId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(cuisineService.approve(id, adminId));
+        return ResponseEntity.ok(adminCuisineService.approve(id, adminId));
     }
 
     @PostMapping("/{id}/reject")
@@ -57,6 +57,6 @@ public class AdminCuisineController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         UUID adminId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(cuisineService.reject(id, adminId, rejectRequest.remarks()));
+        return ResponseEntity.ok(adminCuisineService.reject(id, adminId, rejectRequest.remarks()));
     }
 }
