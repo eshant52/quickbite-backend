@@ -41,7 +41,7 @@ import java.util.UUID;
 
 @Service
 @Transactional
-public class DeliveryServiceImpl implements DeliveryService {
+public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryAgentService {
 
     private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
 
@@ -73,6 +73,27 @@ public class DeliveryServiceImpl implements DeliveryService {
         this.deliveryAssignmentStrategy = deliveryAssignmentStrategy;
         this.eventPublisher = eventPublisher;
     }
+
+    // -----------------------------------------------------------------
+    // DeliveryAssignmentService Implementation
+    // -----------------------------------------------------------------
+
+    @Override
+    public void autoAssign(Order order) {
+        DeliveryAgent agent = deliveryAssignmentStrategy.findAgent(order)
+                .orElseThrow(() -> new NoAvailableDeliveryAgentException("No delivery agent available near order location"));
+
+        order.setDeliveryAgent(agent);
+        orderRepository.save(order);
+
+        agent.setAssigned(true);
+        agent.setLastAssignedAt(Instant.now());
+        deliveryAgentRepository.save(agent);
+    }
+
+    // -----------------------------------------------------------------
+    // DeliveryAgentService Implementation
+    // -----------------------------------------------------------------
 
     @Override
     @Transactional(readOnly = true)
@@ -107,19 +128,6 @@ public class DeliveryServiceImpl implements DeliveryService {
         agent.setAvailable(available);
         DeliveryAgent saved = deliveryAgentRepository.save(agent);
         return DeliveryAgentResponse.from(saved);
-    }
-
-    @Override
-    public void autoAssign(Order order) {
-        DeliveryAgent agent = deliveryAssignmentStrategy.findAgent(order)
-                .orElseThrow(() -> new NoAvailableDeliveryAgentException("No delivery agent available near order location"));
-
-        order.setDeliveryAgent(agent);
-        orderRepository.save(order);
-
-        agent.setAssigned(true);
-        agent.setLastAssignedAt(Instant.now());
-        deliveryAgentRepository.save(agent);
     }
 
     @Override

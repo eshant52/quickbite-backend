@@ -10,8 +10,6 @@ import com.quickbite.quickbite.delivery.model.DeliveryAgentVerificationStatus;
 import com.quickbite.quickbite.delivery.repository.DeliveryAgentRepository;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.repository.UserRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,8 +20,6 @@ import java.util.UUID;
 @Service
 @Transactional
 public class AdminDeliveryServiceImpl implements AdminDeliveryService {
-
-    private static final Logger log = LoggerFactory.getLogger(AdminDeliveryServiceImpl.class);
 
     private final DeliveryAgentRepository deliveryAgentRepository;
     private final UserRepository userRepository;
@@ -50,8 +46,6 @@ public class AdminDeliveryServiceImpl implements AdminDeliveryService {
         agent.setAvailable(false);
         DeliveryAgent saved = deliveryAgentRepository.save(agent);
 
-        log.warn("Delivery agent {} was SUSPENDED by admin {}. Reason: {}", agentId, admin.getId(), reason);
-
         return DeliveryAgentResponse.from(saved);
     }
 
@@ -67,8 +61,6 @@ public class AdminDeliveryServiceImpl implements AdminDeliveryService {
 
         agent.setCurrentStatus(DeliveryAgentVerificationStatus.APPROVED);
         DeliveryAgent saved = deliveryAgentRepository.save(agent);
-
-        log.info("Delivery agent {} was REINSTATED to APPROVED by admin {}", agentId, admin.getId());
 
         return DeliveryAgentResponse.from(saved);
     }

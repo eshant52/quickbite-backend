@@ -5,7 +5,7 @@ import com.quickbite.quickbite.delivery.dto.DeliveryAgentResponse;
 import com.quickbite.quickbite.delivery.dto.UpdateAvailabilityRequest;
 import com.quickbite.quickbite.delivery.dto.UpdateLocationRequest;
 import com.quickbite.quickbite.delivery.model.DeliveryAgentVerificationStatus;
-import com.quickbite.quickbite.delivery.service.DeliveryService;
+import com.quickbite.quickbite.delivery.service.DeliveryAgentService;
 import com.quickbite.quickbite.order.dto.OrderResponse;
 import com.quickbite.quickbite.order.model.OrderStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
 class DeliveryAgentControllerTest {
 
     @Mock
-    private DeliveryService deliveryService;
+    private DeliveryAgentService deliveryService;
 
     @Mock
     private AuthenticatedSessionResolver authenticatedSessionResolver;

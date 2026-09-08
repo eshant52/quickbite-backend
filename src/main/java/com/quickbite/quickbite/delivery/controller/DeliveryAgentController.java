@@ -4,7 +4,7 @@ import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.delivery.dto.DeliveryAgentResponse;
 import com.quickbite.quickbite.delivery.dto.UpdateAvailabilityRequest;
 import com.quickbite.quickbite.delivery.dto.UpdateLocationRequest;
-import com.quickbite.quickbite.delivery.service.DeliveryService;
+import com.quickbite.quickbite.delivery.service.DeliveryAgentService;
 import com.quickbite.quickbite.order.dto.OrderResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -20,14 +20,14 @@ import java.util.UUID;
 @RequestMapping("/api/v1/delivery-agent")
 public class DeliveryAgentController {
 
-    private final DeliveryService deliveryService;
+    private final DeliveryAgentService deliveryAgentService;
     private final AuthenticatedSessionResolver authenticatedSessionResolver;
 
     public DeliveryAgentController(
-            DeliveryService deliveryService,
+            DeliveryAgentService deliveryAgentService,
             AuthenticatedSessionResolver authenticatedSessionResolver
     ) {
-        this.deliveryService = deliveryService;
+        this.deliveryAgentService = deliveryAgentService;
         this.authenticatedSessionResolver = authenticatedSessionResolver;
     }
 
@@ -36,7 +36,7 @@ public class DeliveryAgentController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(deliveryService.getMyProfile(userId));
+        return ResponseEntity.ok(deliveryAgentService.getMyProfile(userId));
     }
 
     @PatchMapping("/availability")
@@ -45,7 +45,7 @@ public class DeliveryAgentController {
             @RequestBody @Valid UpdateAvailabilityRequest request
     ) {
         UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(deliveryService.updateAvailability(userId, request.available()));
+        return ResponseEntity.ok(deliveryAgentService.updateAvailability(userId, request.available()));
     }
 
     @PutMapping("/location")
@@ -54,7 +54,7 @@ public class DeliveryAgentController {
             @RequestBody @Valid UpdateLocationRequest request
     ) {
         UUID userId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(deliveryService.updateLocation(userId, request));
+        return ResponseEntity.ok(deliveryAgentService.updateLocation(userId, request));
     }
 
     @PostMapping("/orders/{orderId}/pickup")
@@ -63,7 +63,7 @@ public class DeliveryAgentController {
             @PathVariable UUID orderId
     ) {
         UUID agentUserId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(deliveryService.markOutForDelivery(orderId, agentUserId));
+        return ResponseEntity.ok(deliveryAgentService.markOutForDelivery(orderId, agentUserId));
     }
 
     @PostMapping("/orders/{orderId}/delivered")
@@ -72,6 +72,6 @@ public class DeliveryAgentController {
             @PathVariable UUID orderId
     ) {
         UUID agentUserId = authenticatedSessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(deliveryService.markDelivered(orderId, agentUserId));
+        return ResponseEntity.ok(deliveryAgentService.markDelivered(orderId, agentUserId));
     }
 }
