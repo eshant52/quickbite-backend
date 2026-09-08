@@ -17,12 +17,14 @@ public class AuthCookieServiceImpl implements AuthCookieService {
         this.authProperties = authProperties;
     }
 
+    @Override
     public ResponseCookie refreshCookie(String refreshToken) {
         return baseCookie(refreshToken)
                 .maxAge(authProperties.jwt().refreshTokenExpiry().getSeconds())
                 .build();
     }
 
+    @Override
     public ResponseCookie expiredRefreshCookie() {
         return baseCookie("")
                 .maxAge(Duration.ZERO)
