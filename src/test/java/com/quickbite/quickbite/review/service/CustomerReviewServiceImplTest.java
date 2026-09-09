@@ -1,11 +1,11 @@
 package com.quickbite.quickbite.review.service;
 
 import com.quickbite.quickbite.common.dto.CursorPage;
+import com.quickbite.quickbite.common.event.review.ReviewChangedEvent;
 import com.quickbite.quickbite.order.model.Order;
 import com.quickbite.quickbite.order.model.OrderStatus;
 import com.quickbite.quickbite.order.repository.OrderRepository;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
-import com.quickbite.quickbite.restaurant.repository.RestaurantRepository;
 import com.quickbite.quickbite.review.dto.CreateReviewRequest;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
 import com.quickbite.quickbite.review.dto.UpdateReviewRequest;
@@ -24,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Limit;
 
 import java.math.BigDecimal;
@@ -47,10 +48,10 @@ class CustomerReviewServiceImplTest {
     private OrderRepository orderRepository;
 
     @Mock
-    private RestaurantRepository restaurantRepository;
+    private UserRepository userRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private CustomerReviewServiceImpl reviewService;
@@ -97,9 +98,6 @@ class CustomerReviewServiceImplTest {
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
             when(reviewRepository.existsByOrderId(orderId)).thenReturn(false);
             when(userRepository.findById(customerId)).thenReturn(Optional.of(customer));
-            when(restaurantRepository.findById(restaurantId)).thenReturn(Optional.of(restaurant));
-            when(reviewRepository.getAverageRatingForRestaurant(restaurantId)).thenReturn(4.50);
-            when(reviewRepository.countByRestaurantId(restaurantId)).thenReturn(11L);
 
             when(reviewRepository.save(any(Review.class))).thenAnswer(invocation -> {
                 Review r = invocation.getArgument(0);
@@ -114,9 +112,7 @@ class CustomerReviewServiceImplTest {
             assertThat(response.comment()).isEqualTo("Amazing tacos!");
             assertThat(response.restaurantName()).isEqualTo("Taco Haven");
 
-            verify(restaurantRepository).save(restaurant);
-            assertThat(restaurant.getAvgRating()).isEqualTo(BigDecimal.valueOf(4.50).setScale(2));
-            assertThat(restaurant.getTotalRating()).isEqualTo(11L);
+            verify(eventPublisher).publishEvent(new ReviewChangedEvent(restaurantId));
         }
 
         @Test
@@ -239,19 +235,16 @@ class CustomerReviewServiceImplTest {
 
             when(reviewRepository.findByIdAndCustomerId(reviewId, customerId)).thenReturn(Optional.of(review));
             when(reviewRepository.save(any(Review.class))).thenReturn(review);
-            when(restaurantRepository.findById(restaurantId)).thenReturn(Optional.of(restaurant));
-            when(reviewRepository.getAverageRatingForRestaurant(restaurantId)).thenReturn(4.80);
-            when(reviewRepository.countByRestaurantId(restaurantId)).thenReturn(10L);
 
             ReviewResponse response = reviewService.updateReview(reviewId, customerId, request);
 
             assertThat(response.rating()).isEqualTo(5);
             assertThat(response.comment()).isEqualTo("Much better on second try!");
-            verify(restaurantRepository).save(restaurant);
+            verify(eventPublisher).publishEvent(new ReviewChangedEvent(restaurantId));
         }
 
         @Test
-        @DisplayName("Deletes review and recalculates restaurant average")
+        @DisplayName("Deletes review and publishes ReviewChangedEvent")
         void deleteReview_Success() {
             UUID reviewId = UUID.randomUUID();
             Review review = new Review();
@@ -261,14 +254,11 @@ class CustomerReviewServiceImplTest {
             review.setOrder(order);
 
             when(reviewRepository.findByIdAndCustomerId(reviewId, customerId)).thenReturn(Optional.of(review));
-            when(restaurantRepository.findById(restaurantId)).thenReturn(Optional.of(restaurant));
-            when(reviewRepository.getAverageRatingForRestaurant(restaurantId)).thenReturn(4.10);
-            when(reviewRepository.countByRestaurantId(restaurantId)).thenReturn(9L);
 
             reviewService.deleteReview(reviewId, customerId);
 
             verify(reviewRepository).delete(review);
-            verify(restaurantRepository).save(restaurant);
+            verify(eventPublisher).publishEvent(new ReviewChangedEvent(restaurantId));
         }
     }
 }

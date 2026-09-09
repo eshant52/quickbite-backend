@@ -6,9 +6,9 @@ import com.quickbite.quickbite.review.dto.ReviewResponse;
 import java.util.UUID;
 
 /**
- * Domain service for restaurant review moderation and platform oversight.
+ * Administrative service for platform-wide review moderation and oversight.
  */
-public interface RestaurantReviewManagementService {
+public interface AdminReviewManagementService {
 
     CursorPage<ReviewResponse> listReviews(UUID restaurantId, UUID cursor, int size);
 

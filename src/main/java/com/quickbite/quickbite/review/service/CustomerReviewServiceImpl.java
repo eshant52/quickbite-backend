@@ -1,12 +1,11 @@
 package com.quickbite.quickbite.review.service;
 
 import com.quickbite.quickbite.common.dto.CursorPage;
+import com.quickbite.quickbite.common.event.review.ReviewChangedEvent;
 import com.quickbite.quickbite.order.model.Order;
 import com.quickbite.quickbite.order.model.OrderStatus;
 import com.quickbite.quickbite.order.repository.OrderRepository;
-import com.quickbite.quickbite.restaurant.exception.RestaurantNotFoundException;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
-import com.quickbite.quickbite.restaurant.repository.RestaurantRepository;
 import com.quickbite.quickbite.review.dto.CreateReviewRequest;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
 import com.quickbite.quickbite.review.dto.UpdateReviewRequest;
@@ -17,12 +16,11 @@ import com.quickbite.quickbite.review.model.Review;
 import com.quickbite.quickbite.review.repository.ReviewRepository;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,19 +30,19 @@ public class CustomerReviewServiceImpl implements CustomerReviewService {
 
     private final ReviewRepository reviewRepository;
     private final OrderRepository orderRepository;
-    private final RestaurantRepository restaurantRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public CustomerReviewServiceImpl(
             ReviewRepository reviewRepository,
             OrderRepository orderRepository,
-            RestaurantRepository restaurantRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.reviewRepository = reviewRepository;
         this.orderRepository = orderRepository;
-        this.restaurantRepository = restaurantRepository;
         this.userRepository = userRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -78,8 +76,8 @@ public class CustomerReviewServiceImpl implements CustomerReviewService {
 
         Review saved = reviewRepository.save(review);
 
-        // Recalculate and update restaurant ratings
-        updateRestaurantRatingAggregate(restaurant.getId());
+        // Publish domain event to recalculate restaurant ratings asynchronously/via listener
+        eventPublisher.publishEvent(new ReviewChangedEvent(restaurant.getId()));
 
         return ReviewResponse.from(saved);
     }
@@ -95,7 +93,7 @@ public class CustomerReviewServiceImpl implements CustomerReviewService {
     @Override
     @Transactional(readOnly = true)
     public CursorPage<ReviewResponse> getMyReviews(UUID customerId, UUID cursor, int size) {
-        int fetchSize = Math.max(1, Math.min(size, 50));
+        int fetchSize = Math.clamp(size, 1, 50);
         List<Review> fetched = reviewRepository.findByCustomerWithCursor(
                 customerId,
                 cursor,
@@ -115,8 +113,8 @@ public class CustomerReviewServiceImpl implements CustomerReviewService {
 
         Review updated = reviewRepository.save(review);
 
-        // Recalculate restaurant ratings
-        updateRestaurantRatingAggregate(review.getRestaurant().getId());
+        // Publish domain event to recalculate restaurant ratings
+        eventPublisher.publishEvent(new ReviewChangedEvent(review.getRestaurant().getId()));
 
         return ReviewResponse.from(updated);
     }
@@ -129,23 +127,7 @@ public class CustomerReviewServiceImpl implements CustomerReviewService {
         UUID restaurantId = review.getRestaurant().getId();
         reviewRepository.delete(review);
 
-        // Recalculate restaurant ratings
-        updateRestaurantRatingAggregate(restaurantId);
-    }
-
-    private void updateRestaurantRatingAggregate(UUID restaurantId) {
-        Restaurant restaurant = restaurantRepository.findById(restaurantId)
-                .orElseThrow(() -> new RestaurantNotFoundException("Restaurant not found with id: " + restaurantId));
-
-        Double avg = reviewRepository.getAverageRatingForRestaurant(restaurantId);
-        long count = reviewRepository.countByRestaurantId(restaurantId);
-
-        BigDecimal avgBigDecimal = avg != null
-                ? BigDecimal.valueOf(avg).setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-
-        restaurant.setAvgRating(avgBigDecimal);
-        restaurant.setTotalRating(count);
-        restaurantRepository.save(restaurant);
+        // Publish domain event to recalculate restaurant ratings
+        eventPublisher.publishEvent(new ReviewChangedEvent(restaurantId));
     }
 }

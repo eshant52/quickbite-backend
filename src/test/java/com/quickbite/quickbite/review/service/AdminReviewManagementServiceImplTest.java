@@ -1,9 +1,9 @@
 package com.quickbite.quickbite.review.service;
 
 import com.quickbite.quickbite.common.dto.CursorPage;
+import com.quickbite.quickbite.common.event.review.ReviewChangedEvent;
 import com.quickbite.quickbite.order.model.Order;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
-import com.quickbite.quickbite.restaurant.repository.RestaurantRepository;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
 import com.quickbite.quickbite.review.exception.ReviewNotFoundException;
 import com.quickbite.quickbite.review.model.Review;
@@ -16,9 +16,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Limit;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,16 +30,16 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class RestaurantReviewManagementServiceImplTest {
+class AdminReviewManagementServiceImplTest {
 
     @Mock
     private ReviewRepository reviewRepository;
 
     @Mock
-    private RestaurantRepository restaurantRepository;
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
-    private RestaurantReviewManagementServiceImpl reviewManagementService;
+    private AdminReviewManagementServiceImpl reviewManagementService;
 
     private User customer;
     private Restaurant restaurant;
@@ -106,18 +106,13 @@ class RestaurantReviewManagementServiceImplTest {
     }
 
     @Test
-    @DisplayName("deleteReview - deletes review and updates restaurant rating aggregate")
+    @DisplayName("deleteReview - platform admin deletes review and publishes ReviewChangedEvent")
     void deleteReview_Success() {
         when(reviewRepository.findById(reviewId)).thenReturn(Optional.of(review));
-        when(restaurantRepository.findById(restaurantId)).thenReturn(Optional.of(restaurant));
-        when(reviewRepository.getAverageRatingForRestaurant(restaurantId)).thenReturn(4.20);
-        when(reviewRepository.countByRestaurantId(restaurantId)).thenReturn(8L);
 
         reviewManagementService.deleteReview(reviewId);
 
         verify(reviewRepository).delete(review);
-        verify(restaurantRepository).save(restaurant);
-        assertThat(restaurant.getAvgRating()).isEqualTo(BigDecimal.valueOf(4.20).setScale(2));
-        assertThat(restaurant.getTotalRating()).isEqualTo(8L);
+        verify(eventPublisher).publishEvent(new ReviewChangedEvent(restaurantId));
     }
 }

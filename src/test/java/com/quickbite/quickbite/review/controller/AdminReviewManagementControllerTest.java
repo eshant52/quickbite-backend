@@ -2,7 +2,7 @@ package com.quickbite.quickbite.review.controller;
 
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
-import com.quickbite.quickbite.review.service.RestaurantReviewManagementService;
+import com.quickbite.quickbite.review.service.AdminReviewManagementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,13 +22,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class RestaurantReviewManagementControllerTest {
+class AdminReviewManagementControllerTest {
 
     @Mock
-    private RestaurantReviewManagementService reviewManagementService;
+    private AdminReviewManagementService reviewManagementService;
 
     @InjectMocks
-    private RestaurantReviewManagementController controller;
+    private AdminReviewManagementController controller;
 
     private UUID reviewId;
     private UUID restaurantId;
@@ -77,7 +77,7 @@ class RestaurantReviewManagementControllerTest {
     }
 
     @Test
-    @DisplayName("deleteReview - returns HTTP 204 No Content")
+    @DisplayName("deleteReview - returns HTTP 204 No Content when admin deletes review")
     void deleteReview_Success() {
         ResponseEntity<Void> response = controller.deleteReview(reviewId);
 

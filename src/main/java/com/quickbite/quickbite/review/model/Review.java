@@ -5,7 +5,6 @@ import com.quickbite.quickbite.restaurant.model.Restaurant;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.order.model.Order;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -15,7 +14,14 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "reviews")
+@Table(
+        name = "reviews",
+        uniqueConstraints = @UniqueConstraint(name = "uq_reviews_order_id", columnNames = "order_id"),
+        indexes = {
+                @Index(name = "idx_reviews_restaurant_id", columnList = "restaurant_id, id DESC"),
+                @Index(name = "idx_reviews_customer_id", columnList = "customer_id, ID DESC"),
+        }
+)
 public class Review extends Base {
     @ManyToOne
     @JoinColumn(nullable = false)
