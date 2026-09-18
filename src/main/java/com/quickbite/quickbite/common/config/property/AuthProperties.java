@@ -3,7 +3,6 @@ package com.quickbite.quickbite.common.config.property;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
-
 import java.util.List;
 
 @ConfigurationProperties(prefix = "quickbite.auth")

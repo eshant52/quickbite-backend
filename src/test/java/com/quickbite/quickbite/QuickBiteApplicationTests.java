@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.quickbite.quickbite.common.config.KafkaConfig;
 import com.quickbite.quickbite.common.config.RedisConfig;
+import com.quickbite.quickbite.common.config.property.CacheProperties;
 import com.quickbite.quickbite.common.event.QuickBiteTopics;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.junit.jupiter.api.Test;
@@ -114,7 +115,7 @@ class QuickBiteApplicationTests {
     }
 
     @Configuration
-    @EnableConfigurationProperties(KafkaProperties.class)
+    @EnableConfigurationProperties({KafkaProperties.class, CacheProperties.class})
     static class TestConfig {
 
         @Bean

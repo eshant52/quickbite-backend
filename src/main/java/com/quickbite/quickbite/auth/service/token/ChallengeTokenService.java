@@ -1,7 +1,7 @@
 package com.quickbite.quickbite.auth.service.token;
 
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
-import org.springframework.beans.factory.annotation.Value;
+import com.quickbite.quickbite.common.config.property.AuthProperties;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -21,12 +21,9 @@ public class ChallengeTokenService {
 
     private final TokenService tokenService;
 
-    public ChallengeTokenService(
-            @Value("${quickbite.jwt.challenge-token-expiry:PT5M}") Duration expiryDuration,
-            @Value("${quickbite.jwt.challenge-token-audience:quickbite-auth}") String audience,
-            TokenService tokenService) {
-        this.expiryDuration = expiryDuration;
-        this.audience = audience;
+    public ChallengeTokenService(AuthProperties authProperties, TokenService tokenService) {
+        this.expiryDuration = authProperties.jwt().challengeTokenExpiry();
+        this.audience = authProperties.jwt().challengeTokenAudience();
         this.tokenService = tokenService;
     }
 

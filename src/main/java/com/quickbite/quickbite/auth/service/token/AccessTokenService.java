@@ -1,7 +1,7 @@
 package com.quickbite.quickbite.auth.service.token;
 
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
-import org.springframework.beans.factory.annotation.Value;
+import com.quickbite.quickbite.common.config.property.AuthProperties;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -20,13 +20,9 @@ public class AccessTokenService {
 
     private final TokenService tokenService;
 
-
-    public AccessTokenService(
-            @Value("${quickbite.jwt.access-token-expiry:PT15M}") Duration expiryDuration,
-            @Value("${quickbite.jwt.access-token-audience:quickbite-api}") String audience,
-            TokenService tokenService) {
-        this.expiryDuration = expiryDuration;
-        this.audience = audience;
+    public AccessTokenService(AuthProperties authProperties, TokenService tokenService) {
+        this.expiryDuration = authProperties.jwt().accessTokenExpiry();
+        this.audience = authProperties.jwt().accessTokenAudience();
         this.tokenService = tokenService;
     }
 

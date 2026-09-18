@@ -1,8 +1,6 @@
 package com.quickbite.quickbite.common.config;
 
-import java.time.Duration;
-
-import org.springframework.beans.factory.annotation.Value;
+import com.quickbite.quickbite.common.config.property.CacheProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,9 +34,9 @@ public class RedisConfig {
     @Bean
     public CacheManager cacheManager(
             RedisConnectionFactory connectionFactory,
-            @Value("${app.cache.default-ttl:PT10M}") String defaultTtl) {
+            CacheProperties cacheProperties) {
         RedisCacheConfiguration cacheConfiguration = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.parse(defaultTtl))
+                .entryTtl(cacheProperties.defaultTtl())
                 .prefixCacheNameWith(CACHE_KEY_PREFIX)
                 .disableCachingNullValues()
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))

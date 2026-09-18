@@ -268,13 +268,13 @@ class PaymentServiceImplTest {
         }
 
         @Test
-        @DisplayName("Throws ResourceNotFoundException when no payments belong to customer")
+        @DisplayName("Throws PaymentNotFoundException when no payments belong to customer")
         void getPaymentByOrderId_notFound() {
             when(paymentRepository.findAllByOrderIdAndCustomerId(orderId, customerId))
                     .thenReturn(List.of());
 
             assertThatThrownBy(() -> paymentService.getPaymentByOrderId(orderId, customerId))
-                    .isInstanceOf(ResourceNotFoundException.class)
+                    .isInstanceOf(PaymentNotFoundException.class)
                     .hasMessageContaining("Payment not found for order");
         }
     }
