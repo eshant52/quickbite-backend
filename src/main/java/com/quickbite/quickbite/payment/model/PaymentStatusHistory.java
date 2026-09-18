@@ -24,4 +24,7 @@ public class PaymentStatusHistory extends Base {
     @JdbcTypeCode(SqlTypes.ENUM)
     @Column(columnDefinition = "payment_status", nullable = false)
     private PaymentStatus status;
+
+    @Column(columnDefinition = "TEXT")
+    private String reason;
 }

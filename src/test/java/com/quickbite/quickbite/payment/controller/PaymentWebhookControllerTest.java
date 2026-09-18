@@ -32,6 +32,18 @@ class PaymentWebhookControllerTest {
         ResponseEntity<Void> response = paymentWebhookController.handleStubWebhook(payload);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(paymentWebhookService).handleWebhook("STUB-ABC12345", PaymentStatus.SUCCESS);
+        verify(paymentWebhookService).handleStubOnlineWebhook("STUB-ABC12345", PaymentStatus.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("handleRazorpayWebhook delegates to service and returns 200 OK")
+    void handleRazorpayWebhook_success() {
+        String rawBody = "{\"event\":\"payment.captured\"}";
+        String signature = "test_sig_123";
+
+        ResponseEntity<Void> response = paymentWebhookController.handleRazorpayWebhook(rawBody, signature);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(paymentWebhookService).handleRazorpayWebhook(rawBody, signature);
     }
 }

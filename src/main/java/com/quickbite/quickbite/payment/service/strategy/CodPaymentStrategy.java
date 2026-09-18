@@ -1,16 +1,14 @@
 package com.quickbite.quickbite.payment.service.strategy;
 
-import com.quickbite.quickbite.cart.repository.CartRepository;
 import com.quickbite.quickbite.common.event.order.OrderPlacedEvent;
+import com.quickbite.quickbite.common.utils.TransactionIdGenerator;
 import com.quickbite.quickbite.order.model.Order;
 import com.quickbite.quickbite.payment.dto.CodPaymentResult;
 import com.quickbite.quickbite.payment.dto.PaymentResult;
 import com.quickbite.quickbite.payment.model.Payment;
 import com.quickbite.quickbite.payment.model.PaymentMethod;
-import com.quickbite.quickbite.payment.model.PaymentStatus;
 import com.quickbite.quickbite.payment.model.PaymentStatusHistory;
-import com.quickbite.quickbite.payment.repository.PaymentRepository;
-import com.quickbite.quickbite.payment.repository.PaymentStatusHistoryRepository;
+import com.quickbite.quickbite.payment.service.PaymentLifecycleService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,58 +36,30 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class CodPaymentStrategy implements PaymentStrategy {
 
-    private final PaymentRepository paymentRepository;
-    private final PaymentStatusHistoryRepository paymentStatusHistoryRepository;
-    private final CartRepository cartRepository;
+    private final PaymentLifecycleService paymentLifecycle;
+    private final TransactionIdGenerator transactionIdGenerator;
     private final ApplicationEventPublisher eventPublisher;
 
     public CodPaymentStrategy(
-            PaymentRepository paymentRepository,
-            PaymentStatusHistoryRepository paymentStatusHistoryRepository,
-            CartRepository cartRepository,
+            PaymentLifecycleService paymentLifecycle,
+            TransactionIdGenerator transactionIdGenerator,
             ApplicationEventPublisher eventPublisher) {
-        this.paymentRepository = paymentRepository;
-        this.paymentStatusHistoryRepository = paymentStatusHistoryRepository;
-        this.cartRepository = cartRepository;
+        this.paymentLifecycle = paymentLifecycle;
+        this.transactionIdGenerator = transactionIdGenerator;
         this.eventPublisher = eventPublisher;
     }
 
     @Override
     @Transactional
     public PaymentResult initiate(Order order, PaymentMethod paymentMethod) {
+        // 1. Create the payment with status pending
+        Payment payment = paymentLifecycle.createPendingPayment(
+                order,
+                transactionIdGenerator.generate("COD"),
+                paymentMethod
+        );
 
-        // 1. Persist Payment record
-        Payment payment = new Payment();
-        payment.setOrder(order);
-        payment.setPaymentMethod(PaymentMethod.COD);
-        payment.setTransactionId("COD-" + order.getId().toString().substring(0, 8).toUpperCase());
-        payment.setAmount(order.getTotalAmount());
-        payment.setCurrentStatus(PaymentStatus.PENDING);
-        paymentRepository.save(payment);
-
-        // 2. Persist payment status history
-        PaymentStatusHistory paymentHistory = new PaymentStatusHistory();
-        paymentHistory.setPayment(payment);
-        paymentHistory.setStatus(PaymentStatus.PENDING);
-        paymentStatusHistoryRepository.save(paymentHistory);
-
-        // 3. Clear cart — safe for COD (order is committed, no gateway risk)
-        cartRepository.findByCustomer(order.getCustomer())
-                .ifPresent(cartRepository::delete);
-
-        // 4. Register OrderPlacedEvent to be published AFTER this transaction commits.
-        //    OrderKafkaEventPublisher picks this up via @TransactionalEventListener(AFTER_COMMIT),
-        //    ensuring Kafka consumers always find committed order data.
-        eventPublisher.publishEvent(new OrderPlacedEvent(
-                order.getId(),
-                order.getCustomer().getId(),
-                order.getCustomer().getName(),
-                order.getCustomer().getEmail(),
-                order.getRestaurant().getId(),
-                order.getRestaurant().getName(),
-                order.getTotalAmount(),
-                order.getCreatedAt()
-        ));
+        paymentLifecycle.processCodPaymentSuccess(payment.getId());
 
         return new CodPaymentResult(
                 payment.getId(),

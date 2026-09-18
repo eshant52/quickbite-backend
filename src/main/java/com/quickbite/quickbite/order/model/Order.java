@@ -26,7 +26,13 @@ import java.util.List;
 @Setter
 @Audited
 @Entity
-@Table(name = "orders")
+@Table(
+        name = "orders",
+        indexes = {
+                // Partial index in PostgreSQL: ON orders (created_at) WHERE current_status = 'AWAITING_PAYMENT'
+                @Index(name = "idx_orders_awaiting_payment_created", columnList = "created_at")
+        }
+)
 public class Order extends Base {
     @ManyToOne
     @JoinColumn(nullable = false)
@@ -105,4 +111,8 @@ public class Order extends Base {
     /** Estimated driving duration from restaurant to customer in seconds. */
     @Column
     private Long estimatedDeliverySeconds;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 }

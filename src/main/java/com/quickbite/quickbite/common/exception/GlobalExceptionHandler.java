@@ -207,6 +207,15 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(com.quickbite.quickbite.payment.exception.PaymentVerificationException.class)
+    public ProblemDetail handlePaymentVerificationException(
+            com.quickbite.quickbite.payment.exception.PaymentVerificationException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problemDetail.setTitle("Payment Verification Failed");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
     // Unknown exception
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleException(Exception e) {

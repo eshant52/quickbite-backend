@@ -49,9 +49,7 @@ class OrderCreationServiceImplTest {
 
     private static final GeometryFactory GF = new GeometryFactory(new PrecisionModel(), 4326);
 
-    @Mock private OrderRepository orderRepository;
-    @Mock private OrderItemRepository orderItemRepository;
-    @Mock private OrderStatusHistoryRepository orderStatusHistoryRepository;
+    @Mock private OrderLifecycleService orderLifecycleService;
     @Mock private UserRepository userRepository;
     @Mock private AddressRepository addressRepository;
     @Mock private CartRepository cartRepository;
@@ -81,15 +79,13 @@ class OrderCreationServiceImplTest {
         );
 
         orderCreationService = new OrderCreationServiceImpl(
-                orderRepository,
-                orderItemRepository,
-                orderStatusHistoryRepository,
                 userRepository,
                 addressRepository,
                 cartRepository,
                 routingGateway,
                 calculators,
-                feeProperties
+                feeProperties,
+                orderLifecycleService
         );
 
         UUID customerId = UUID.randomUUID();
@@ -146,11 +142,17 @@ class OrderCreationServiceImplTest {
         when(routingGateway.route(any(GeoPoint.class), any(GeoPoint.class)))
                 .thenReturn(new RouteResult(4200.0, 720));
 
-        when(orderRepository.save(any(Order.class))).thenAnswer(i -> {
-            Order o = i.getArgument(0);
-            o.setId(UUID.randomUUID());
-            return o;
-        });
+        when(orderLifecycleService.persistNewOrder(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(i -> {
+                    Order o = new Order();
+                    o.setId(UUID.randomUUID());
+                    o.setDeliveryFee(i.getArgument(4));
+                    RouteResult r = i.getArgument(3);
+                    o.setDeliveryDistanceMeters(r.distanceMeters());
+                    o.setEstimatedDeliverySeconds((long) r.durationSeconds());
+                    o.setCurrentStatus(i.getArgument(10));
+                    return o;
+                });
 
         Order createdOrder = orderCreationService.createOrderWithItems(customer.getId(), req);
 
@@ -158,10 +160,8 @@ class OrderCreationServiceImplTest {
         assertThat(createdOrder.getDeliveryFee()).isEqualByComparingTo(BigDecimal.valueOf(48.60));
         assertThat(createdOrder.getDeliveryDistanceMeters()).isEqualTo(4200.0);
         assertThat(createdOrder.getEstimatedDeliverySeconds()).isEqualTo(720L);
-        assertThat(createdOrder.getCurrentStatus()).isEqualTo(OrderStatus.PLACED);
+        assertThat(createdOrder.getCurrentStatus()).isEqualTo(OrderStatus.AWAITING_PAYMENT);
 
-        verify(orderRepository).save(any(Order.class));
-        verify(orderItemRepository).saveAll(any());
-        verify(orderStatusHistoryRepository).save(any());
+        verify(orderLifecycleService).persistNewOrder(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 }

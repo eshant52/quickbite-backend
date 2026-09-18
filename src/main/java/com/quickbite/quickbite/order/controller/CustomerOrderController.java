@@ -7,6 +7,7 @@ import com.quickbite.quickbite.order.dto.OrderSummaryResponse;
 import com.quickbite.quickbite.order.dto.PlaceOrderRequest;
 import com.quickbite.quickbite.order.service.CustomerOrderService;
 import com.quickbite.quickbite.payment.dto.PaymentResult;
+import com.quickbite.quickbite.payment.model.PaymentMethod;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -64,6 +65,16 @@ public class CustomerOrderController {
             @PathVariable UUID orderId) {
         UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);
         return ResponseEntity.ok(customerOrderService.getMyOrder(customerId, orderId));
+    }
+
+    @PostMapping("/{orderId}/retry-payment")
+    public ResponseEntity<PaymentResult> retryPayment(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID orderId,
+            @RequestParam(value = "paymentMethod", required = false) PaymentMethod paymentMethod) {
+        UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);
+        PaymentResult result = customerOrderService.retryPayment(customerId, orderId, paymentMethod);
+        return ResponseEntity.ok(result);
     }
 
     @DeleteMapping("/{orderId}/cancel")

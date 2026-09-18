@@ -17,6 +17,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,10 +47,14 @@ class PaymentControllerTest {
         PaymentResponse sampleResponse = new PaymentResponse(
                 UUID.randomUUID(),
                 orderId,
+                "TXN-123",
                 PaymentMethod.UPI,
                 new BigDecimal("25.50"),
                 PaymentStatus.SUCCESS,
-                Instant.now()
+                "order_rzp_123",
+                "pay_123",
+                Instant.now(),
+                List.of()
         );
 
         when(authenticatedSessionResolver.userIdFromJwt(jwt)).thenReturn(customerId);

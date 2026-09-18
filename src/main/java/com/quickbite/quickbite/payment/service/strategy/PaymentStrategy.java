@@ -4,6 +4,8 @@ import com.quickbite.quickbite.order.model.Order;
 import com.quickbite.quickbite.payment.dto.PaymentResult;
 import com.quickbite.quickbite.payment.model.PaymentMethod;
 
+import java.util.UUID;
+
 public interface PaymentStrategy {
     /**
      * Initiates payment for the given order using this strategy.

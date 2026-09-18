@@ -10,5 +10,6 @@ public enum OrderNotificationType {
     OUT_FOR_DELIVERY,
     PLACED,
     PREPARING,
-    READY_FOR_PICKUP
+    READY_FOR_PICKUP,
+    ABANDONED
 }

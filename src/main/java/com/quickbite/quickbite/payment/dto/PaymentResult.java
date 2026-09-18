@@ -15,9 +15,10 @@ import java.util.UUID;
 )
 @JsonSubTypes({
         @JsonSubTypes.Type(value = CodPaymentResult.class, name = "COD"),
-        @JsonSubTypes.Type(value = StubOnlinePaymentResult.class, name = "STUB_ONLINE")
+        @JsonSubTypes.Type(value = StubOnlinePaymentResult.class, name = "STUB_ONLINE"),
+        @JsonSubTypes.Type(value = OnlinePaymentResult.class, name = "ONLINE")
 })
-public sealed interface PaymentResult permits CodPaymentResult, StubOnlinePaymentResult {
+public sealed interface PaymentResult permits CodPaymentResult, StubOnlinePaymentResult, OnlinePaymentResult {
 
     UUID paymentId();
     UUID orderId();

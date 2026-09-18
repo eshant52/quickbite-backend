@@ -1,0 +1,419 @@
+package com.quickbite.quickbite.payment.service;
+
+import com.quickbite.quickbite.common.event.payment.PaymentCancelledEvent;
+import com.quickbite.quickbite.common.event.payment.PaymentFailedEvent;
+import com.quickbite.quickbite.common.event.payment.PaymentStatusChangedEvent;
+import com.quickbite.quickbite.common.event.payment.PaymentSucceededEvent;
+import com.quickbite.quickbite.common.exception.BadRequestException;
+import com.quickbite.quickbite.order.model.Order;
+import com.quickbite.quickbite.payment.dto.GatewayOrder;
+import com.quickbite.quickbite.payment.exception.PaymentNotFoundException;
+import com.quickbite.quickbite.payment.model.Payment;
+import com.quickbite.quickbite.payment.model.PaymentMethod;
+import com.quickbite.quickbite.payment.model.PaymentStatus;
+import com.quickbite.quickbite.payment.model.PaymentStatusHistory;
+import com.quickbite.quickbite.payment.repository.PaymentRepository;
+import com.quickbite.quickbite.payment.repository.PaymentStatusHistoryRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Manages the full lifecycle of {@link Payment} entities.
+ *
+ * <h2>Cross-domain boundary</h2>
+ * <p>This service no longer directly imports {@code OrderRepository} or
+ * {@code OrderStatusHistoryRepository}. Order state changes are driven by
+ * internal Spring application events ({@link PaymentSucceededEvent},
+ * {@link PaymentFailedEvent}, {@link PaymentCancelledEvent}) that are
+ * published within the same DB transaction and handled by
+ * {@link com.quickbite.quickbite.order.listener.PaymentEventListener}
+ * ({@code BEFORE_COMMIT} phase) in the order domain.
+ *
+ * <h2>Terminal state guards</h2>
+ * <p>No transition may overwrite a terminal payment status
+ * ({@code REFUNDED} or {@code REFUND_FAILED}), and {@code SUCCESS}
+ * can never be overwritten by {@code FAILED}.
+ */
+@Service
+public class PaymentLifecycleServiceImpl implements PaymentLifecycleService {
+
+    private static final Logger log = LoggerFactory.getLogger(PaymentLifecycleServiceImpl.class);
+
+    private final PaymentRepository paymentRepository;
+    private final PaymentStatusHistoryRepository paymentStatusHistoryRepository;
+    private final ApplicationEventPublisher eventPublisher;
+
+    public PaymentLifecycleServiceImpl(
+            PaymentRepository paymentRepository,
+            PaymentStatusHistoryRepository paymentStatusHistoryRepository,
+            ApplicationEventPublisher eventPublisher) {
+        this.paymentRepository = paymentRepository;
+        this.paymentStatusHistoryRepository = paymentStatusHistoryRepository;
+        this.eventPublisher = eventPublisher;
+    }
+
+    // ── Creation ──────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public Payment createPendingPayment(Order order, String transactionId,
+            PaymentMethod paymentMethod, String gatewayName) {
+        Payment payment = new Payment();
+        payment.setOrder(order);
+        payment.setPaymentMethod(paymentMethod);
+        payment.setTransactionId(transactionId);
+        payment.setAmount(order.getTotalAmount());
+        payment.setCurrentStatus(PaymentStatus.PENDING);
+        payment.setGatewayName(gatewayName);
+
+        Payment savedPayment = paymentRepository.save(payment);
+
+        PaymentStatusHistory history = new PaymentStatusHistory();
+        history.setPayment(savedPayment);
+        history.setStatus(PaymentStatus.PENDING);
+        paymentStatusHistoryRepository.save(history);
+
+        return savedPayment;
+    }
+
+    @Override
+    @Transactional
+    public Payment createPendingPayment(Order order, String transactionId,
+            PaymentMethod paymentMethod) {
+        Payment payment = new Payment();
+        payment.setOrder(order);
+        payment.setPaymentMethod(paymentMethod);
+        payment.setTransactionId(transactionId);
+        payment.setAmount(order.getTotalAmount());
+        payment.setCurrentStatus(PaymentStatus.PENDING);
+
+        Payment savedPayment = paymentRepository.save(payment);
+
+        PaymentStatusHistory history = new PaymentStatusHistory();
+        history.setPayment(savedPayment);
+        history.setStatus(PaymentStatus.PENDING);
+        paymentStatusHistoryRepository.save(history);
+
+        return savedPayment;
+    }
+
+    @Override
+    @Transactional
+    public Payment updateGatewayOrder(UUID paymentId, GatewayOrder gatewayOrder) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
+        payment.setGatewayOrderId(gatewayOrder.gatewayOrderId());
+        return paymentRepository.save(payment);
+    }
+
+    // ── Gateway-driven transitions ────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public void processOnlinePaymentSuccess(String gatewayOrderId, String gatewayPaymentId) {
+        Payment payment = paymentRepository.findByGatewayOrderIdForUpdate(gatewayOrderId)
+                .orElseThrow(() -> new PaymentNotFoundException(
+                        "Payment not found for gateway order: " + gatewayOrderId));
+        applySuccessTransition(payment, gatewayPaymentId);
+    }
+
+    @Override
+    @Transactional
+    public void processOnlinePaymentFailed(String gatewayOrderId, String reason) {
+        Payment payment = paymentRepository.findByGatewayOrderIdForUpdate(gatewayOrderId)
+                .orElseThrow(() -> new PaymentNotFoundException(
+                        "Payment not found for gateway order: " + gatewayOrderId));
+        applyFailedTransition(payment, reason);
+    }
+
+    @Override
+    @Transactional
+    public void processStubPayment(String transactionId, PaymentStatus status) {
+        Payment payment = paymentRepository.findByTransactionId(transactionId)
+                .orElseThrow(() -> new PaymentNotFoundException(
+                        "Payment not found for transaction " + transactionId));
+
+        if (status != PaymentStatus.SUCCESS && status != PaymentStatus.FAILED) {
+            throw new BadRequestException("Invalid payment status for webhook: " + status);
+        }
+
+        if (status == PaymentStatus.FAILED) {
+            applyFailedTransition(payment, "Stub webhook: payment failed");
+        } else {
+            applySuccessTransition(payment, null);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void processCodPaymentSuccess(UUID paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
+        applySuccessTransition(payment, null);
+    }
+
+    @Override
+    @Transactional
+    public void reconcilePaidPayment(UUID paymentId, String gatewayPaymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
+        applySuccessTransition(payment, gatewayPaymentId);
+    }
+
+    @Override
+    @Transactional
+    public void reconcileExpiredPayment(UUID paymentId, String reason) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
+        applyCancelledTransition(payment, reason);
+    }
+
+    @Override
+    @Transactional
+    public void cancelPendingPayments(UUID orderId, String reason) {
+        List<Payment> pending = paymentRepository.findByOrderIdAndCurrentStatus(
+                orderId, PaymentStatus.PENDING);
+        for (Payment payment : pending) {
+            applyCancelledTransition(payment, reason);
+        }
+    }
+
+    // ── Explicit status setters ───────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public void markSuccess(UUID paymentId, String gatewayPaymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
+        applySuccessTransition(payment, gatewayPaymentId);
+    }
+
+    @Override
+    @Transactional
+    public void markFailed(UUID paymentId, String reason) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
+        applyFailedTransition(payment, reason);
+    }
+
+    @Override
+    @Transactional
+    public void markCancelled(UUID paymentId, String reason) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
+        applyCancelledTransition(payment, reason);
+    }
+
+    @Override
+    @Transactional
+    public void markRefunded(UUID paymentId, String reason) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
+
+        PaymentStatus previousStatus = payment.getCurrentStatus();
+
+        if (previousStatus == PaymentStatus.REFUNDED) {
+            log.info("Payment {} is already REFUNDED. Skipping.", paymentId);
+            return;
+        }
+
+        updatePaymentStatus(payment, PaymentStatus.REFUNDED, reason);
+
+        Order order = payment.getOrder();
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                payment.getId(),
+                order.getId(),
+                order.getCustomer().getId(),
+                previousStatus,
+                PaymentStatus.REFUNDED,
+                payment.getPaymentMethod(),
+                payment.getAmount(),
+                Instant.now()
+        ));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markRefundFailed(UUID paymentId, String reason) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
+
+        if (payment.getCurrentStatus() == PaymentStatus.REFUND_FAILED) {
+            log.info("Payment {} is already REFUND_FAILED. Skipping.", paymentId);
+            return;
+        }
+
+        PaymentStatus previousStatus = payment.getCurrentStatus();
+        updatePaymentStatus(payment, PaymentStatus.REFUND_FAILED, reason);
+
+        Order order = payment.getOrder();
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                payment.getId(),
+                order.getId(),
+                order.getCustomer().getId(),
+                previousStatus,
+                PaymentStatus.REFUND_FAILED,
+                payment.getPaymentMethod(),
+                payment.getAmount(),
+                Instant.now()
+        ));
+    }
+
+    // ── Private transition methods (SRP-compliant, separated by terminal state) ─
+
+    private void applySuccessTransition(Payment payment, String gatewayPaymentId) {
+        if (gatewayPaymentId != null && !gatewayPaymentId.isBlank()) {
+            payment.setGatewayPaymentId(gatewayPaymentId);
+        }
+
+        PaymentStatus previousStatus = payment.getCurrentStatus();
+
+        if (previousStatus == PaymentStatus.SUCCESS) {
+            log.info("Payment {} is already SUCCESS. Skipping.", payment.getId());
+            return;
+        }
+
+        // Never overwrite a terminal refund state
+        if (isRefundTerminal(previousStatus)) {
+            log.warn("Skipping SUCCESS transition — payment {} is in terminal state {}",
+                    payment.getId(), previousStatus);
+            return;
+        }
+
+        updatePaymentStatus(payment, PaymentStatus.SUCCESS, null);
+
+        Order order = payment.getOrder();
+
+        // Publish internal event for order domain to sync state (BEFORE_COMMIT listener)
+        eventPublisher.publishEvent(new PaymentSucceededEvent(
+                payment.getId(),
+                order.getId(),
+                payment.getPaymentMethod(),
+                payment.getGatewayPaymentId(),
+                payment.getAmount()
+        ));
+
+        // Publish Kafka-dispatched event (AFTER_COMMIT)
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                payment.getId(),
+                order.getId(),
+                order.getCustomer().getId(),
+                previousStatus,
+                PaymentStatus.SUCCESS,
+                payment.getPaymentMethod(),
+                payment.getAmount(),
+                Instant.now()
+        ));
+    }
+
+    private void applyFailedTransition(Payment payment, String reason) {
+        PaymentStatus previousStatus = payment.getCurrentStatus();
+
+        if (previousStatus == PaymentStatus.FAILED) {
+            log.info("Payment {} is already FAILED. Skipping.", payment.getId());
+            return;
+        }
+
+        // Terminal state guard: SUCCESS can never be overwritten by FAILED
+        if (previousStatus == PaymentStatus.SUCCESS) {
+            log.warn("Ignoring FAILED transition for already SUCCESS payment: {}", payment.getId());
+            return;
+        }
+
+        if (isRefundTerminal(previousStatus)) {
+            log.warn("Skipping FAILED transition — payment {} is in terminal state {}",
+                    payment.getId(), previousStatus);
+            return;
+        }
+
+        updatePaymentStatus(payment, PaymentStatus.FAILED, reason);
+
+        Order order = payment.getOrder();
+
+        // Publish internal event for order domain to sync state (BEFORE_COMMIT listener)
+        eventPublisher.publishEvent(new PaymentFailedEvent(
+                payment.getId(),
+                order.getId(),
+                reason
+        ));
+
+        // Publish Kafka-dispatched event (AFTER_COMMIT)
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                payment.getId(),
+                order.getId(),
+                order.getCustomer().getId(),
+                previousStatus,
+                PaymentStatus.FAILED,
+                payment.getPaymentMethod(),
+                payment.getAmount(),
+                Instant.now()
+        ));
+    }
+
+    private void applyCancelledTransition(Payment payment, String reason) {
+        PaymentStatus previousStatus = payment.getCurrentStatus();
+
+        if (previousStatus == PaymentStatus.CANCELLED) {
+            log.info("Payment {} is already CANCELLED. Skipping.", payment.getId());
+            return;
+        }
+
+        if (isRefundTerminal(previousStatus)) {
+            log.warn("Skipping CANCELLED transition — payment {} is in terminal state {}",
+                    payment.getId(), previousStatus);
+            return;
+        }
+
+        updatePaymentStatus(payment, PaymentStatus.CANCELLED, reason);
+
+        Order order = payment.getOrder();
+
+        // Publish internal event for order domain to sync state (BEFORE_COMMIT listener).
+        eventPublisher.publishEvent(new PaymentCancelledEvent(
+                payment.getId(),
+                order.getId(),
+                reason
+        ));
+
+        // Publish Kafka-dispatched event (AFTER_COMMIT)
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                payment.getId(),
+                order.getId(),
+                order.getCustomer().getId(),
+                previousStatus,
+                PaymentStatus.CANCELLED,
+                payment.getPaymentMethod(),
+                payment.getAmount(),
+                Instant.now()
+        ));
+    }
+
+    /**
+     * Persists a status change and records status history.
+     * Does NOT save the payment entity itself — relies on Hibernate dirty checking
+     * to flush the {@code currentStatus} field set on the managed entity.
+     */
+    private void updatePaymentStatus(Payment payment, PaymentStatus newStatus, String reason) {
+        payment.setCurrentStatus(newStatus);
+        paymentRepository.save(payment);
+
+        PaymentStatusHistory history = new PaymentStatusHistory();
+        history.setPayment(payment);
+        history.setStatus(newStatus);
+        history.setReason(reason);
+        paymentStatusHistoryRepository.save(history);
+    }
+
+    /** Returns {@code true} if the status is a terminal refund state that should never be overwritten. */
+    private boolean isRefundTerminal(PaymentStatus status) {
+        return status == PaymentStatus.REFUNDED || status == PaymentStatus.REFUND_FAILED;
+    }
+}

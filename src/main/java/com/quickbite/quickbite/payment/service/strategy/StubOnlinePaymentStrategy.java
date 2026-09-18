@@ -1,5 +1,6 @@
 package com.quickbite.quickbite.payment.service.strategy;
 
+import com.quickbite.quickbite.common.utils.TransactionIdGenerator;
 import com.quickbite.quickbite.order.model.Order;
 import com.quickbite.quickbite.payment.dto.PaymentResult;
 import com.quickbite.quickbite.payment.dto.StubOnlinePaymentResult;
@@ -7,78 +8,59 @@ import com.quickbite.quickbite.payment.model.Payment;
 import com.quickbite.quickbite.payment.model.PaymentMethod;
 import com.quickbite.quickbite.payment.model.PaymentStatus;
 import com.quickbite.quickbite.payment.model.PaymentStatusHistory;
-import com.quickbite.quickbite.payment.repository.PaymentRepository;
-import com.quickbite.quickbite.payment.repository.PaymentStatusHistoryRepository;
+import com.quickbite.quickbite.payment.service.PaymentLifecycleService;
+import com.quickbite.quickbite.payment.service.gateway.PaymentGateway;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+
 /**
  * Stub strategy for all online payment methods (UPI, CARD, NET_BANKING, WALLET).
+ *
+ * <p><b>Dev profile only</b> — this bean is registered exclusively when
+ * {@code spring.profiles.active=dev}. In all other profiles, {@link OnlinePaymentStrategy}
+ * handles online payments via the real {@link PaymentGateway}.
  *
  * <p><b>Transaction contract (TX 2 of checkout):</b>
  * <ol>
  *   <li>Creates a {@link Payment} record (status = PENDING).</li>
  *   <li>Records a {@link PaymentStatusHistory} entry.</li>
  *   <li>Returns a {@link StubOnlinePaymentResult} with a fake {@code paymentUrl}
- *       that the client can redirect to for local development.</li>
- * </ol>
- *
- * <p>The cart is <b>not</b> cleared here — it remains alive until the payment
- * gateway webhook confirms success. If payment fails or times out, the customer
- * can retry without losing their cart.
- *
- * <p>No Kafka event is published here. {@code OrderPlacedEvent} will be fired
- * by the webhook handler (once implemented) after the payment is confirmed.
- *
- * <p>Replace this with {@code RazorpayPaymentStrategy} / {@code StripePaymentStrategy}
- * once the real gateway adapters are implemented. Those strategies should:
- * <ol>
- *   <li>Persist the Payment (PENDING) in a fast DB transaction.</li>
- *   <li>Call the gateway HTTP API <em>outside</em> any DB transaction (no connection held).</li>
- *   <li>On success: update payment (SUCCESS), transition order (PLACED), clear cart,
- *       publish {@code OrderPlacedEvent} — all in a new transaction.</li>
- *   <li>On failure: update payment (FAILED), transition order (PAYMENT_FAILED) — new transaction.</li>
+ *       that can be used for local development without real gateway credentials.</li>
  * </ol>
  */
+@Profile("dev")
 @Component
 public class StubOnlinePaymentStrategy implements PaymentStrategy {
 
-    private final PaymentRepository paymentRepository;
-    private final PaymentStatusHistoryRepository paymentStatusHistoryRepository;
+    private final PaymentLifecycleService paymentLifecycle;
+    private final TransactionIdGenerator transactionIdGenerator;
 
     public StubOnlinePaymentStrategy(
-            PaymentRepository paymentRepository,
-            PaymentStatusHistoryRepository paymentStatusHistoryRepository) {
-        this.paymentRepository = paymentRepository;
-        this.paymentStatusHistoryRepository = paymentStatusHistoryRepository;
+            PaymentLifecycleService paymentLifecycle,
+            TransactionIdGenerator transactionIdGenerator) {
+        this.paymentLifecycle = paymentLifecycle;
+        this.transactionIdGenerator = transactionIdGenerator;
     }
 
     @Override
     @Transactional
     public PaymentResult initiate(Order order, PaymentMethod paymentMethod) {
 
-        // 1. Persist Payment record (PENDING — awaiting gateway confirmation)
-        Payment payment = new Payment();
-        payment.setOrder(order);
-        payment.setPaymentMethod(paymentMethod);
-        payment.setTransactionId("STUB-" + order.getId().toString().substring(0, 8).toUpperCase());
-        payment.setAmount(order.getTotalAmount());
-        payment.setCurrentStatus(PaymentStatus.PENDING);
-        paymentRepository.save(payment);
+        Payment createdPayment = paymentLifecycle.createPendingPayment(
+                order,
+                transactionIdGenerator.generate("STUB"),
+                paymentMethod,
+                "STUB_GATEWAY"
+        );
 
-        // 2. Persist payment status history
-        PaymentStatusHistory history = new PaymentStatusHistory();
-        history.setPayment(payment);
-        history.setStatus(PaymentStatus.PENDING);
-        paymentStatusHistoryRepository.save(history);
+        String stubPaymentUrl = "https://stub-gateway.quickbite.local/pay?txn=" + createdPayment.getTransactionId();
 
-        // 3. Return stub result — real strategies would return gateway-specific credentials
-        //    (Razorpay: gatewayOrderId + keyId; Stripe: clientSecret + publishableKey)
-        String stubPaymentUrl = "https://stub-gateway.quickbite.local/pay?txn=" + payment.getTransactionId();
         return new StubOnlinePaymentResult(
-                payment.getId(),
+                createdPayment.getId(),
                 order.getId(),
-                payment.getTransactionId(),
+                createdPayment.getTransactionId(),
                 paymentMethod,
                 PaymentStatus.PENDING,
                 order.getTotalAmount(),

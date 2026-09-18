@@ -11,7 +11,12 @@ import java.util.UUID;
 public interface PaymentQueryService {
 
     /**
-     * Returns the payment record for a given order, used by the customer GET endpoint.
+     * Retrieves the payment details for a given order and customer.
+     *
+     * @param orderId    the UUID of the order
+     * @param customerId the UUID of the customer
+     * @return PaymentResponse containing payment details
+     * @throws com.quickbite.quickbite.payment.exception.PaymentNotFoundException if no payment is found for the given order and customer
      */
     PaymentResponse getPaymentByOrderId(UUID orderId, UUID customerId);
 }

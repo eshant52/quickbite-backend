@@ -107,6 +107,10 @@ public class PaymentEventListener {
                     "title", "Payment Refunded",
                     "message", "Your payment has been refunded. Please check your account for details."
             );
+            case REFUND_FAILED -> Map.of(
+                    "title", "Refund Failed",
+                    "message", "We encountered an issue processing your refund. Our support team is looking into it."
+            );
         };
     }
 
@@ -117,6 +121,7 @@ public class PaymentEventListener {
             case FAILED -> PaymentNotificationType.FAILED;
             case CANCELLED -> PaymentNotificationType.CANCELLED;
             case REFUNDED -> PaymentNotificationType.REFUNDED;
+            case REFUND_FAILED -> PaymentNotificationType.REFUND_FAILED;
         };
     }
 }

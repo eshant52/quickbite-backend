@@ -5,13 +5,18 @@ import com.quickbite.quickbite.payment.model.PaymentStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record PaymentResponse(
         UUID id,
         UUID orderId,
+        String transactionId,
         PaymentMethod method,
         BigDecimal amount,
         PaymentStatus status,
-        Instant createdAt) {
+        String gatewayOrderId,
+        String gatewayPaymentId,
+        Instant createdAt,
+        List<PaymentAttemptSummary> attempts) {
 }

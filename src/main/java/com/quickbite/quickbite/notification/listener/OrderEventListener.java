@@ -105,6 +105,7 @@ public class OrderEventListener {
             case DELIVERED -> OrderNotificationType.DELIVERED;
             case DECLINED -> OrderNotificationType.DECLINED;
             case PAYMENT_FAILED -> OrderNotificationType.PAYMENT_FAILED;
+            case ABANDONED -> OrderNotificationType.ABANDONED;
             default -> null;
         };
 
@@ -191,6 +192,10 @@ public class OrderEventListener {
             case PAYMENT_FAILED -> Map.of(
                     "title", "Payment Failed",
                     "message", "Payment for your order has failed."
+            );
+            case ABANDONED -> Map.of(
+                    "title", "Order Cancelled due to Inactivity",
+                    "message", "Your order was cancelled because payment was not completed within the allowed time."
             );
             default -> Map.of(
                     "title", "Order Updated",

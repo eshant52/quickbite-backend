@@ -5,5 +5,10 @@ public enum PaymentStatus {
     SUCCESS,
     FAILED,
     CANCELLED,
-    REFUNDED
+    REFUNDED,
+    /**
+     * Gateway refund failed. The failure reason is recorded in {@code PaymentStatusHistory}.
+     * No automated retry — the support team investigates via payment history.
+     */
+    REFUND_FAILED
 }

@@ -5,5 +5,6 @@ public enum PaymentNotificationType {
     SUCCESS,
     FAILED,
     CANCELLED,
-    REFUNDED
+    REFUNDED,
+    REFUND_FAILED
 }
