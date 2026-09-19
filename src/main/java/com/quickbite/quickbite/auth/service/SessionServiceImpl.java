@@ -4,185 +4,193 @@ import com.quickbite.quickbite.auth.dto.DeviceInfo;
 import com.quickbite.quickbite.auth.dto.IssuedToken;
 import com.quickbite.quickbite.auth.dto.SessionResponse;
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
-import com.quickbite.quickbite.auth.exception.MaxSessionException;
 import com.quickbite.quickbite.auth.model.RefreshToken;
 import com.quickbite.quickbite.auth.model.RefreshTokenFamily;
 import com.quickbite.quickbite.auth.model.Session;
-import com.quickbite.quickbite.auth.repository.RefreshTokenFamilyRepository;
 import com.quickbite.quickbite.auth.repository.RefreshTokenRepository;
-import com.quickbite.quickbite.auth.repository.SessionRepository;
-import com.quickbite.quickbite.auth.service.token.ChallengeTokenService;
 import com.quickbite.quickbite.auth.util.TokenUtils;
 import com.quickbite.quickbite.common.config.property.AuthProperties;
 import com.quickbite.quickbite.user.model.User;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class SessionServiceImpl implements SessionService {
 
-    private final SessionRepository sessionRepository;
-    private final RefreshTokenFamilyRepository refreshTokenFamilyRepository;
+    private static final String LOCK_PREFIX = "quickbite:session-lock:";
+    private static final String REFRESH_LOCK_PREFIX = "quickbite:refresh-lock:";
+    private static final Duration ROTATION_GRACE_PERIOD = Duration.ofSeconds(2);
+
+    private final SessionPersistenceService sessionPersistenceService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final SessionStoreService sessionStoreService;
-    private final ChallengeTokenService challengeTokenService;
     private final AuthProperties authProperties;
-
+    private final RedissonClient redissonClient;
 
     public SessionServiceImpl(
-            SessionRepository sessionRepository,
-            RefreshTokenFamilyRepository refreshTokenFamilyRepository,
+            SessionPersistenceService sessionPersistenceService,
             RefreshTokenRepository refreshTokenRepository,
             SessionStoreService sessionStoreService,
-            ChallengeTokenService challengeTokenService,
-            AuthProperties authProperties) {
-        this.sessionRepository = sessionRepository;
-        this.refreshTokenFamilyRepository = refreshTokenFamilyRepository;
+            AuthProperties authProperties,
+            RedissonClient redissonClient) {
+        this.sessionPersistenceService = sessionPersistenceService;
         this.refreshTokenRepository = refreshTokenRepository;
         this.sessionStoreService = sessionStoreService;
-        this.challengeTokenService = challengeTokenService;
         this.authProperties = authProperties;
+        this.redissonClient = redissonClient;
     }
 
     @Override
-    @Transactional
     public IssuedToken createNewSession(User user, DeviceInfo deviceInfo) {
         UUID userId = user.getId();
-        if (!sessionStoreService.acquireSessionCreationLock(userId, Duration.ofSeconds(10))) {
+        RLock lock = redissonClient.getLock(LOCK_PREFIX + userId);
+        boolean locked;
+        try {
+            locked = lock.tryLock(0, 10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AuthenticationException("Session creation interrupted. Please try again.");
+        }
+
+        if (!locked) {
             throw new AuthenticationException("Session creation is already in progress. Please try again.");
         }
 
         try {
-            enforceSessionLimit(userId);
-
-            Instant now = Instant.now();
-            Instant expiresAt = now.plus(authProperties.jwt().refreshTokenExpiry());
-
-            // 1. Create Session
-            Session session = new Session();
-            session.setUser(user);
-            session.setDeviceName(deviceInfo.deviceName());
-            session.setDeviceOS(deviceInfo.deviceOs());
-            session.setClientType(deviceInfo.clientType());
-            session.setIp(deviceInfo.ip());
-            session.setLoginAt(now);
-            session.setLastUsedAt(now);
-            session.setExpiresAt(expiresAt);
-            session = sessionRepository.save(session);
-
-            // 2. Create RefreshTokenFamily
-            RefreshTokenFamily family = new RefreshTokenFamily();
-            family.setSession(session);
-            family = refreshTokenFamilyRepository.save(family);
-
-            // 3. Create initial RefreshToken (generation = 1)
+            Instant expiresAt = Instant.now().plus(authProperties.jwt().refreshTokenExpiry());
             String rawToken = TokenUtils.generateOpaqueToken();
-            RefreshToken refreshToken = new RefreshToken();
-            refreshToken.setFamily(family);
-            refreshToken.setTokenHash(TokenUtils.sha256(rawToken));
-            refreshToken.setGeneration(1);
-            refreshToken.setExpiresAt(expiresAt);
-            refreshTokenRepository.save(refreshToken);
 
-            // 4. Track in Redis
-            sessionStoreService.addSession(userId, session.getId(), authProperties.jwt().refreshTokenExpiry());
+            // 1. Transactional persistence: commits to PostgreSQL before returning
+            Session session = sessionPersistenceService.persistNewSession(user, deviceInfo, expiresAt, rawToken);
 
             return new IssuedToken(rawToken, session.getId(), user.getId());
         } finally {
-            sessionStoreService.releaseSessionCreationLock(userId);
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 
     @Override
-    @Transactional
     public IssuedToken validateAndRotate(String rawToken) {
         String hash = TokenUtils.sha256(rawToken);
 
-        RefreshToken existing = refreshTokenRepository.findRefreshTokenWithFamilyAndSessionByTokenHash(hash)
-                .orElseThrow(() -> new AuthenticationException("Invalid or expired refresh token"));
-
-        if (existing.getExpiresAt().isBefore(Instant.now())) {
-            throw new AuthenticationException("Refresh token has expired");
+        // 1. Fast path: check grace cache before acquiring lock
+        Optional<String> fastGraceToken = sessionStoreService.getRotatedTokenGrace(hash);
+        if (fastGraceToken.isPresent()) {
+            return resolveIssuedTokenForCachedHash(hash, fastGraceToken.get());
         }
 
-        RefreshTokenFamily family = existing.getFamily();
-        if (family.getRevokedAt() != null) {
-            throw new AuthenticationException("Session has been revoked");
+        // 2. Lock on the token hash so concurrent requests (e.g. 5ms apart) queue up safely
+        RLock lock = redissonClient.getLock(REFRESH_LOCK_PREFIX + hash);
+        boolean locked;
+        try {
+            locked = lock.tryLock(3, 5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AuthenticationException("Token rotation interrupted. Please try again.");
         }
 
-        Session session = family.getSession();
-
-        // Atomic update: try marking the token used
-        int marked = refreshTokenRepository.markTokenUsed(existing.getId(), Instant.now());
-
-        if (marked == 0) {
-            // BREACH DETECTED! Old token presented after rotation
-            refreshTokenFamilyRepository.revokeFamilyOnBreach(family.getId());
-            sessionRepository.revokeSessionById(session.getId());
-            sessionStoreService.removeSession(session.getUser().getId(), session.getId());
-
-            throw new AuthenticationException("Refresh token reuse detected. Session has been revoked. Please login again.");
+        if (!locked) {
+            throw new AuthenticationException("Token rotation already in progress. Please try again.");
         }
 
-        // SAFE ROTATION PATH
-        String newRawToken = TokenUtils.generateOpaqueToken();
-        RefreshToken nextToken = new RefreshToken();
-        nextToken.setFamily(family);
-        nextToken.setTokenHash(TokenUtils.sha256(newRawToken));
-        nextToken.setGeneration(existing.getGeneration() + 1);
-        nextToken.setExpiresAt(existing.getExpiresAt());
-        refreshTokenRepository.save(nextToken);
+        try {
+            // 3. Double-checked locking: Re-check grace cache after acquiring lock
+            // If another concurrent request just completed rotation, it will have populated the cache!
+            Optional<String> cachedToken = sessionStoreService.getRotatedTokenGrace(hash);
+            if (cachedToken.isPresent()) {
+                return resolveIssuedTokenForCachedHash(hash, cachedToken.get());
+            }
 
-        sessionRepository.updateLastUsed(session.getId(), Instant.now());
+            // 4. Normal rotation logic
+            RefreshToken existing = refreshTokenRepository.findRefreshTokenWithFamilyAndSessionByTokenHash(hash)
+                    .orElseThrow(() -> new AuthenticationException("Invalid or expired refresh token"));
 
-        return new IssuedToken(newRawToken, session.getId(), session.getUser().getId());
+            if (existing.getExpiresAt().isBefore(Instant.now())) {
+                throw new AuthenticationException("Refresh token has expired");
+            }
+
+            RefreshTokenFamily family = existing.getFamily();
+            if (family.getRevokedAt() != null) {
+                throw new AuthenticationException("Session has been revoked");
+            }
+
+            Session session = family.getSession();
+            if (session.getRevokedAt() != null) {
+                throw new AuthenticationException("Session has been revoked");
+            }
+
+            if (session.getExpiresAt().isBefore(Instant.now())) {
+                throw new AuthenticationException("Session has expired");
+            }
+
+            if (!session.getUser().isActive()) {
+                throw new AuthenticationException("Account is deactivated");
+            }
+
+            // Try marking token used
+            boolean marked = sessionPersistenceService.markTokenUsed(existing.getId(), Instant.now());
+
+            if (!marked) {
+                // BREACH DETECTED! Token reuse outside grace period
+                // Revoke in an independent committed transaction (REQUIRES_NEW)
+                sessionPersistenceService.revokeBreachedFamily(family.getId(), session.getId(), session.getUser().getId());
+
+                throw new AuthenticationException("Refresh token reuse detected. Session has been revoked. Please login again.");
+            }
+
+            // SAFE ROTATION PATH
+            String newRawToken = TokenUtils.generateOpaqueToken();
+            sessionPersistenceService.saveRotatedToken(
+                    family,
+                    session,
+                    newRawToken,
+                    existing.getGeneration() + 1,
+                    existing.getExpiresAt()
+            );
+
+            // Cache for 2-second grace window for concurrent requests/retries
+            sessionStoreService.cacheRotatedTokenGrace(hash, newRawToken, ROTATION_GRACE_PERIOD);
+
+            return new IssuedToken(newRawToken, session.getId(), session.getUser().getId());
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
 
     @Override
-    @Transactional
     public void revokeSession(UUID userId, UUID sessionId) {
-        refreshTokenFamilyRepository.revokeFamiliesBySessionId(sessionId);
-        sessionRepository.revokeSessionById(sessionId);
-        sessionStoreService.removeSession(userId, sessionId);
+        sessionPersistenceService.revokeSession(userId, sessionId);
     }
 
     @Override
-    @Transactional
     public void revokeAllSessions(UUID userId) {
-        sessionRepository.revokeAllByUserId(userId);
-        refreshTokenFamilyRepository.revokeFamiliesByUserId(userId);
-        sessionStoreService.removeAllSessions(userId);
+        sessionPersistenceService.revokeAllSessions(userId);
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<SessionResponse> listActiveSessionsForUser(UUID userId) {
-        List<Session> sessions = sessionRepository.findActiveByUserId(userId);
+        List<Session> sessions = sessionPersistenceService.findActiveSessionsByUserId(userId);
         return sessions.stream()
-                .map(s -> new SessionResponse(
-                        s.getId(),
-                        s.getDeviceName(),
-                        s.getDeviceOS(),
-                        s.getClientType() != null ? s.getClientType().name() : null,
-                        s.getIp(),
-                        s.getLastUsedAt(),
-                        s.getLoginAt(),
-                        Math.max(0, (int) Duration.between(Instant.now(), s.getExpiresAt()).toDays())
-                ))
+                .map(SessionResponse::from)
                 .toList();
     }
 
-    private void enforceSessionLimit(UUID userId) {
-        long activeCount = sessionStoreService.getActiveSessionsCount(userId);
-
-        if (activeCount >= authProperties.maxConcurrentSessions()) {
-            String challengeToken = challengeTokenService.generateSessionLimitChallenge(userId);
-            throw new MaxSessionException(challengeToken, authProperties.maxConcurrentSessions());
-        }
+    private IssuedToken resolveIssuedTokenForCachedHash(String hash, String cachedRawToken) {
+        RefreshToken token = refreshTokenRepository.findRefreshTokenWithFamilyAndSessionByTokenHash(hash)
+                .orElseThrow(() -> new AuthenticationException("Invalid or expired refresh token"));
+        Session session = token.getFamily().getSession();
+        return new IssuedToken(cachedRawToken, session.getId(), session.getUser().getId());
     }
 }

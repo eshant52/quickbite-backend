@@ -1,5 +1,8 @@
 package com.quickbite.quickbite.auth.dto;
 
+import com.quickbite.quickbite.auth.model.Session;
+
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -12,4 +15,17 @@ public record SessionResponse(
         Instant lastUsedAt,
         Instant loginAt,
         Integer daysLeft
-) {}
+) {
+    public static SessionResponse from(Session s) {
+        return new SessionResponse(
+                s.getId(),
+                s.getDeviceName(),
+                s.getDeviceOS(),
+                s.getClientType() != null ? s.getClientType().name() : null,
+                s.getIp(),
+                s.getLastUsedAt(),
+                s.getLoginAt(),
+                Math.max(0, (int) Duration.between(Instant.now(), s.getExpiresAt()).toDays())
+        );
+    }
+}

@@ -124,7 +124,7 @@ public class SecurityConfig {
 
         configuration.setAllowedOriginPatterns(allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Client-Type", "X-Session-Management-Token"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Client-Type"));
         configuration.setExposedHeaders(List.of("Set-Cookie"));
         configuration.setAllowCredentials(true);
 

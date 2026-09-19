@@ -1,29 +1,27 @@
 package com.quickbite.quickbite.auth.service;
 
-import com.quickbite.quickbite.auth.dto.*;
-import com.quickbite.quickbite.auth.exception.AuthenticationException;
-import com.quickbite.quickbite.auth.service.token.AccessTokenService;
-import com.quickbite.quickbite.auth.dto.*;
+import com.quickbite.quickbite.auth.dto.AuthResponse;
+import com.quickbite.quickbite.auth.dto.DeviceInfo;
+import com.quickbite.quickbite.auth.dto.IssuedToken;
+import com.quickbite.quickbite.auth.dto.LoginRequest;
+import com.quickbite.quickbite.auth.dto.SessionResponse;
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
 import com.quickbite.quickbite.auth.service.token.AccessTokenService;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 @Service
-@Transactional
 public class AuthServiceImpl implements AuthenticationService, SessionChallengeService, LogoutService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccessTokenService accessTokenService;
     private final SessionService sessionService;
-
 
     public AuthServiceImpl(
             UserRepository userRepository,
@@ -35,7 +33,6 @@ public class AuthServiceImpl implements AuthenticationService, SessionChallengeS
         this.accessTokenService = accessTokenService;
         this.sessionService = sessionService;
     }
-
 
     @Override
     public AuthResponse login(LoginRequest loginRequest, DeviceInfo deviceInfo) {
@@ -70,7 +67,6 @@ public class AuthServiceImpl implements AuthenticationService, SessionChallengeS
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<SessionResponse> getActiveSessionsForUser(UUID userId) {
         return sessionService.listActiveSessionsForUser(userId);
     }
@@ -80,11 +76,14 @@ public class AuthServiceImpl implements AuthenticationService, SessionChallengeS
         sessionService.revokeSession(userId, sessionId);
     }
 
-
     @Override
     public AuthResponse claimSession(UUID userId, DeviceInfo deviceInfo) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationException("Invalid or expired session management token"));
+
+        if (!user.isActive()) {
+            throw new AuthenticationException("Account is deactivated");
+        }
 
         IssuedToken issuedToken = sessionService.createNewSession(user, deviceInfo);
 
@@ -102,7 +101,6 @@ public class AuthServiceImpl implements AuthenticationService, SessionChallengeS
         );
     }
 
-
     @Override
     public AuthResponse refresh(String rawRefreshToken) {
         IssuedToken issuedRotatedToken = sessionService.validateAndRotate(rawRefreshToken);
@@ -110,6 +108,10 @@ public class AuthServiceImpl implements AuthenticationService, SessionChallengeS
         UUID userId = issuedRotatedToken.userId();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AuthenticationException("User not found for refresh token"));
+
+        if (!user.isActive()) {
+            throw new AuthenticationException("Account is deactivated");
+        }
 
         String accessToken = accessTokenService.generateAccessToken(
                 user.getId(),
@@ -126,12 +128,10 @@ public class AuthServiceImpl implements AuthenticationService, SessionChallengeS
         );
     }
 
-
     @Override
     public void logoutCurrentSession(UUID userId, UUID sessionId) {
         sessionService.revokeSession(userId, sessionId);
     }
-
 
     @Override
     public void logoutAllSessions(UUID userId) {

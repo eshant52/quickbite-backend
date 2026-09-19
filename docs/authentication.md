@@ -11,47 +11,50 @@ QuickBite implements a **Hybrid Stateful-Session / Stateless-Token Authenticatio
 ### Architectural Pillars
 * **Self-Issued JWTs**: Acts as its own OAuth 2.0 Authorization Server and Resource Server using asymmetric RSA key pairs (2048-bit `private.pem` and `public.pem`).
 * **Dual JWT Types**: Segregates business API access (`quickbite-api` audience) from session administrative access (`quickbite-auth` audience).
-* **Token Rotation & Breach Detection**: Implements Refresh Token Families (`RefreshTokenFamily`). Using an already-rotated or reused refresh token triggers security breach protocol, instantly invalidating the entire family.
-* **Dual-Layer Persistence**: Active session state is mirrored in **Redis** for fast, low-latency validation and **PostgreSQL** for audit compliance and long-term history.
+* **Token Rotation & Breach Detection**: Implements Refresh Token Families (`RefreshTokenFamily`). Using an already-rotated or reused refresh token triggers security breach protocol, instantly invalidating the entire family via an independent committed transaction (`REQUIRES_NEW`).
+* **Authoritative Persistence & Distributed Concurrency**: Active session state and concurrency limits are authoritatively enforced in **PostgreSQL** (eliminating ghost session lockouts), while **Redisson** provides distributed locking (`RLock`) and **Redis** provides a 2-second grace cache for concurrent token rotation retries.
 * **XSS & CSRF Defense**: Long-lived refresh tokens are strictly transported via `HttpOnly`, `Secure`, `SameSite=Strict` cookies (`qb_refresh_token`).
 
 ---
 
 ## 2. Package & Component Structure
 
-The `com.quickbite.quickbite.auth` domain is organized into distinct subpackages:
+The `com.quickbite.quickbite.auth` domain is organized into distinct packages:
 
 ```
 com.quickbite.quickbite.auth
 ├── controller
-│   └── AuthController.java                      # REST Endpoints for Auth & Session management
+│   ├── AuthenticationController.java            # Login and Refresh endpoints
+│   ├── LogoutController.java                    # Logout and session invalidation
+│   ├── SessionChallengeController.java          # Session limit challenge & eviction endpoints
+│   └── UserRegistrationController.java          # Customer registration
 ├── dto
-│   ├── AuthResponse.java                        # Response payload containing Access & Challenge tokens
+│   ├── AuthResponse.java                        # Response payload containing Access token
 │   ├── AuthenticatedSession.java                # Value object representing decoded (userId, sessionId)
-│   ├── ClaimSessionRequest.java                 # Request payload for target session eviction
-│   ├── DeviceInfo.java                          # Extracted client metadata (ip, browser, os, deviceType)
+│   ├── DeviceInfo.java                          # Extracted client metadata (ip, browser, os, clientType)
 │   ├── IssuedToken.java                         # Internal DTO for minted token state
 │   ├── LoginRequest.java / RegisterRequest.java # Authentication request DTOs
-│   ├── MaxSessionResponse.java                  # Returned when concurrent session limit is hit
-│   ├── RefreshRequest.java                      # Request payload for manual refresh token calls
+│   ├── SessionLimitErrorResponse.java           # Returned (HTTP 409) when concurrent limit is hit
 │   └── SessionResponse.java                     # Public DTO for active session details
 ├── exception
 │   ├── AuthenticationException.java             # Base domain exception (HTTP 401)
-│   └── MaxSessionException.java                 # Thrown when session limit is breached (HTTP 409/400)
+│   └── MaxSessionException.java                 # Thrown when session limit is breached (HTTP 409)
 ├── model
 │   ├── ClientType.java                          # Enum (WEB, MOBILE_APP, TABLET, DESKTOP)
-│   ├── RefreshToken.java                        # Individual refresh token entity
+│   ├── RefreshToken.java                        # Individual refresh token entity (hashed)
 │   ├── RefreshTokenFamily.java                  # Aggregate root tracking token rotation lineage
 │   └── Session.java                             # Active user session entity
 ├── repository
-│   └── RefreshTokenRepository.java              # JPA repository for tokens & families
+│   ├── RefreshTokenFamilyRepository.java        # JPA repository for token families
+│   ├── RefreshTokenRepository.java              # JPA repository for hashed refresh tokens
+│   └── SessionRepository.java                   # JPA repository for sessions (counts, lookups)
 ├── service
 │   ├── AuthCookieService(Impl).java             # Manages HttpOnly refresh token cookies
 │   ├── AuthService(Impl).java                   # Orchestrates authentication, registration, claim flows
-│   ├── AuthenticatedSessionResolver(Impl).java  # Resolves (userId, sessionId) from Spring Security Jwt
-│   ├── SessionService(Impl).java                # Core session lifecycle & rotation engine
-│   ├── SessionStoreService.java                 # Abstraction for session persistence
-│   ├── SessionRedisStoreService.java            # Redis implementation of session store
+│   ├── SessionService(Impl).java                # Lock coordinator & facade for session lifecycle
+│   ├── SessionPersistenceService(Impl).java     # Declarative @Transactional PostgreSQL worker
+│   ├── SessionStoreService.java                 # Abstraction for volatile cache operations
+│   ├── SessionRedisStoreService.java            # Redis implementation (2s rotation grace window)
 │   └── token
 │       ├── AccessTokenService.java              # Mints and verifies API Access Tokens (PT15M)
 │       ├── ChallengeTokenService.java           # Mints and verifies Session Challenge Tokens (PT5M)
@@ -127,7 +130,7 @@ erDiagram
 | **Lifetime**          | 15 Minutes (`PT15M`)             | 5 Minutes (`PT5M`)                                               | 7 Days (`P7D`)              |
 | **Audience (`aud`)**  | `quickbite-api`                  | `quickbite-auth`                                                 | N/A                         |
 | **Granted Authority** | `SCOPE_API` + `ROLE_*`           | `SCOPE_AUTH`                                                     | N/A                         |
-| **Transport**         | Header (`Authorization: Bearer`) | Header (`Authorization: Bearer` or `X-Session-Management-Token`) | Cookie (`qb_refresh_token`) |
+| **Transport**         | Header (`Authorization: Bearer`) | Header (`Authorization: Bearer`)                                 | Cookie (`qb_refresh_token`) |
 | **Storage**           | Stateless (Memory)               | Stateless (Memory)                                               | Redis & PostgreSQL (Hashed) |
 
 ### 4.2 Spring Security Request Lifecycle
@@ -222,32 +225,41 @@ When a client presents a Refresh Token, the system rotates it. If an attacker at
 sequenceDiagram
     autonumber
     participant Client
-    participant AuthController
-    participant SessionServiceImpl
-    participant RefreshTokenRepository
-    participant SessionStoreService
+    participant AuthenticationController
+    participant SessionServiceImpl as SessionServiceImpl (Coordinator)
+    participant Redis as Redis (Grace & Redisson Lock)
+    participant SessionPersistenceService as SessionPersistenceService (DB Worker)
+    participant DB as PostgreSQL
 
-    Client->>AuthController: POST /api/v1/auth/refresh-token (Cookie)
-    AuthController->>SessionServiceImpl: validateAndRotate(rawRefreshToken)
+    Client->>AuthenticationController: POST /api/v1/auth/refresh-token (Cookie)
+    AuthenticationController->>SessionServiceImpl: validateAndRotate(rawRefreshToken)
     SessionServiceImpl->>SessionServiceImpl: Hash Token (SHA-256)
-    SessionServiceImpl->>RefreshTokenRepository: findByTokenHash(hash)
-
-    alt Token Not Found OR Expired
-        RefreshTokenRepository-->>SessionServiceImpl: Empty / Expired
-        SessionServiceImpl-->>AuthController: Throw AuthenticationException
-        AuthController-->>Client: 401 Unauthorized
-    else Token Found & Used == true (BREACH DETECTED!)
-        Note over SessionServiceImpl: Security Incident: Refresh Token Reused!
-        SessionServiceImpl->>RefreshTokenRepository: Invalidate Token Family (is_invalidated = true)
-        SessionServiceImpl->>SessionStoreService: Revoke Session (Redis & DB)
-        SessionServiceImpl-->>AuthController: Throw AuthenticationException("Security Breach Detected")
-        AuthController-->>Client: 401 Unauthorized (All Tokens Revoked)
-    else Token Found & Valid (Used == false)
-        SessionServiceImpl->>RefreshTokenRepository: Mark current token as USED
-        SessionServiceImpl->>RefreshTokenRepository: Issue NEW RefreshToken in same Family
-        SessionServiceImpl->>SessionStoreService: Update Session last_accessed_at
-        SessionServiceImpl-->>AuthController: Return New IssuedToken
-        AuthController-->>Client: 200 OK (New Set-Cookie & Access Token)
+    
+    SessionServiceImpl->>Redis: 1. Fast Grace Check: getRotatedTokenGrace(hash)
+    alt Fast Grace Cache Hit (Concurrent Replay)
+        Redis-->>SessionServiceImpl: Cached New Token
+        SessionServiceImpl-->>AuthenticationController: Return IssuedToken
+    else Cache Miss
+        SessionServiceImpl->>Redis: 2. Acquire Redisson Lock (quickbite:refresh-lock:<hash>)
+        SessionServiceImpl->>Redis: 3. Double-Check Grace Cache
+        alt Grace Cache Hit After Lock
+            SessionServiceImpl-->>AuthenticationController: Return IssuedToken
+        else Proceed with Rotation
+            SessionServiceImpl->>SessionPersistenceService: markTokenUsed(tokenId)
+            alt Already Used (BREACH DETECTED!)
+                Note over SessionServiceImpl, DB: Security Incident: Token Reuse outside grace window!
+                SessionServiceImpl->>SessionPersistenceService: revokeBreachedFamily(REQUIRES_NEW)
+                SessionPersistenceService->>DB: COMMIT Revocation of Family & Session
+                SessionServiceImpl-->>AuthenticationController: Throw AuthenticationException ("Refresh token reuse detected")
+                AuthenticationController-->>Client: 401 Unauthorized
+            else Marked Successfully (SAFE PATH)
+                SessionServiceImpl->>SessionPersistenceService: saveRotatedToken(...)
+                SessionPersistenceService->>DB: INSERT next gen token & UPDATE session lastUsedAt
+                SessionServiceImpl->>Redis: cacheRotatedTokenGrace(oldHash, newRawToken, 2s)
+                SessionServiceImpl-->>AuthenticationController: Return New IssuedToken
+                AuthenticationController-->>Client: 200 OK (New Refresh Cookie & Access Token)
+            end
+        end
     end
 ```
 
@@ -262,25 +274,28 @@ sequenceDiagram
     autonumber
     actor User
     participant Client
-    participant AuthController
+    participant SessionChallengeController
     participant AuthServiceImpl
     participant SessionServiceImpl
+    participant SessionPersistenceService
+    participant DB as PostgreSQL
 
     Note over User, Client: Login fails with 409 Conflict -> Received Challenge Token
     User->>Client: Select Session to Evict (targetSessionId)
-    Client->>AuthController: POST /api/v1/auth/claim-session (Header: Bearer ChallengeToken)
+    Client->>SessionChallengeController: POST /api/v1/auth/claim-session (Header: Bearer ChallengeToken)
     
-    Note over AuthController: SecurityFilter verifies ChallengeToken (aud: quickbite-auth -> SCOPE_AUTH)
-    AuthController->>AuthServiceImpl: claimSession(userId, targetSessionId, DeviceInfo)
+    Note over SessionChallengeController: SecurityFilter verifies ChallengeToken (aud: quickbite-auth -> SCOPE_AUTH)
+    SessionChallengeController->>AuthServiceImpl: claimSession(userId, targetSessionId, DeviceInfo)
     
     AuthServiceImpl->>SessionServiceImpl: revokeSession(userId, targetSessionId)
-    SessionServiceImpl->>SessionServiceImpl: Delete Session & Invalidate Family (Redis & DB)
+    SessionServiceImpl->>SessionPersistenceService: revokeSession(userId, targetSessionId)
+    SessionPersistenceService->>DB: Invalidate Family & Revoke Session (user_id scoped)
     
-    AuthServiceImpl->>SessionServiceImpl: createNewSession(userId, DeviceInfo)
+    AuthServiceImpl->>SessionServiceImpl: createNewSession(user, DeviceInfo)
     SessionServiceImpl-->>AuthServiceImpl: New IssuedToken
     
-    AuthServiceImpl-->>AuthController: AuthResponse (New Access Token & Refresh Cookie)
-    AuthController-->>Client: 200 OK
+    AuthServiceImpl-->>SessionChallengeController: AuthResponse (New Access Token & Refresh Cookie)
+    SessionChallengeController-->>Client: 200 OK
 ```
 
 ---

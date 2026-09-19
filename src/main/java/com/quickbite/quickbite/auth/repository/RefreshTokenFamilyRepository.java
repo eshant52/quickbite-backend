@@ -29,6 +29,11 @@ public interface RefreshTokenFamilyRepository extends JpaRepository<RefreshToken
 
     @Modifying
     @Transactional
+    @Query("UPDATE RefreshTokenFamily f SET f.revokedAt = CURRENT_TIMESTAMP WHERE f.session.id = :sessionId AND f.session.user.id = :userId AND f.revokedAt IS NULL")
+    int revokeFamiliesBySessionIdAndUserId(@Param("sessionId") UUID sessionId, @Param("userId") UUID userId);
+
+    @Modifying
+    @Transactional
     @Query("UPDATE RefreshTokenFamily f SET f.revokedAt = CURRENT_TIMESTAMP WHERE f.session.user.id = :userId AND f.revokedAt IS NULL")
     int revokeFamiliesByUserId(@Param("userId") UUID userId);
 }
