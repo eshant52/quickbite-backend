@@ -9,6 +9,7 @@ import com.quickbite.quickbite.user.model.User;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -19,6 +20,14 @@ import java.util.UUID;
  * ensuring database connections are never held open across external network calls.
  */
 public interface OrderLifecycleService {
+
+    /**
+     * Loads an order by ID with a pessimistic write lock and checks it is not in a terminal state.
+     *
+     * @param orderId the order ID
+     * @return the order entity if not in a terminal state or else null
+     */
+    Optional<Order> getOrderIfNotInTerminalState(UUID orderId);
 
     /**
      * Prepares an order for a payment retry by loading it with a pessimistic write lock,
@@ -138,4 +147,32 @@ public interface OrderLifecycleService {
      * @return true if the status is terminal, false if intermediate
      */
     boolean isTerminal(OrderStatus status);
+
+    /**
+     * Acquires up to {@code batchSize} stale {@code PLACED} orders past their restaurant acceptance deadline
+     * using {@code FOR UPDATE SKIP LOCKED}, marks them {@code CANCELLED} with reason
+     * {@code RESTAURANT_UNRESPONSIVE}, cancels pending payments or refunds successful online payments,
+     * and publishes cancellation events.
+     *
+     * @param now       current timestamp
+     * @param batchSize maximum number of orders to process
+     * @return number of orders processed
+     */
+    int processRestaurantAcceptanceTimeoutBatch(Instant now, int batchSize);
+
+    /**
+     * Cancels a single unaccepted PLACED order in its own isolated transaction.
+     *
+     * @param order the unaccepted order to cancel
+     */
+    void cancelUnacceptedOrder(Order order);
+
+    /**
+     * Cancels an order when proactive delivery dispatch fails to assign an agent within the max window.
+     * Sets status to {@code CANCELLED} with reason {@code NO_AGENT_FOUND}, refunds customer if paid online,
+     * and publishes cancellation events.
+     *
+     * @param orderId the order ID
+     */
+    void cancelDueToNoDeliveryAgent(UUID orderId);
 }

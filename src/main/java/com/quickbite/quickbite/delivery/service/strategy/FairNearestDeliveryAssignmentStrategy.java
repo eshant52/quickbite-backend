@@ -29,7 +29,10 @@ import java.util.Optional;
  *   <li><b>Fairness Tiebreaker:</b> Agents with similar drive times are tie-broken by
  *       {@code lastAssignedAt ASC} (nulls first), guaranteeing starvation-free rotation.</li>
  * </ol>
+ *
+ * @deprecated Superseded by {@link PostgisDeliveryCandidateSelector}.
  */
+@Deprecated(forRemoval = true)
 @Component
 @Primary
 public class FairNearestDeliveryAssignmentStrategy implements DeliveryAssignmentStrategy {

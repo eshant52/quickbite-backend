@@ -85,4 +85,12 @@ public class CustomerOrderController {
         customerOrderService.cancelOrder(customerId, orderId);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/{orderId}/delivery-agent")
+    public ResponseEntity<com.quickbite.quickbite.order.dto.AssignedDeliveryAgentResponse> getAssignedDeliveryAgent(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID orderId) {
+        UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);
+        return ResponseEntity.ok(customerOrderService.getAssignedDeliveryAgent(customerId, orderId));
+    }
 }

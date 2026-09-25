@@ -9,6 +9,7 @@ public final class QuickBiteTopics {
     public static final String VEHICLE_APPLICATION_EVENTS = "quickbite.vehicle.application.events";
     public static final String CUISINE_EVENTS = "quickbite.cuisine.events";
     public static final String PAYMENT_EVENTS = "quickbite.payment.events";
+    public static final String DELIVERY_EVENTS = "quickbite.delivery.events";
 
     // Dead letter topic suffix convention: <topic>.DLT (managed by DeadLetterPublishingRecoverer)
     public static final String DLT_SUFFIX = ".DLT";

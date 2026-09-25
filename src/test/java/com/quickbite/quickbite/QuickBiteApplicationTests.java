@@ -86,7 +86,9 @@ class QuickBiteApplicationTests {
                         QuickBiteTopics.DELIVERY_AGENT_APPLICATION_EVENTS,
                         QuickBiteTopics.DELIVERY_AGENT_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX,
                         QuickBiteTopics.VEHICLE_APPLICATION_EVENTS,
-                        QuickBiteTopics.VEHICLE_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX);
+                        QuickBiteTopics.VEHICLE_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX,
+                        QuickBiteTopics.DELIVERY_EVENTS,
+                        QuickBiteTopics.DELIVERY_EVENTS + QuickBiteTopics.DLT_SUFFIX);
 
         // DLT topics use 1 partition; domain aggregate streams use 3
         var dltTopics = List.of(
@@ -95,7 +97,8 @@ class QuickBiteApplicationTests {
                 QuickBiteTopics.CUISINE_EVENTS + QuickBiteTopics.DLT_SUFFIX,
                 QuickBiteTopics.PAYMENT_EVENTS + QuickBiteTopics.DLT_SUFFIX,
                 QuickBiteTopics.DELIVERY_AGENT_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX,
-                QuickBiteTopics.VEHICLE_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX
+                QuickBiteTopics.VEHICLE_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX,
+                QuickBiteTopics.DELIVERY_EVENTS + QuickBiteTopics.DLT_SUFFIX
         );
 
         assertThat(topics.values())
@@ -107,7 +110,7 @@ class QuickBiteApplicationTests {
 
         assertThat(topics.values())
                 .filteredOn(topic -> dltTopics.contains(topic.name()))
-                .hasSize(6)
+                .hasSize(7)
                 .allSatisfy(topic -> {
                     assertThat(topic.numPartitions()).isEqualTo(1);
                     assertThat(topic.replicationFactor()).isEqualTo((short) 1);

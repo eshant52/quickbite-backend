@@ -53,7 +53,6 @@ class OrderServiceImplTest {
     @Mock private OrderCreationService orderCreationService;
     @Mock private OrderLifecycleService orderLifecycleService;
     @Mock private PaymentProcessingService paymentService;
-    @Mock private DeliveryAssignmentService deliveryAssignmentService;
     @Mock private RedissonClient redissonClient;
     @Mock private RLock rLock;
     @Mock private RBucket<String> rBucket;
@@ -82,7 +81,6 @@ class OrderServiceImplTest {
                 orderCreationService,
                 orderLifecycleService,
                 paymentService,
-                deliveryAssignmentService,
                 redissonClient,
                 new com.quickbite.quickbite.common.config.property.OrderProperties(15, 100, "0 */5 * * * *", 5)
         );
@@ -320,6 +318,16 @@ class OrderServiceImplTest {
         }
 
         @Test
+        @DisplayName("acceptOrder throws BadRequestException when acceptance deadline has passed")
+        void acceptOrder_expiredDeadline_throwsBadRequestException() {
+            order.setRestaurantAcceptanceDeadline(java.time.Instant.now().minusSeconds(10));
+
+            assertThatThrownBy(() -> orderService.acceptOrder(orderId, restaurantId, ownerId))
+                    .isInstanceOf(com.quickbite.quickbite.common.exception.BadRequestException.class)
+                    .hasMessageContaining("expired");
+        }
+
+        @Test
         @DisplayName("declineOrder delegates status transition to lifecycle service")
         void declineOrder_success() {
             order.setCurrentStatus(OrderStatus.DECLINED);
@@ -346,7 +354,7 @@ class OrderServiceImplTest {
         }
 
         @Test
-        @DisplayName("markReadyForPickup transitions status and triggers autoAssign")
+        @DisplayName("markReadyForPickup transitions status without inline delivery assignment")
         void markReadyForPickup_success() {
             order.setCurrentStatus(OrderStatus.READY_FOR_PICKUP);
             when(orderLifecycleService.transitionStatus(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP))
@@ -356,7 +364,38 @@ class OrderServiceImplTest {
 
             assertThat(response.currentStatus()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
             verify(orderLifecycleService).transitionStatus(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP);
-            verify(deliveryAssignmentService).autoAssign(order);
+        }
+    }
+
+    @Nested
+    @DisplayName("getAssignedDeliveryAgent")
+    class GetAssignedDeliveryAgentTests {
+        @Test
+        @DisplayName("returns assigned delivery agent response when agent is assigned")
+        void getAssignedDeliveryAgent_success() {
+            when(userRepository.findById(customerId)).thenReturn(Optional.of(customer));
+            com.quickbite.quickbite.delivery.model.DeliveryAgent agent = new com.quickbite.quickbite.delivery.model.DeliveryAgent();
+            agent.setId(UUID.randomUUID());
+            agent.setUser(customer);
+            order.setDeliveryAgent(agent);
+            when(orderRepository.findByIdAndCustomerId(orderId, customerId)).thenReturn(Optional.of(order));
+
+            var response = orderService.getAssignedDeliveryAgent(customerId, orderId);
+
+            assertThat(response).isNotNull();
+            assertThat(response.agentId()).isEqualTo(agent.getId());
+        }
+
+        @Test
+        @DisplayName("throws ResourceNotFoundException when delivery agent is not yet assigned")
+        void getAssignedDeliveryAgent_unassigned_throwsNotFound() {
+            when(userRepository.findById(customerId)).thenReturn(Optional.of(customer));
+            order.setDeliveryAgent(null);
+            when(orderRepository.findByIdAndCustomerId(orderId, customerId)).thenReturn(Optional.of(order));
+
+            assertThatThrownBy(() -> orderService.getAssignedDeliveryAgent(customerId, orderId))
+                    .isInstanceOf(com.quickbite.quickbite.common.exception.ResourceNotFoundException.class)
+                    .hasMessageContaining("No delivery agent assigned");
         }
     }
 }

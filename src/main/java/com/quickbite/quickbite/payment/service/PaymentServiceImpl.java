@@ -66,6 +66,22 @@ public class PaymentServiceImpl implements PaymentProcessingService, PaymentQuer
     }
 
     @Override
+    public void refundSuccessfulPayment(UUID orderId, String reason) {
+        List<Payment> successfulPayments = paymentRepository.findByOrderIdAndCurrentStatus(orderId, PaymentStatus.SUCCESS);
+        for (Payment payment : successfulPayments) {
+            if (payment.getPaymentMethod() != null && payment.getPaymentMethod().isOnline()
+                    && payment.getGatewayPaymentId() != null && !payment.getGatewayPaymentId().isBlank()) {
+                eventPublisher.publishEvent(new PaymentRefundRequestedEvent(
+                        payment.getId(),
+                        payment.getGatewayPaymentId(),
+                        payment.getAmount(),
+                        reason
+                ));
+            }
+        }
+    }
+
+    @Override
     public Optional<PaymentResult> reconcileAllPaymentAttempts(UUID orderId) {
         List<Payment> attempts = paymentRepository.findAttemptsForReconciliation(
                 orderId, List.of(PaymentStatus.REFUNDED, PaymentStatus.REFUND_FAILED));

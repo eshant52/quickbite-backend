@@ -78,6 +78,10 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
     // DeliveryAssignmentService Implementation
     // -----------------------------------------------------------------
 
+    /**
+     * @deprecated Superseded by the asynchronous offer-based dispatch flow via {@link DeliveryDispatchService#initiateDispatch(UUID)}.
+     */
+    @Deprecated(forRemoval = true)
     @Override
     public void autoAssign(Order order) {
         DeliveryAgent agent = deliveryAssignmentStrategy.findAgent(order)

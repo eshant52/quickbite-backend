@@ -67,4 +67,20 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Optional<Order> findByIdAndCustomerId(UUID id, UUID customerId);
 
     Optional<Order> findByIdAndRestaurantId(UUID id, UUID restaurantId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")})
+    @Query("""
+            SELECT o FROM Order o
+            WHERE o.currentStatus = :status
+              AND o.restaurantAcceptanceDeadline < :now
+            ORDER BY o.restaurantAcceptanceDeadline ASC
+            """)
+    List<Order> findByCurrentStatusAndRestaurantAcceptanceDeadlineBeforeForUpdateSkipLocked(
+            @Param("status") OrderStatus status,
+            @Param("now") Instant now,
+            Limit limit
+    );
+
+    Optional<Order> findByIdAndCurrentStatusNotIn(UUID id, List<OrderStatus> statuses);
 }

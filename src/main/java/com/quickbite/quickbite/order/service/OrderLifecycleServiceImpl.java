@@ -17,9 +17,13 @@ import com.quickbite.quickbite.order.repository.OrderStatusHistoryRepository;
 import com.quickbite.quickbite.payment.service.PaymentProcessingService;
 import com.quickbite.quickbite.user.model.Address;
 import com.quickbite.quickbite.user.model.User;
+import com.quickbite.quickbite.common.config.property.OrderProperties;
+import com.quickbite.quickbite.order.model.OrderCancellationReason;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -29,6 +33,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -41,18 +46,40 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final PaymentProcessingService paymentService;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderProperties orderProperties;
+    private OrderLifecycleService self;
 
     public OrderLifecycleServiceImpl(
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             OrderStatusHistoryRepository orderStatusHistoryRepository,
             PaymentProcessingService paymentService,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            OrderProperties orderProperties) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
         this.paymentService = paymentService;
         this.eventPublisher = eventPublisher;
+        this.orderProperties = orderProperties;
+    }
+
+    @Autowired
+    public void setSelf(@Lazy OrderLifecycleService self) {
+        this.self = self;
+    }
+
+    private OrderLifecycleService self() {
+        return self != null ? self : this;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Order> getOrderIfNotInTerminalState(UUID orderId) {
+        return orderRepository.findByIdAndCurrentStatusNotIn(
+                orderId,
+                List.of(OrderStatus.ABANDONED, OrderStatus.CANCELLED, OrderStatus.DELIVERED, OrderStatus.DECLINED)
+        );
     }
 
     @Override
@@ -178,6 +205,7 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
         }
 
         order.setCurrentStatus(OrderStatus.CANCELLED);
+        order.setCancellationReason(OrderCancellationReason.CUSTOMER_CANCELLED);
         orderRepository.save(order);
 
         OrderStatusHistory history = new OrderStatusHistory();
@@ -185,12 +213,97 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
         history.setOrderStatus(OrderStatus.CANCELLED);
         orderStatusHistoryRepository.save(history);
 
+        paymentService.refundSuccessfulPayment(order.getId(), "Order cancelled by customer");
         paymentService.cancelPendingPayments(order.getId(), "Order cancelled by customer");
 
         eventPublisher.publishEvent(new OrderCancelledEvent(
                 order.getId(),
                 order.getCustomer().getId(),
                 order.getRestaurant().getId(),
+                Instant.now()
+        ));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int processRestaurantAcceptanceTimeoutBatch(Instant now, int batchSize) {
+        List<Order> unacceptedOrders = orderRepository
+                .findByCurrentStatusAndRestaurantAcceptanceDeadlineBeforeForUpdateSkipLocked(
+                OrderStatus.PLACED,
+                now,
+                Limit.of(batchSize)
+        );
+
+        if (unacceptedOrders.isEmpty()) {
+            return 0;
+        }
+
+        for (Order order : unacceptedOrders) {
+            try {
+                self().cancelUnacceptedOrder(order);
+            } catch (Exception e) {
+                log.error("Failed to cancel unaccepted order {}: {}", order.getId(), e.getMessage(), e);
+            }
+        }
+
+        return unacceptedOrders.size();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void cancelUnacceptedOrder(Order order) {
+        if (order.getCurrentStatus() != OrderStatus.PLACED) {
+            return;
+        }
+
+        order.setCurrentStatus(OrderStatus.CANCELLED);
+        order.setCancellationReason(OrderCancellationReason.RESTAURANT_UNRESPONSIVE);
+        Order saved = orderRepository.save(order);
+
+        OrderStatusHistory history = new OrderStatusHistory();
+        history.setOrder(saved);
+        history.setOrderStatus(OrderStatus.CANCELLED);
+        orderStatusHistoryRepository.save(history);
+
+        paymentService.refundSuccessfulPayment(saved.getId(), "Auto-refund: Restaurant did not accept order within acceptance window");
+        paymentService.cancelPendingPayments(saved.getId(), "Restaurant acceptance window expired");
+
+        eventPublisher.publishEvent(new OrderCancelledEvent(
+                saved.getId(),
+                saved.getCustomer().getId(),
+                saved.getRestaurant().getId(),
+                Instant.now()
+        ));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void cancelDueToNoDeliveryAgent(UUID orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found: " + orderId));
+
+        if (isTerminal(order.getCurrentStatus())) {
+            log.info("Order {} already in terminal state {}, skipping dispatch timeout cancellation.",
+                    order.getId(), order.getCurrentStatus());
+            return;
+        }
+
+        order.setCurrentStatus(OrderStatus.CANCELLED);
+        order.setCancellationReason(OrderCancellationReason.NO_AGENT_FOUND);
+        Order saved = orderRepository.save(order);
+
+        OrderStatusHistory history = new OrderStatusHistory();
+        history.setOrder(saved);
+        history.setOrderStatus(OrderStatus.CANCELLED);
+        orderStatusHistoryRepository.save(history);
+
+        paymentService.refundSuccessfulPayment(saved.getId(), "Auto-refund: No delivery partner available to fulfill order");
+        paymentService.cancelPendingPayments(saved.getId(), "No delivery partner available");
+
+        eventPublisher.publishEvent(new OrderCancelledEvent(
+                saved.getId(),
+                saved.getCustomer().getId(),
+                saved.getRestaurant().getId(),
                 Instant.now()
         ));
     }
@@ -251,6 +364,9 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
         order.setTipAmount(tip);
         order.setTotalAmount(total);
         order.setCurrentStatus(initialStatus);
+        if (initialStatus == OrderStatus.PLACED) {
+            order.setRestaurantAcceptanceDeadline(Instant.now().plus(orderProperties.restaurantAcceptanceWindow()));
+        }
         order.setDeliveryDistanceMeters(route.distanceMeters());
         order.setEstimatedDeliverySeconds(route.durationSeconds());
 

@@ -73,7 +73,8 @@ class OrderLifecycleServiceImplTest {
                 orderItemRepository,
                 orderStatusHistoryRepository,
                 paymentService,
-                eventPublisher
+                eventPublisher,
+                new com.quickbite.quickbite.common.config.property.OrderProperties(15, 100, "0 */5 * * * *", 5)
         );
 
         customerId = UUID.randomUUID();
@@ -454,6 +455,77 @@ class OrderLifecycleServiceImplTest {
             verify(orderRepository).save(order1);
             verify(orderRepository).save(order2);
             assertThat(order2.getCurrentStatus()).isEqualTo(OrderStatus.ABANDONED);
+        }
+    }
+
+    @Nested
+    @DisplayName("Restaurant acceptance timeout and dispatch exhaustion")
+    class RestaurantAcceptanceTimeoutAndExhaustionTests {
+
+        @Test
+        @DisplayName("processRestaurantAcceptanceTimeoutBatch cancels expired PLACED orders and refunds payment")
+        void processRestaurantAcceptanceTimeoutBatch_success() {
+            Instant now = Instant.now();
+            order.setCurrentStatus(OrderStatus.PLACED);
+            when(orderRepository.findByCurrentStatusAndRestaurantAcceptanceDeadlineBeforeForUpdateSkipLocked(
+                    eq(OrderStatus.PLACED), eq(now), eq(Limit.of(50))))
+                    .thenReturn(List.of(order));
+            when(orderRepository.save(order)).thenReturn(order);
+
+            int processed = lifecycleService.processRestaurantAcceptanceTimeoutBatch(now, 50);
+
+            assertThat(processed).isEqualTo(1);
+            assertThat(order.getCurrentStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(order.getCancellationReason()).isEqualTo(com.quickbite.quickbite.order.model.OrderCancellationReason.RESTAURANT_UNRESPONSIVE);
+            verify(paymentService).refundSuccessfulPayment(eq(order.getId()), anyString());
+            verify(paymentService).cancelPendingPayments(eq(order.getId()), anyString());
+            verify(eventPublisher).publishEvent(any(com.quickbite.quickbite.common.event.order.OrderCancelledEvent.class));
+        }
+
+        @Test
+        @DisplayName("cancelDueToNoDeliveryAgent cancels order with NO_AGENT_FOUND and refunds payment")
+        void cancelDueToNoDeliveryAgent_success() {
+            order.setCurrentStatus(OrderStatus.ACCEPTED);
+            when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
+            when(orderRepository.save(order)).thenReturn(order);
+
+            lifecycleService.cancelDueToNoDeliveryAgent(orderId);
+
+            assertThat(order.getCurrentStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(order.getCancellationReason()).isEqualTo(com.quickbite.quickbite.order.model.OrderCancellationReason.NO_AGENT_FOUND);
+            verify(paymentService).refundSuccessfulPayment(eq(order.getId()), anyString());
+            verify(paymentService).cancelPendingPayments(eq(order.getId()), anyString());
+            verify(eventPublisher).publishEvent(any(com.quickbite.quickbite.common.event.order.OrderCancelledEvent.class));
+        }
+
+        @Test
+        @DisplayName("processRestaurantAcceptanceTimeoutBatch continues processing remaining orders when one throws (Fix C4)")
+        void processRestaurantAcceptanceTimeoutBatch_continuesOnSingleFailure() {
+            Instant now = Instant.now();
+            Order order1 = new Order();
+            order1.setId(UUID.randomUUID());
+            order1.setCustomer(order.getCustomer());
+            order1.setRestaurant(order.getRestaurant());
+            order1.setCurrentStatus(OrderStatus.PLACED);
+
+            Order order2 = new Order();
+            order2.setId(UUID.randomUUID());
+            order2.setCustomer(order.getCustomer());
+            order2.setRestaurant(order.getRestaurant());
+            order2.setCurrentStatus(OrderStatus.PLACED);
+
+            when(orderRepository.findByCurrentStatusAndRestaurantAcceptanceDeadlineBeforeForUpdateSkipLocked(
+                    eq(OrderStatus.PLACED), eq(now), eq(Limit.of(50))))
+                    .thenReturn(List.of(order1, order2));
+            when(orderRepository.save(order1)).thenThrow(new RuntimeException("DB error on order1"));
+            when(orderRepository.save(order2)).thenReturn(order2);
+
+            int processed = lifecycleService.processRestaurantAcceptanceTimeoutBatch(now, 50);
+
+            assertThat(processed).isEqualTo(2);
+            verify(orderRepository).save(order1);
+            verify(orderRepository).save(order2);
+            assertThat(order2.getCurrentStatus()).isEqualTo(OrderStatus.CANCELLED);
         }
     }
 }

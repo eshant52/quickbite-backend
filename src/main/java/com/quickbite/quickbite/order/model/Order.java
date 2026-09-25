@@ -20,6 +20,7 @@ import org.hibernate.envers.Audited;
 import org.hibernate.envers.NotAudited;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 
 @Getter
@@ -30,7 +31,8 @@ import java.util.List;
         name = "orders",
         indexes = {
                 // Partial index in PostgreSQL: ON orders (created_at) WHERE current_status = 'AWAITING_PAYMENT'
-                @Index(name = "idx_orders_awaiting_payment_created", columnList = "created_at")
+                @Index(name = "idx_orders_awaiting_payment_created", columnList = "created_at"),
+                @Index(name = "idx_orders_restaurant_acceptance_deadline", columnList = "restaurant_acceptance_deadline")
         }
 )
 public class Order extends Base {
@@ -111,6 +113,15 @@ public class Order extends Base {
     /** Estimated driving duration from restaurant to customer in seconds. */
     @Column
     private Long estimatedDeliverySeconds;
+
+    @Column
+    private Instant restaurantAcceptanceDeadline;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @JdbcTypeCode(SqlTypes.ENUM)
+    @Column(columnDefinition = "order_cancellation_reason")
+    private OrderCancellationReason cancellationReason;
 
     @Version
     @Column(nullable = false)

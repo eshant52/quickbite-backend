@@ -156,6 +156,22 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(com.quickbite.quickbite.delivery.exception.OfferExpiredException.class)
+    public ProblemDetail handleOfferExpiredException(com.quickbite.quickbite.delivery.exception.OfferExpiredException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.valueOf(422));
+        problemDetail.setTitle("Offer Expired");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(ResourceConflictException.class)
+    public ProblemDetail handleResourceConflictException(ResourceConflictException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problemDetail.setTitle("Resource Conflict");
+        problemDetail.setDetail(ex.getMessage());
+        return problemDetail;
+    }
+
     @ExceptionHandler(com.quickbite.quickbite.allotment.exception.AllotmentAlreadyClaimedException.class)
     public ProblemDetail handleAllotmentAlreadyClaimedException(com.quickbite.quickbite.allotment.exception.AllotmentAlreadyClaimedException ex) {
         ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);

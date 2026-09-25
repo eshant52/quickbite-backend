@@ -10,6 +10,10 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * @deprecated Superseded by {@link PostgisDeliveryCandidateSelector}.
+ */
+@Deprecated(forRemoval = true)
 @Slf4j
 @Component
 public class NearestDeliveryAssignmentStrategy implements DeliveryAssignmentStrategy {

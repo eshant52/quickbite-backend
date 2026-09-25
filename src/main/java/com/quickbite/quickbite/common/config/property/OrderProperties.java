@@ -2,6 +2,8 @@ package com.quickbite.quickbite.common.config.property;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.time.Duration;
+
 /**
  * Typed configuration properties for the order domain.
  * Bound from {@code quickbite.order.*} in application properties.
@@ -26,7 +28,12 @@ public record OrderProperties(
         /*
          * Cooldown duration in seconds to prevent accidental duplicate place-order submissions.
          */
-        int placeCooldownSeconds
+        int placeCooldownSeconds,
+
+        /*
+         * Acceptance window for the restaurant after order is placed.
+         */
+        Duration restaurantAcceptanceWindow
 ) {
     public OrderProperties {
         if (abandonTtlMinutes <= 0) {
@@ -41,9 +48,16 @@ public record OrderProperties(
         if (placeCooldownSeconds <= 0) {
             placeCooldownSeconds = 5;
         }
+        if (restaurantAcceptanceWindow == null || restaurantAcceptanceWindow.isZero() || restaurantAcceptanceWindow.isNegative()) {
+            restaurantAcceptanceWindow = Duration.ofMinutes(2);
+        }
+    }
+
+    public OrderProperties(int abandonTtlMinutes, int abandonBatchSize, String abandonCron, int placeCooldownSeconds) {
+        this(abandonTtlMinutes, abandonBatchSize, abandonCron, placeCooldownSeconds, Duration.ofMinutes(2));
     }
 
     public OrderProperties(int abandonTtlMinutes, int abandonBatchSize) {
-        this(abandonTtlMinutes, abandonBatchSize, "0 */5 * * * *", 5);
+        this(abandonTtlMinutes, abandonBatchSize, "0 */5 * * * *", 5, Duration.ofMinutes(2));
     }
 }

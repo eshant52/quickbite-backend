@@ -1,5 +1,6 @@
 package com.quickbite.quickbite.order.listener;
 
+import com.quickbite.quickbite.common.config.property.OrderProperties;
 import com.quickbite.quickbite.common.event.order.OrderPlacedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentCancelledEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentFailedEvent;
@@ -17,6 +18,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+
+import java.time.Instant;
+import java.util.UUID;
 
 /**
  * Handles internal payment domain events to synchronize {@link Order} state.
@@ -40,14 +44,17 @@ public class PaymentEventListener {
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderProperties orderProperties;
 
     public PaymentEventListener(
             OrderRepository orderRepository,
             OrderStatusHistoryRepository orderStatusHistoryRepository,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            OrderProperties orderProperties) {
         this.orderRepository = orderRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
         this.eventPublisher = eventPublisher;
+        this.orderProperties = orderProperties;
     }
 
     /**
@@ -71,6 +78,7 @@ public class PaymentEventListener {
 
         if (current == OrderStatus.AWAITING_PAYMENT) {
             order.setCurrentStatus(OrderStatus.PLACED);
+            order.setRestaurantAcceptanceDeadline(Instant.now().plus(orderProperties.restaurantAcceptanceWindow()));
             orderRepository.save(order);
             recordOrderHistory(order, OrderStatus.PLACED);
 
@@ -115,9 +123,7 @@ public class PaymentEventListener {
      */
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void handlePaymentFailed(PaymentFailedEvent event) {
-        Order order = orderRepository.findById(event.orderId())
-                .orElseThrow(() -> new OrderNotFoundException(
-                        "Order not found for payment sync: " + event.orderId()));
+        Order order = loadOrder(event.orderId());
 
         if (order.getCurrentStatus() == OrderStatus.AWAITING_PAYMENT) {
             order.setCurrentStatus(OrderStatus.PAYMENT_FAILED);
@@ -136,9 +142,7 @@ public class PaymentEventListener {
      */
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void handlePaymentCancelled(PaymentCancelledEvent event) {
-        Order order = orderRepository.findById(event.orderId())
-                .orElseThrow(() -> new OrderNotFoundException(
-                        "Order not found for payment sync: " + event.orderId()));
+        Order order = loadOrder(event.orderId());
 
         if (order.getCurrentStatus() == OrderStatus.AWAITING_PAYMENT) {
             order.setCurrentStatus(OrderStatus.PAYMENT_FAILED);
@@ -154,5 +158,11 @@ public class PaymentEventListener {
         history.setOrder(order);
         history.setOrderStatus(status);
         orderStatusHistoryRepository.save(history);
+    }
+
+    private Order loadOrder(UUID orderId) {
+        return orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(
+                        "Order not found for payment sync: " + orderId));
     }
 }

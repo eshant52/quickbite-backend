@@ -181,4 +181,21 @@ public class KafkaConfig {
                 .replicas(1)
                 .build();
     }
+
+    // 5. Delivery Stream
+    @Bean
+    public NewTopic deliveryEventsTopic() {
+        return TopicBuilder.name(QuickBiteTopics.DELIVERY_EVENTS)
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic deliveryEventsDltTopic() {
+        return TopicBuilder.name(QuickBiteTopics.DELIVERY_EVENTS + QuickBiteTopics.DLT_SUFFIX)
+                .partitions(1)
+                .replicas(1)
+                .build();
+    }
 }

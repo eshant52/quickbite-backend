@@ -1,15 +1,26 @@
 package com.quickbite.quickbite.notification.model;
 
 public enum OrderNotificationType {
+    // Initial status
     AWAITING_PAYMENT,
-    PAYMENT_FAILED,
+
+    // Intermediate statuses
+    PLACED,
     ACCEPTED,
+    RESTAURANT_TIMEOUT,
+    PREPARING,
+    READY_FOR_PICKUP,
+    OUT_FOR_DELIVERY,
+
+    // Terminal statuses
+    PAYMENT_FAILED,
     CANCELLED,
     DECLINED,
     DELIVERED,
-    OUT_FOR_DELIVERY,
-    PLACED,
-    PREPARING,
-    READY_FOR_PICKUP,
-    ABANDONED
+    ABANDONED,
+
+    // Delivery Agent assignment statuses
+    DELIVERY_OFFER_RECEIVED,
+    AGENT_ASSIGNED,
+    NO_AGENT_FOUND,
 }

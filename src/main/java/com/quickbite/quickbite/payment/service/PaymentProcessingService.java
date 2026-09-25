@@ -54,4 +54,13 @@ public interface PaymentProcessingService {
      * @return Optional containing the winning PaymentResult if any attempt was paid, or empty
      */
     Optional<PaymentResult> reconcileAllPaymentAttempts(UUID orderId);
+
+    /**
+     * Emits a refund request event for any successful online payment associated with the order.
+     * Cash on Delivery (COD) payments and unpaid attempts are ignored.
+     *
+     * @param orderId the order's UUID
+     * @param reason  the reason for refund
+     */
+    void refundSuccessfulPayment(UUID orderId, String reason);
 }

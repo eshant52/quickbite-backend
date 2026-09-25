@@ -4,7 +4,7 @@ import com.quickbite.quickbite.common.config.property.OrderProperties;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.common.exception.BadRequestException;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
-import com.quickbite.quickbite.delivery.service.DeliveryAssignmentService;
+import com.quickbite.quickbite.order.dto.AssignedDeliveryAgentResponse;
 import com.quickbite.quickbite.order.dto.OrderResponse;
 import com.quickbite.quickbite.order.dto.OrderSummaryResponse;
 import com.quickbite.quickbite.order.dto.PlaceOrderRequest;
@@ -57,7 +57,6 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     private final OrderCreationService orderCreationService;
     private final OrderLifecycleService orderLifecycleService;
     private final PaymentProcessingService paymentService;
-    private final DeliveryAssignmentService deliveryAssignmentService;
     private final RedissonClient redissonClient;
     private final OrderProperties orderProperties;
 
@@ -68,7 +67,6 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
             OrderCreationService orderCreationService,
             OrderLifecycleService orderLifecycleService,
             PaymentProcessingService paymentService,
-            DeliveryAssignmentService deliveryAssignmentService,
             RedissonClient redissonClient,
             OrderProperties orderProperties) {
         this.orderRepository = orderRepository;
@@ -77,7 +75,6 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
         this.orderCreationService = orderCreationService;
         this.orderLifecycleService = orderLifecycleService;
         this.paymentService = paymentService;
-        this.deliveryAssignmentService = deliveryAssignmentService;
         this.redissonClient = redissonClient;
         this.orderProperties = orderProperties;
     }
@@ -200,6 +197,20 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
         orderLifecycleService.cancelOrder(order);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public AssignedDeliveryAgentResponse getAssignedDeliveryAgent(UUID customerId, UUID orderId) {
+        User customer = loadUser(customerId);
+        Order order = orderRepository.findByIdAndCustomerId(orderId, customer.getId())
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+
+        if (order.getDeliveryAgent() == null) {
+            throw new ResourceNotFoundException("No delivery agent assigned to this order yet");
+        }
+
+        return AssignedDeliveryAgentResponse.from(order.getDeliveryAgent());
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // Restaurant operations
     // ──────────────────────────────────────────────────────────────────────────
@@ -231,6 +242,10 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     @Transactional
     public OrderResponse acceptOrder(UUID orderId, UUID restaurantId, UUID ownerId) {
         Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
+        if (order.getRestaurantAcceptanceDeadline() != null
+                && order.getRestaurantAcceptanceDeadline().isBefore(Instant.now())) {
+            throw new BadRequestException("Order acceptance window has expired");
+        }
         return OrderResponse.from(orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.ACCEPTED));
     }
 
@@ -253,7 +268,6 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     public OrderResponse markReadyForPickup(UUID orderId, UUID restaurantId, UUID ownerId) {
         Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
         Order updated = orderLifecycleService.transitionStatus(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP);
-        deliveryAssignmentService.autoAssign(updated);
         return OrderResponse.from(updated);
     }
 

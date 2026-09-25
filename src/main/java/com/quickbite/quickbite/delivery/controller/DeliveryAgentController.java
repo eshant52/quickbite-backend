@@ -2,9 +2,11 @@ package com.quickbite.quickbite.delivery.controller;
 
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.delivery.dto.DeliveryAgentResponse;
+import com.quickbite.quickbite.delivery.dto.OrderOfferSummaryResponse;
 import com.quickbite.quickbite.delivery.dto.UpdateAvailabilityRequest;
 import com.quickbite.quickbite.delivery.dto.UpdateLocationRequest;
 import com.quickbite.quickbite.delivery.service.DeliveryAgentService;
+import com.quickbite.quickbite.delivery.service.DeliveryDispatchService;
 import com.quickbite.quickbite.order.dto.OrderResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -21,13 +23,16 @@ import java.util.UUID;
 public class DeliveryAgentController {
 
     private final DeliveryAgentService deliveryAgentService;
+    private final DeliveryDispatchService deliveryDispatchService;
     private final AuthenticatedSessionResolver authenticatedSessionResolver;
 
     public DeliveryAgentController(
             DeliveryAgentService deliveryAgentService,
+            DeliveryDispatchService deliveryDispatchService,
             AuthenticatedSessionResolver authenticatedSessionResolver
     ) {
         this.deliveryAgentService = deliveryAgentService;
+        this.deliveryDispatchService = deliveryDispatchService;
         this.authenticatedSessionResolver = authenticatedSessionResolver;
     }
 
@@ -73,5 +78,34 @@ public class DeliveryAgentController {
     ) {
         UUID agentUserId = authenticatedSessionResolver.userIdFromJwt(jwt);
         return ResponseEntity.ok(deliveryAgentService.markDelivered(orderId, agentUserId));
+    }
+
+    @GetMapping("/orders/{orderId}/offer-summary")
+    public ResponseEntity<OrderOfferSummaryResponse> getOfferSummary(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID orderId
+    ) {
+        UUID agentUserId = authenticatedSessionResolver.userIdFromJwt(jwt);
+        return ResponseEntity.ok(deliveryDispatchService.getOfferSummary(orderId, agentUserId));
+    }
+
+    @PostMapping("/orders/{orderId}/accept")
+    public ResponseEntity<Void> acceptOffer(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID orderId
+    ) {
+        UUID agentUserId = authenticatedSessionResolver.userIdFromJwt(jwt);
+        deliveryDispatchService.acceptOffer(orderId, agentUserId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/orders/{orderId}/reject")
+    public ResponseEntity<Void> rejectOffer(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID orderId
+    ) {
+        UUID agentUserId = authenticatedSessionResolver.userIdFromJwt(jwt);
+        deliveryDispatchService.rejectOffer(orderId, agentUserId);
+        return ResponseEntity.noContent().build();
     }
 }

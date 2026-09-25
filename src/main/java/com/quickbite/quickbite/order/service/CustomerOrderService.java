@@ -42,4 +42,5 @@ public interface CustomerOrderService {
     OrderResponse getMyOrder(UUID customerId, UUID orderId);
     CursorPage<OrderSummaryResponse> listMyOrders(UUID customerId, UUID cursor, int size);
     void cancelOrder(UUID customerId, UUID orderId);
+    com.quickbite.quickbite.order.dto.AssignedDeliveryAgentResponse getAssignedDeliveryAgent(UUID customerId, UUID orderId);
 }
