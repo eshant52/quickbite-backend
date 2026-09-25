@@ -125,6 +125,10 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
             throw new BadRequestException("Only approved delivery agents can update duty availability");
         }
 
+        if (available && agent.getCurrentVehicle() == null) {
+            throw new BadRequestException("You must select an active verified vehicle before going on duty");
+        }
+
         if (!available && agent.isAssigned()) {
             throw new BadRequestException("Cannot go off-duty while you have an active delivery in progress");
         }

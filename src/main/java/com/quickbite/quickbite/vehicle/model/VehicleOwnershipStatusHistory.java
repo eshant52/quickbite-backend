@@ -2,9 +2,7 @@ package com.quickbite.quickbite.vehicle.model;
 
 import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.user.model.User;
-import com.quickbite.quickbite.vehicle.model.VehicleOwnership;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
@@ -28,10 +26,9 @@ public class VehicleOwnershipStatusHistory extends Base {
     private OwnershipStatus status;
 
     @ManyToOne
-    @JoinColumn(nullable = true)
+    @JoinColumn
     private User reviewedBy;
 
-    @Size(max = 500, message = "Remarks must be at most 500 characters")
     @Column(columnDefinition = "TEXT")
     private String remarks;
 }

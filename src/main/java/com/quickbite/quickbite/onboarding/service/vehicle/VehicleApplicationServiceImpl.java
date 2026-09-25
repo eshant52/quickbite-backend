@@ -175,6 +175,19 @@ public class VehicleApplicationServiceImpl implements VehicleApplicationService,
         }
 
         Optional<Vehicle> existing = vehicleRepository.findByVinNumber(request.vinNumber().trim());
+        if (existing.isPresent() && !request.isOwnershipTransferred()) {
+            vehicleOwnershipRepository.findByVehicleAndCurrentStatus(existing.get(), OwnershipStatus.ACTIVE)
+                    .ifPresent(activeOwnership -> {
+                        if (activeOwnership.getOwner() != null
+                                && activeOwnership.getOwner().getUser() != null
+                                && !activeOwnership.getOwner().getUser().getId().equals(agentUserId)) {
+                            throw new BadRequestException(
+                                    "This vehicle (VIN) is already actively registered to another delivery agent. "
+                                            + "Mark ownershipTransferred = true if transferring ownership."
+                            );
+                        }
+                    });
+        }
         vehicleApp.setExistingVehicle(existing.orElse(null));
         vehicleApp.setOwnershipTransferred(request.isOwnershipTransferred());
         vehicleApp.setVinNumber(request.vinNumber().trim());
@@ -422,23 +435,48 @@ public class VehicleApplicationServiceImpl implements VehicleApplicationService,
             vehicle = vehicleRepository.save(vehicle);
         }
 
-        // 2. If ownership transferred, transition old active ownership to TRANSFERRED
-        if (vehicleApp.isOwnershipTransferred()) {
-            vehicleOwnershipRepository.findByVehicleAndCurrentStatus(vehicle, OwnershipStatus.ACTIVE)
-                    .ifPresent(old -> {
-                        old.setCurrentStatus(OwnershipStatus.TRANSFERRED);
-                        vehicleOwnershipRepository.save(old);
-                        recordVehicleOwnershipStatusHistory(old, OwnershipStatus.TRANSFERRED);
-                    });
-        }
+        // 2. Resolve any existing ACTIVE ownership for this physical vehicle
+        final Vehicle resolvedVehicle = vehicle;
+        DeliveryAgent newOwner = vehicleApp.getDeliveryAgent();
+        vehicleOwnershipRepository.findByVehicleAndCurrentStatus(resolvedVehicle, OwnershipStatus.ACTIVE)
+                .ifPresent(old -> {
+                    boolean sameOwner = old.getOwner() != null
+                            && newOwner != null
+                            && old.getOwner().getId().equals(newOwner.getId());
+                    if (!sameOwner && !vehicleApp.isOwnershipTransferred()) {
+                        throw new BadRequestException(
+                                "Cannot approve vehicle application: vehicle (VIN) is already actively registered "
+                                        + "to another delivery agent and ownershipTransferred is false."
+                        );
+                    }
+                    OwnershipStatus newOldStatus = sameOwner ? OwnershipStatus.EXPIRED : OwnershipStatus.TRANSFERRED;
+                    old.setCurrentStatus(newOldStatus);
+                    vehicleOwnershipRepository.save(old);
+                    recordVehicleOwnershipStatusHistory(old, newOldStatus);
+
+                    DeliveryAgent oldOwner = old.getOwner();
+                    if (!sameOwner
+                            && oldOwner != null
+                            && oldOwner.getCurrentVehicle() != null
+                            && oldOwner.getCurrentVehicle().getId().equals(resolvedVehicle.getId())) {
+                        oldOwner.setCurrentVehicle(null);
+                        oldOwner.setAvailable(false);
+                        deliveryAgentRepository.save(oldOwner);
+                    }
+                });
 
         // 3. Create active VehicleOwnership for this delivery agent
         VehicleOwnership ownership = new VehicleOwnership();
-        ownership.setOwner(vehicleApp.getDeliveryAgent());
-        ownership.setVehicle(vehicle);
+        ownership.setOwner(newOwner);
+        ownership.setVehicle(resolvedVehicle);
         ownership.setCurrentStatus(OwnershipStatus.ACTIVE);
         VehicleOwnership savedOwnership = vehicleOwnershipRepository.save(ownership);
         recordVehicleOwnershipStatusHistory(savedOwnership, OwnershipStatus.ACTIVE);
+
+        if (newOwner.getCurrentVehicle() == null) {
+            newOwner.setCurrentVehicle(resolvedVehicle);
+            deliveryAgentRepository.save(newOwner);
+        }
 
         // 4. Promote documents to VehicleOwnershipDocument
         List<VehicleOwnershipDocument> vehicleDocs = vehicleApp.getDocuments().stream()

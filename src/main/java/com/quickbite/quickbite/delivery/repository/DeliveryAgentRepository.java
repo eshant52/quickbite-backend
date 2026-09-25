@@ -20,6 +20,8 @@ public interface DeliveryAgentRepository extends JpaRepository<DeliveryAgent, UU
 
     Optional<DeliveryAgent> findByUser(User user);
 
+    Optional<DeliveryAgent> findByUserId(UUID userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT da FROM DeliveryAgent da WHERE da.id = :id")
     Optional<DeliveryAgent> findByIdForUpdate(@Param("id") UUID id);
@@ -48,9 +50,10 @@ public interface DeliveryAgentRepository extends JpaRepository<DeliveryAgent, UU
             WHERE da.is_available = true
               AND da.is_assigned = false
               AND da.current_status = 'APPROVED'
+              AND da.current_vehicle_id IS NOT NULL
               AND da.last_location IS NOT NULL
               AND ST_DWithin(da.last_location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusMeters)
-            ORDER BY ST_Distance(da.last_location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) ASC
+            ORDER BY ST_Distance(da.last_location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography)
             LIMIT :limit
             """, nativeQuery = true)
     List<DeliveryAgent> findNearestAvailableAgentsWithinRadius(

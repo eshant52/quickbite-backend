@@ -340,15 +340,33 @@ public class DeliveryAgentApplicationServiceImpl implements DeliveryAgentApplica
             vehicle = vehicleRepository.save(vehicle);
         }
 
-        // 4. Handle Vehicle Transfer
-        if (appVehicle.isOwnershipTransferred()) {
-            vehicleOwnershipRepository.findByVehicleAndCurrentStatus(vehicle, OwnershipStatus.ACTIVE)
-                    .ifPresent(oldOwnership -> {
-                        oldOwnership.setCurrentStatus(OwnershipStatus.TRANSFERRED);
-                        vehicleOwnershipRepository.save(oldOwnership);
-                        recordVehicleOwnershipStatusHistory(oldOwnership, OwnershipStatus.TRANSFERRED);
-                    });
-        }
+        // 4. Handle Existing Active Vehicle Ownership / Transfer
+        final Vehicle resolvedVehicle = vehicle;
+        vehicleOwnershipRepository.findByVehicleAndCurrentStatus(resolvedVehicle, OwnershipStatus.ACTIVE)
+                .ifPresent(oldOwnership -> {
+                    boolean sameOwner = oldOwnership.getOwner() != null
+                            && oldOwnership.getOwner().getId().equals(deliveryAgent.getId());
+                    if (!sameOwner && !appVehicle.isOwnershipTransferred()) {
+                        throw new BadRequestException(
+                                "Cannot approve application: vehicle (VIN) is already actively registered "
+                                        + "to another delivery agent and ownershipTransferred is false."
+                        );
+                    }
+                    OwnershipStatus nextStatus = sameOwner ? OwnershipStatus.EXPIRED : OwnershipStatus.TRANSFERRED;
+                    oldOwnership.setCurrentStatus(nextStatus);
+                    vehicleOwnershipRepository.save(oldOwnership);
+                    recordVehicleOwnershipStatusHistory(oldOwnership, nextStatus);
+
+                    DeliveryAgent oldOwner = oldOwnership.getOwner();
+                    if (!sameOwner
+                            && oldOwner != null
+                            && oldOwner.getCurrentVehicle() != null
+                            && oldOwner.getCurrentVehicle().getId().equals(resolvedVehicle.getId())) {
+                        oldOwner.setCurrentVehicle(null);
+                        oldOwner.setAvailable(false);
+                        deliveryAgentRepository.save(oldOwner);
+                    }
+                });
 
         // 5. Create VehicleOwnership
         VehicleOwnership ownership = new VehicleOwnership();

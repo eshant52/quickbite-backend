@@ -1,7 +1,6 @@
 package com.quickbite.quickbite.vehicle.model;
 
 import com.quickbite.quickbite.common.model.Base;
-import com.quickbite.quickbite.vehicle.model.Vehicle;
 import com.quickbite.quickbite.delivery.model.DeliveryAgent;
 import jakarta.persistence.*;
 import lombok.Getter;

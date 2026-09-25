@@ -96,9 +96,15 @@ class DeliveryServiceImplTest {
         user.setEmail("jack@delivery.com");
         user.setPhoneNumber("9876543210");
 
+        com.quickbite.quickbite.vehicle.model.Vehicle vehicle = new com.quickbite.quickbite.vehicle.model.Vehicle();
+        vehicle.setId(UUID.randomUUID());
+        vehicle.setNumberPlate("KA01AB1234");
+        vehicle.setVehicleType(com.quickbite.quickbite.vehicle.model.VehicleType.BIKE);
+
         agent = new DeliveryAgent();
         agent.setId(agentId);
         agent.setUser(user);
+        agent.setCurrentVehicle(vehicle);
         agent.setAvailable(false);
         agent.setCurrentStatus(DeliveryAgentVerificationStatus.APPROVED);
         agent.setCreatedAt(Instant.now());
@@ -236,6 +242,22 @@ class DeliveryServiceImplTest {
             assertThatThrownBy(() -> deliveryService.updateAvailability(userId, true))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("Only approved delivery agents");
+
+            verify(deliveryAgentRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Throws BadRequestException if agent tries to go online without a selected currentVehicle")
+        void updateAvailability_cannotGoOnlineWithoutCurrentVehicle() {
+            agent.setCurrentStatus(DeliveryAgentVerificationStatus.APPROVED);
+            agent.setCurrentVehicle(null);
+
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(deliveryAgentRepository.findByUser(user)).thenReturn(Optional.of(agent));
+
+            assertThatThrownBy(() -> deliveryService.updateAvailability(userId, true))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("You must select an active verified vehicle before going on duty");
 
             verify(deliveryAgentRepository, never()).save(any());
         }

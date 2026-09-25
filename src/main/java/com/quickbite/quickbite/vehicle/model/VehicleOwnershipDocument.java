@@ -3,10 +3,7 @@ package com.quickbite.quickbite.vehicle.model;
 import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.common.model.DocumentVerificationStatus;
 import com.quickbite.quickbite.user.model.User;
-import com.quickbite.quickbite.vehicle.model.VehicleOwnership;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
@@ -25,11 +22,9 @@ public class VehicleOwnershipDocument extends Base {
     @JoinColumn(nullable = false)
     private VehicleOwnership vehicleOwnership;
 
-    @Size(max = 500, message = "Description must be at most 500 characters")
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @NotBlank(message = "URL is required")
     @Column(columnDefinition = "TEXT", nullable = false)
     private String url;
 
@@ -51,7 +46,6 @@ public class VehicleOwnershipDocument extends Base {
 
     private Instant reviewedAt;
 
-    @Size(max = 500, message = "Remarks must be at most 500 characters")
     @Column(columnDefinition = "TEXT")
     private String remarks;
 }
