@@ -125,4 +125,9 @@ public class SessionPersistenceServiceImpl implements SessionPersistenceService 
     public List<Session> findActiveSessionsByUserId(UUID userId) {
         return sessionRepository.findActiveByUserId(userId);
     }
+
+    @Override
+    public int purgeStaleTokens(Instant now, Instant cutoff) {
+        return refreshTokenRepository.purgeStaleToken(now, cutoff);
+    }
 }

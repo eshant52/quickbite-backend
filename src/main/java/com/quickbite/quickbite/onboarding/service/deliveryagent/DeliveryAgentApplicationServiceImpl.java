@@ -334,6 +334,11 @@ public class DeliveryAgentApplicationServiceImpl implements DeliveryAgentApplica
                         return vehicleRepository.save(newV);
                     });
         }
+        if (appVehicle.getNumberPlate() != null
+                && !appVehicle.getNumberPlate().equals(vehicle.getNumberPlate())) {
+            vehicle.setNumberPlate(appVehicle.getNumberPlate());
+            vehicle = vehicleRepository.save(vehicle);
+        }
 
         // 4. Handle Vehicle Transfer
         if (appVehicle.isOwnershipTransferred()) {

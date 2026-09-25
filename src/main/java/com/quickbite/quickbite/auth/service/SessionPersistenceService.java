@@ -24,4 +24,6 @@ public interface SessionPersistenceService {
     int revokeAllSessions(UUID userId);
 
     List<Session> findActiveSessionsByUserId(UUID userId);
+
+    int purgeStaleTokens(Instant now, Instant cutoff);
 }

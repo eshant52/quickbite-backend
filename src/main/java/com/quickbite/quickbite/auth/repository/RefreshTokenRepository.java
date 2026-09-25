@@ -35,6 +35,6 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     @Modifying
     @Transactional
-    @Query("DELETE FROM RefreshToken WHERE (revokedAt IS NOT NULL OR expiresAt < :now) AND createdAt < :cutoff")
+    @Query("DELETE FROM RefreshToken WHERE (revokedAt IS NOT NULL OR usedAt IS NOT NULL OR expiresAt < :now) AND createdAt < :cutoff")
     int purgeStaleToken(@Param("now") Instant now, @Param("cutoff") Instant cutoff);
 }

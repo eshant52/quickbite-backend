@@ -416,6 +416,11 @@ public class VehicleApplicationServiceImpl implements VehicleApplicationService,
                         return vehicleRepository.save(newV);
                     });
         }
+        if (vehicleApp.getNumberPlate() != null
+                && !vehicleApp.getNumberPlate().equals(vehicle.getNumberPlate())) {
+            vehicle.setNumberPlate(vehicleApp.getNumberPlate());
+            vehicle = vehicleRepository.save(vehicle);
+        }
 
         // 2. If ownership transferred, transition old active ownership to TRANSFERRED
         if (vehicleApp.isOwnershipTransferred()) {
