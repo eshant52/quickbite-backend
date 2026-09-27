@@ -38,6 +38,20 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
             Limit limit
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")})
+    @Query("""
+            SELECT o FROM Order o
+            WHERE o.currentStatus IN :statuses
+              AND o.createdAt < :cutoff
+            ORDER BY o.createdAt ASC
+            """)
+    List<Order> findByCurrentStatusInAndCreatedAtBeforeForUpdateSkipLocked(
+            @Param("statuses") List<OrderStatus> statuses,
+            @Param("cutoff") Instant cutoff,
+            Limit limit
+    );
+
     @Query("""
             SELECT o FROM Order o
             WHERE o.customer.id = :customerId

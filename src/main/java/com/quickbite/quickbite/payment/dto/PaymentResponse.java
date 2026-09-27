@@ -1,5 +1,6 @@
 package com.quickbite.quickbite.payment.dto;
 
+import com.quickbite.quickbite.payment.model.Payment;
 import com.quickbite.quickbite.payment.model.PaymentMethod;
 import com.quickbite.quickbite.payment.model.PaymentStatus;
 
@@ -19,4 +20,19 @@ public record PaymentResponse(
         String gatewayPaymentId,
         Instant createdAt,
         List<PaymentAttemptSummary> attempts) {
+
+    public static PaymentResponse from(Payment payment, UUID orderId, List<PaymentAttemptSummary> attempts) {
+        return new PaymentResponse(
+                payment.getId(),
+                orderId,
+                payment.getTransactionId(),
+                payment.getPaymentMethod(),
+                payment.getAmount(),
+                payment.getCurrentStatus(),
+                payment.getGatewayOrderId(),
+                payment.getGatewayPaymentId(),
+                payment.getCreatedAt(),
+                attempts
+        );
+    }
 }

@@ -102,6 +102,23 @@ class PaymentEventListenerTest {
         }
 
         @Test
+        @DisplayName("When order is PAYMENT_FAILED, reconciled/retried payment success transitions order to PLACED")
+        void orderPaymentFailed_transitionsToPlaced() {
+            order.setCurrentStatus(OrderStatus.PAYMENT_FAILED);
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+            PaymentSucceededEvent event = new PaymentSucceededEvent(
+                    paymentId, orderId, PaymentMethod.UPI, "pay_rzp_reconciled", new BigDecimal("350.00"));
+
+            listener.handlePaymentSucceeded(event);
+
+            assertThat(order.getCurrentStatus()).isEqualTo(OrderStatus.PLACED);
+            verify(orderRepository).save(order);
+            verify(orderStatusHistoryRepository).save(any(OrderStatusHistory.class));
+            verify(eventPublisher).publishEvent(any(OrderPlacedEvent.class));
+        }
+
+        @Test
         @DisplayName("When order is ABANDONED, late payment triggers auto-refund request")
         void orderAbandoned_triggersAutoRefund() {
             order.setCurrentStatus(OrderStatus.ABANDONED);
@@ -142,6 +159,26 @@ class PaymentEventListenerTest {
                     ArgumentCaptor.forClass(PaymentRefundRequestedEvent.class);
             verify(eventPublisher).publishEvent(refundCaptor.capture());
             assertThat(refundCaptor.getValue().reason()).contains("CANCELLED");
+        }
+
+        @Test
+        @DisplayName("When order is DECLINED, late payment triggers auto-refund request")
+        void orderDeclined_triggersAutoRefund() {
+            order.setCurrentStatus(OrderStatus.DECLINED);
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+            PaymentSucceededEvent event = new PaymentSucceededEvent(
+                    paymentId, orderId, PaymentMethod.UPI, "pay_rzp_late3", new BigDecimal("350.00"));
+
+            listener.handlePaymentSucceeded(event);
+
+            assertThat(order.getCurrentStatus()).isEqualTo(OrderStatus.DECLINED);
+            verify(orderRepository, never()).save(order);
+
+            ArgumentCaptor<PaymentRefundRequestedEvent> refundCaptor =
+                    ArgumentCaptor.forClass(PaymentRefundRequestedEvent.class);
+            verify(eventPublisher).publishEvent(refundCaptor.capture());
+            assertThat(refundCaptor.getValue().reason()).contains("DECLINED");
         }
 
         @Test

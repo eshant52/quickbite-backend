@@ -215,38 +215,8 @@ class PaymentLifecycleServiceImplTest {
     }
 
     @Nested
-    @DisplayName("reconcile & cancellation")
-    class ReconciliationTests {
-
-        @Test
-        @DisplayName("reconcilePaidPayment marks payment SUCCESS and publishes PaymentSucceededEvent")
-        void reconcilePaidPayment_success() {
-            when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
-
-            paymentLifecycle.reconcilePaidPayment(paymentId, "pay_rzp_rec");
-
-            assertThat(payment.getCurrentStatus()).isEqualTo(PaymentStatus.SUCCESS);
-            assertThat(payment.getGatewayPaymentId()).isEqualTo("pay_rzp_rec");
-
-            verify(paymentRepository).save(payment);
-            verify(eventPublisher).publishEvent(any(PaymentSucceededEvent.class));
-            verify(eventPublisher).publishEvent(any(PaymentStatusChangedEvent.class));
-        }
-
-        @Test
-        @DisplayName("reconcileExpiredPayment marks payment CANCELLED and publishes PaymentCancelledEvent")
-        void reconcileExpiredPayment_success() {
-            when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
-
-            paymentLifecycle.reconcileExpiredPayment(paymentId, "Gateway order expired or closed");
-
-            assertThat(payment.getCurrentStatus()).isEqualTo(PaymentStatus.CANCELLED);
-
-            verify(paymentRepository).save(payment);
-            verify(paymentStatusHistoryRepository).save(any(PaymentStatusHistory.class));
-            verify(eventPublisher).publishEvent(any(PaymentCancelledEvent.class));
-            verify(eventPublisher).publishEvent(any(PaymentStatusChangedEvent.class));
-        }
+    @DisplayName("cancellation")
+    class CancellationTests {
 
         @Test
         @DisplayName("cancelPendingPayments cancels all pending payments for order")
@@ -349,12 +319,12 @@ class PaymentLifecycleServiceImplTest {
         void idempotency_sameStatus() {
             when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
 
-            paymentLifecycle.reconcileExpiredPayment(paymentId, "Already cancelled");
+            paymentLifecycle.markCancelled(paymentId, "Already cancelled");
             reset(paymentRepository, eventPublisher);
 
             // Re-apply same CANCELLED status
             when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
-            paymentLifecycle.reconcileExpiredPayment(paymentId, "Already cancelled");
+            paymentLifecycle.markCancelled(paymentId, "Already cancelled");
 
             verify(paymentRepository, never()).save(payment);
             verifyNoInteractions(eventPublisher);
@@ -402,10 +372,92 @@ class PaymentLifecycleServiceImplTest {
         @Test
         @DisplayName("processStubPayment with invalid status throws BadRequestException")
         void processStubPayment_invalidStatus() {
+            payment.setGatewayName("STUB_GATEWAY");
             when(paymentRepository.findByTransactionId("TXN-123")).thenReturn(Optional.of(payment));
 
             assertThatThrownBy(() -> paymentLifecycle.processStubPayment("TXN-123", PaymentStatus.PENDING))
                     .isInstanceOf(BadRequestException.class);
+        }
+
+        @Test
+        @DisplayName("refundOrCancelCodPayment marks payment REFUNDED when order status is DELIVERED")
+        void refundOrCancelCodPayment_delivered_marksRefunded() {
+            payment.setPaymentMethod(PaymentMethod.COD);
+            payment.setCurrentStatus(PaymentStatus.SUCCESS);
+            order.setCurrentStatus(OrderStatus.DELIVERED);
+            when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+
+            paymentLifecycle.refundOrCancelCodPayment(payment, "Damaged order");
+
+            assertThat(payment.getCurrentStatus()).isEqualTo(PaymentStatus.REFUNDED);
+            verify(paymentRepository).save(payment);
+        }
+
+        @Test
+        @DisplayName("refundOrCancelCodPayment marks payment CANCELLED when order status is not DELIVERED")
+        void refundOrCancelCodPayment_notDelivered_marksCancelled() {
+            payment.setPaymentMethod(PaymentMethod.COD);
+            payment.setCurrentStatus(PaymentStatus.SUCCESS);
+            order.setCurrentStatus(OrderStatus.CANCELLED);
+            when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+
+            paymentLifecycle.refundOrCancelCodPayment(payment, "Cancelled before delivery");
+
+            assertThat(payment.getCurrentStatus()).isEqualTo(PaymentStatus.CANCELLED);
+            verify(paymentRepository).save(payment);
+        }
+
+        @Test
+        @DisplayName("Terminal state guard: ignores CANCELLED transition if online payment is already SUCCESS")
+        void terminalState_ignoreCancelledAfterOnlineSuccess() {
+            payment.setPaymentMethod(PaymentMethod.UPI);
+            payment.setCurrentStatus(PaymentStatus.SUCCESS);
+            when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+
+            paymentLifecycle.markCancelled(paymentId, "Should not cancel online paid payment");
+
+            assertThat(payment.getCurrentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            verify(paymentRepository, never()).save(payment);
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Terminal state guard: ignores CANCELLED transition if payment is already FAILED")
+        void terminalState_ignoreCancelledAfterFailed() {
+            payment.setCurrentStatus(PaymentStatus.FAILED);
+            when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+
+            paymentLifecycle.markCancelled(paymentId, "Already failed");
+
+            assertThat(payment.getCurrentStatus()).isEqualTo(PaymentStatus.FAILED);
+            verify(paymentRepository, never()).save(payment);
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("processStubPayment sets synthetic stub_pay_ gatewayPaymentId on SUCCESS for STUB_GATEWAY")
+        void processStubPayment_setsStubGatewayPaymentId() {
+            payment.setGatewayName("STUB_GATEWAY");
+            when(paymentRepository.findByTransactionId("TXN-12345")).thenReturn(Optional.of(payment));
+
+            paymentLifecycle.processStubPayment("TXN-12345", PaymentStatus.SUCCESS);
+
+            assertThat(payment.getCurrentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            assertThat(payment.getGatewayPaymentId()).isEqualTo("stub_pay_TXN-12345");
+            verify(paymentRepository).save(payment);
+        }
+
+        @Test
+        @DisplayName("processStubPayment rejects non-STUB_GATEWAY payments")
+        void processStubPayment_rejectsRealGatewayPayment() {
+            payment.setGatewayName("Razorpay");
+            when(paymentRepository.findByTransactionId("TXN-12345")).thenReturn(Optional.of(payment));
+
+            assertThatThrownBy(() -> paymentLifecycle.processStubPayment("TXN-12345", PaymentStatus.SUCCESS))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("STUB_GATEWAY");
+
+            verify(paymentRepository, never()).save(payment);
         }
     }
 }

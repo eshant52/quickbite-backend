@@ -328,7 +328,7 @@ class OrderServiceImplTest {
         }
 
         @Test
-        @DisplayName("declineOrder delegates status transition to lifecycle service")
+        @DisplayName("declineOrder delegates status transition to lifecycle service and triggers payment refund/cancellation")
         void declineOrder_success() {
             order.setCurrentStatus(OrderStatus.DECLINED);
             when(orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.DECLINED))
@@ -338,6 +338,8 @@ class OrderServiceImplTest {
 
             assertThat(response.currentStatus()).isEqualTo(OrderStatus.DECLINED);
             verify(orderLifecycleService).transitionStatus(order, OrderStatus.PLACED, OrderStatus.DECLINED);
+            verify(paymentService).refundSuccessfulPayment(orderId, "Order declined by restaurant");
+            verify(paymentService).cancelPendingPayments(orderId, "Order declined by restaurant");
         }
 
         @Test

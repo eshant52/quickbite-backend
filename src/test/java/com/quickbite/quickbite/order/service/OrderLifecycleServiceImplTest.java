@@ -351,14 +351,16 @@ class OrderLifecycleServiceImplTest {
     class TransitionStatusTests {
 
         @Test
-        @DisplayName("Successfully transitions status when current matches expected")
+        @DisplayName("Successfully transitions status when current matches expected and clears acceptance deadline from PLACED")
         void transitionStatus_success() {
             order.setCurrentStatus(OrderStatus.PLACED);
+            order.setRestaurantAcceptanceDeadline(Instant.now().plusSeconds(300));
             when(orderRepository.save(order)).thenReturn(order);
 
             Order result = lifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.ACCEPTED);
 
             assertThat(result.getCurrentStatus()).isEqualTo(OrderStatus.ACCEPTED);
+            assertThat(result.getRestaurantAcceptanceDeadline()).isNull();
             verify(orderRepository).save(order);
             verify(orderStatusHistoryRepository).save(any(OrderStatusHistory.class));
             verify(eventPublisher).publishEvent(any(OrderStatusChangedEvent.class));
@@ -380,7 +382,7 @@ class OrderLifecycleServiceImplTest {
     class ProcessAbandonmentBatchTests {
 
         @Test
-        @DisplayName("Successfully locks and abandons batch of stale orders")
+        @DisplayName("Successfully locks and abandons batch of stale AWAITING_PAYMENT and PAYMENT_FAILED orders")
         void processAbandonmentBatch_success() {
             Instant cutoff = Instant.now().minus(15, ChronoUnit.MINUTES);
             Order order1 = new Order();
@@ -393,10 +395,12 @@ class OrderLifecycleServiceImplTest {
             order2.setId(UUID.randomUUID());
             order2.setCustomer(customer);
             order2.setRestaurant(restaurant);
-            order2.setCurrentStatus(OrderStatus.AWAITING_PAYMENT);
+            order2.setCurrentStatus(OrderStatus.PAYMENT_FAILED);
 
-            when(orderRepository.findByCurrentStatusAndCreatedAtBeforeForUpdateSkipLocked(
-                    eq(OrderStatus.AWAITING_PAYMENT), eq(cutoff), eq(Limit.of(100))))
+            when(orderRepository.findByCurrentStatusInAndCreatedAtBeforeForUpdateSkipLocked(
+                    eq(List.of(OrderStatus.AWAITING_PAYMENT, OrderStatus.PAYMENT_FAILED)),
+                    eq(cutoff),
+                    eq(Limit.of(100))))
                     .thenReturn(List.of(order1, order2));
 
             int processed = lifecycleService.processAbandonmentBatch(cutoff, 100);
@@ -415,8 +419,10 @@ class OrderLifecycleServiceImplTest {
         @DisplayName("Returns 0 when no stale orders found")
         void processAbandonmentBatch_empty() {
             Instant cutoff = Instant.now().minus(15, ChronoUnit.MINUTES);
-            when(orderRepository.findByCurrentStatusAndCreatedAtBeforeForUpdateSkipLocked(
-                    eq(OrderStatus.AWAITING_PAYMENT), eq(cutoff), eq(Limit.of(100))))
+            when(orderRepository.findByCurrentStatusInAndCreatedAtBeforeForUpdateSkipLocked(
+                    eq(List.of(OrderStatus.AWAITING_PAYMENT, OrderStatus.PAYMENT_FAILED)),
+                    eq(cutoff),
+                    eq(Limit.of(100))))
                     .thenReturn(List.of());
 
             int processed = lifecycleService.processAbandonmentBatch(cutoff, 100);
@@ -440,10 +446,12 @@ class OrderLifecycleServiceImplTest {
             order2.setId(UUID.randomUUID());
             order2.setCustomer(customer);
             order2.setRestaurant(restaurant);
-            order2.setCurrentStatus(OrderStatus.AWAITING_PAYMENT);
+            order2.setCurrentStatus(OrderStatus.PAYMENT_FAILED);
 
-            when(orderRepository.findByCurrentStatusAndCreatedAtBeforeForUpdateSkipLocked(
-                    eq(OrderStatus.AWAITING_PAYMENT), eq(cutoff), eq(Limit.of(100))))
+            when(orderRepository.findByCurrentStatusInAndCreatedAtBeforeForUpdateSkipLocked(
+                    eq(List.of(OrderStatus.AWAITING_PAYMENT, OrderStatus.PAYMENT_FAILED)),
+                    eq(cutoff),
+                    eq(Limit.of(100))))
                     .thenReturn(List.of(order1, order2));
 
             when(orderRepository.save(order1)).thenThrow(new RuntimeException("DB error on order 1"));

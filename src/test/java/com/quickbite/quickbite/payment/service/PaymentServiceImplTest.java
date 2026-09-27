@@ -1,14 +1,9 @@
 package com.quickbite.quickbite.payment.service;
 
 import com.quickbite.quickbite.common.exception.BadRequestException;
-import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
 import com.quickbite.quickbite.order.model.Order;
 import com.quickbite.quickbite.order.model.OrderStatus;
-import com.quickbite.quickbite.order.repository.OrderRepository;
 import com.quickbite.quickbite.payment.dto.CodPaymentResult;
-import com.quickbite.quickbite.payment.dto.GatewayOrderDetails;
-import com.quickbite.quickbite.payment.dto.GatewayOrderStatus;
-import com.quickbite.quickbite.payment.dto.OnlinePaymentResult;
 import com.quickbite.quickbite.payment.dto.RazorpayGatewayWebhookEvent;
 import com.quickbite.quickbite.payment.dto.PaymentResponse;
 import com.quickbite.quickbite.payment.dto.PaymentResult;
@@ -48,6 +43,7 @@ class PaymentServiceImplTest {
     @Mock private PaymentStrategy paymentStrategy;
     @Mock private PaymentGateway paymentGateway;
     @Mock private PaymentLifecycleService paymentLifecycle;
+    @Mock private PaymentReconciliationService paymentReconciliationService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     private PaymentServiceImpl paymentService;
@@ -68,6 +64,7 @@ class PaymentServiceImplTest {
                 List.of(paymentStrategy),
                 paymentGateway,
                 paymentLifecycle,
+                paymentReconciliationService,
                 eventPublisher
         );
 
@@ -158,22 +155,17 @@ class PaymentServiceImplTest {
         }
 
         @Test
-        @DisplayName("Active reconciliation: polls gateway when latest attempt is PENDING and has gatewayOrderId")
+        @DisplayName("Active reconciliation: delegates to PaymentReconciliationService when latest attempt is PENDING and has gatewayOrderId")
         void getPaymentByOrderId_activeReconciliation() {
             payment.setCurrentStatus(PaymentStatus.PENDING);
             payment.setGatewayOrderId("order_rzp_pending");
             when(paymentRepository.findAllByOrderIdAndCustomerId(orderId, customerId))
                     .thenReturn(List.of(payment));
-            when(paymentRepository.findAttemptsForReconciliation(eq(orderId), any()))
-                    .thenReturn(List.of(payment));
-            when(paymentGateway.fetchOrderStatus("order_rzp_pending"))
-                    .thenReturn(new GatewayOrderDetails(GatewayOrderStatus.PAID, "pay_reconciled"));
-            when(paymentGateway.getPublishableKey()).thenReturn("rzp_key");
 
             PaymentResponse response = paymentService.getPaymentByOrderId(orderId, customerId);
 
             assertThat(response.orderId()).isEqualTo(orderId);
-            verify(paymentLifecycle).reconcilePaidPayment(payment.getId(), "pay_reconciled");
+            verify(paymentReconciliationService).reconcileAllPaymentAttempts(orderId);
         }
 
         @Test
@@ -345,165 +337,57 @@ class PaymentServiceImplTest {
     class ReconcileAllPaymentAttemptsTests {
 
         @Test
-        @DisplayName("Reconciles single paid attempt and returns winning result")
-        void singlePaid_returnsWinningResult() {
-            payment.setGatewayOrderId("order_rzp_1");
-            when(paymentRepository.findAttemptsForReconciliation(eq(orderId), any()))
+        @DisplayName("Delegates reconciliation to PaymentReconciliationService")
+        void reconcileAllPaymentAttempts_delegates() {
+            PaymentResult expectedResult = new CodPaymentResult(paymentId, orderId, transactionId, BigDecimal.valueOf(499.00));
+            when(paymentReconciliationService.reconcileAllPaymentAttempts(orderId))
+                    .thenReturn(Optional.of(expectedResult));
+
+            Optional<PaymentResult> result = paymentService.reconcileAllPaymentAttempts(orderId);
+
+            assertThat(result).contains(expectedResult);
+            verify(paymentReconciliationService).reconcileAllPaymentAttempts(orderId);
+        }
+    }
+
+    @Nested
+    @DisplayName("refundSuccessfulPayment")
+    class RefundSuccessfulPaymentTests {
+
+        @Test
+        @DisplayName("Publishes PaymentRefundRequestedEvent for successful online payment with gatewayPaymentId")
+        void refundSuccessfulPayment_online_publishesRefundEvent() {
+            payment.setPaymentMethod(PaymentMethod.UPI);
+            payment.setCurrentStatus(PaymentStatus.SUCCESS);
+            payment.setGatewayPaymentId("pay_rzp_123");
+
+            when(paymentRepository.findByOrderIdAndCurrentStatus(orderId, PaymentStatus.SUCCESS))
                     .thenReturn(List.of(payment));
-            when(paymentGateway.fetchOrderStatus("order_rzp_1"))
-                    .thenReturn(new GatewayOrderDetails(GatewayOrderStatus.PAID, "pay_123"));
-            when(paymentGateway.getPublishableKey()).thenReturn("rzp_key");
 
-            Optional<PaymentResult> result = paymentService.reconcileAllPaymentAttempts(orderId);
+            paymentService.refundSuccessfulPayment(orderId, "Order cancelled");
 
-            assertThat(result).isPresent();
-            assertThat(result.get().status()).isEqualTo(PaymentStatus.SUCCESS);
-            verify(paymentLifecycle).reconcilePaidPayment(payment.getId(), "pay_123");
-            verifyNoInteractions(eventPublisher);
+            verify(eventPublisher).publishEvent(new PaymentRefundRequestedEvent(
+                    paymentId,
+                    "pay_rzp_123",
+                    payment.getAmount(),
+                    "Order cancelled"
+            ));
+            verifyNoInteractions(paymentLifecycle);
         }
 
         @Test
-        @DisplayName("First Success Wins: When multiple attempts are paid, earliest wins and subsequent is refunded as duplicate")
-        void multiPaid_refundsDuplicate() {
-            Payment attempt1 = new Payment();
-            attempt1.setId(UUID.randomUUID());
-            attempt1.setOrder(order);
-            attempt1.setGatewayOrderId("order_rzp_1");
-            attempt1.setTransactionId("TXN-1");
-            attempt1.setAmount(BigDecimal.valueOf(499.00));
-            attempt1.setPaymentMethod(PaymentMethod.UPI);
-            attempt1.setCurrentStatus(PaymentStatus.PENDING);
+        @DisplayName("Delegates COD payment refund/cancellation decision to PaymentLifecycleService")
+        void refundSuccessfulPayment_cod_delegatesToPaymentLifecycle() {
+            payment.setPaymentMethod(PaymentMethod.COD);
+            payment.setCurrentStatus(PaymentStatus.SUCCESS);
 
-            Payment attempt2 = new Payment();
-            attempt2.setId(UUID.randomUUID());
-            attempt2.setOrder(order);
-            attempt2.setGatewayOrderId("order_rzp_2");
-            attempt2.setTransactionId("TXN-2");
-            attempt2.setAmount(BigDecimal.valueOf(499.00));
-            attempt2.setPaymentMethod(PaymentMethod.UPI);
-            attempt2.setCurrentStatus(PaymentStatus.PENDING);
-
-            // Attempts returned ASC by createdAt (attempt1 older, attempt2 newer)
-            when(paymentRepository.findAttemptsForReconciliation(eq(orderId), any()))
-                    .thenReturn(List.of(attempt1, attempt2));
-            when(paymentGateway.fetchOrderStatus("order_rzp_1"))
-                    .thenReturn(new GatewayOrderDetails(GatewayOrderStatus.PAID, "pay_111"));
-            when(paymentGateway.fetchOrderStatus("order_rzp_2"))
-                    .thenReturn(new GatewayOrderDetails(GatewayOrderStatus.PAID, "pay_222"));
-            when(paymentGateway.getPublishableKey()).thenReturn("rzp_key");
-
-            Optional<PaymentResult> result = paymentService.reconcileAllPaymentAttempts(orderId);
-
-            assertThat(result).isPresent();
-            assertThat(result.get().paymentId()).isEqualTo(attempt1.getId());
-            assertThat(result.get().status()).isEqualTo(PaymentStatus.SUCCESS);
-
-            // Attempt 1 (first/earliest) reconciled as winner
-            verify(paymentLifecycle).reconcilePaidPayment(attempt1.getId(), "pay_111");
-
-            // Attempt 2 (subsequent duplicate) marked SUCCESS and auto-refunded
-            verify(paymentLifecycle).reconcilePaidPayment(attempt2.getId(), "pay_222");
-            verify(eventPublisher).publishEvent(any(PaymentRefundRequestedEvent.class));
-        }
-
-        @Test
-        @DisplayName("When DB already has a SUCCESS payment, any newly found paid attempt is refunded")
-        void existingSuccess_refundsSubsequentGatewayPaid() {
-            Payment attempt1 = new Payment();
-            attempt1.setId(UUID.randomUUID());
-            attempt1.setOrder(order);
-            attempt1.setGatewayOrderId("order_rzp_1");
-            attempt1.setGatewayPaymentId("pay_existing");
-            attempt1.setTransactionId("TXN-1");
-            attempt1.setAmount(BigDecimal.valueOf(499.00));
-            attempt1.setPaymentMethod(PaymentMethod.UPI);
-            attempt1.setCurrentStatus(PaymentStatus.SUCCESS);
-
-            Payment attempt2 = new Payment();
-            attempt2.setId(UUID.randomUUID());
-            attempt2.setOrder(order);
-            attempt2.setGatewayOrderId("order_rzp_2");
-            attempt2.setTransactionId("TXN-2");
-            attempt2.setAmount(BigDecimal.valueOf(499.00));
-            attempt2.setPaymentMethod(PaymentMethod.UPI);
-            attempt2.setCurrentStatus(PaymentStatus.PENDING);
-
-            // Sorted ASC
-            when(paymentRepository.findAttemptsForReconciliation(eq(orderId), any()))
-                    .thenReturn(List.of(attempt1, attempt2));
-            when(paymentGateway.fetchOrderStatus("order_rzp_2"))
-                    .thenReturn(new GatewayOrderDetails(GatewayOrderStatus.PAID, "pay_222"));
-            when(paymentGateway.getPublishableKey()).thenReturn("rzp_key");
-
-            Optional<PaymentResult> result = paymentService.reconcileAllPaymentAttempts(orderId);
-
-            assertThat(result).isPresent();
-            assertThat(result.get().paymentId()).isEqualTo(attempt1.getId());
-
-            // No gateway call for attempt1 (already SUCCESS in DB)
-            verify(paymentGateway, never()).fetchOrderStatus("order_rzp_1");
-
-            // Attempt 2 marked SUCCESS and refunded
-            verify(paymentLifecycle).reconcilePaidPayment(attempt2.getId(), "pay_222");
-            verify(eventPublisher).publishEvent(any(PaymentRefundRequestedEvent.class));
-        }
-
-        @Test
-        @DisplayName("Deduplicates multiple Payment rows sharing the same gatewayOrderId")
-        void duplicateGatewayOrderId_deduplicated() {
-            Payment row1 = new Payment();
-            row1.setId(UUID.randomUUID());
-            row1.setOrder(order);
-            row1.setGatewayOrderId("order_rzp_same");
-            row1.setTransactionId("TXN-1");
-            row1.setAmount(BigDecimal.valueOf(499.00));
-            row1.setPaymentMethod(PaymentMethod.UPI);
-            row1.setCurrentStatus(PaymentStatus.PENDING);
-
-            Payment row2 = new Payment();
-            row2.setId(UUID.randomUUID());
-            row2.setOrder(order);
-            row2.setGatewayOrderId("order_rzp_same");
-            row2.setTransactionId("TXN-2");
-            row2.setAmount(BigDecimal.valueOf(499.00));
-            row2.setPaymentMethod(PaymentMethod.UPI);
-            row2.setCurrentStatus(PaymentStatus.PENDING);
-
-            when(paymentRepository.findAttemptsForReconciliation(eq(orderId), any()))
-                    .thenReturn(List.of(row1, row2));
-            when(paymentGateway.fetchOrderStatus("order_rzp_same"))
-                    .thenReturn(new GatewayOrderDetails(GatewayOrderStatus.PAID, "pay_winner"));
-            when(paymentGateway.getPublishableKey()).thenReturn("rzp_key");
-
-            Optional<PaymentResult> result = paymentService.reconcileAllPaymentAttempts(orderId);
-
-            assertThat(result).isPresent();
-            assertThat(result.get().paymentId()).isEqualTo(row1.getId());
-
-            // Only called ONCE for the shared gatewayOrderId
-            verify(paymentGateway, times(1)).fetchOrderStatus("order_rzp_same");
-            verify(paymentLifecycle, times(1)).reconcilePaidPayment(row1.getId(), "pay_winner");
-            // Skipped duplicate pending row is cancelled to prevent orphan pending state
-            verify(paymentLifecycle).reconcileExpiredPayment(row2.getId(), "Superseded by winning attempt");
-            // Zero refund events — no self-refund!
-            verifyNoInteractions(eventPublisher);
-        }
-
-        @Test
-        @DisplayName("Returns empty when no attempts were paid and reconciles expired payments")
-        void nonePaid_returnsEmpty() {
-            payment.setGatewayOrderId("order_rzp_expired");
-            payment.setCurrentStatus(PaymentStatus.PENDING);
-
-            when(paymentRepository.findAttemptsForReconciliation(eq(orderId), any()))
+            when(paymentRepository.findByOrderIdAndCurrentStatus(orderId, PaymentStatus.SUCCESS))
                     .thenReturn(List.of(payment));
-            when(paymentGateway.fetchOrderStatus("order_rzp_expired"))
-                    .thenReturn(GatewayOrderDetails.of(GatewayOrderStatus.EXPIRED));
 
-            Optional<PaymentResult> result = paymentService.reconcileAllPaymentAttempts(orderId);
+            paymentService.refundSuccessfulPayment(orderId, "Post-delivery COD refund");
 
-            assertThat(result).isEmpty();
-            verify(paymentLifecycle).reconcileExpiredPayment(payment.getId(), "Gateway order EXPIRED");
+            verify(paymentLifecycle).refundOrCancelCodPayment(payment, "Post-delivery COD refund");
+            verifyNoInteractions(eventPublisher);
         }
     }
 }

@@ -47,29 +47,13 @@ public interface PaymentLifecycleService {
     void processStubPayment(String transactionId, PaymentStatus status);
 
     /**
-     * Processes Cash on Delivery (COD) payment success.
-     * Synchronizes associated Order to PLACED and publishes events.
-     */
-    void processCodPaymentSuccess(UUID paymentId);
-
-    /**
-     * Reconciles a payment discovered to be already PAID during real-time gateway inquiry.
-     */
-    void reconcilePaidPayment(UUID paymentId, String gatewayPaymentId);
-
-    /**
-     * Reconciles a payment discovered to be EXPIRED/closed at the gateway during real-time inquiry.
-     */
-    void reconcileExpiredPayment(UUID paymentId, String reason);
-
-    /**
      * Cancels all pending payments associated with the given order ID.
      */
     void cancelPendingPayments(UUID orderId, String reason);
 
     /**
      * Marks a payment as SUCCESS in an isolated transaction.
-     * Invoked after successful payment capture at the payment gateway.
+     * Invoked after successful payment capture at the payment gateway or for COD initiation.
      */
     void markSuccess(UUID paymentId, String gatewayPaymentId);
 
@@ -102,5 +86,11 @@ public interface PaymentLifecycleService {
      * record is always persisted even if the calling listener's context is rolling back.
      */
     void markRefundFailed(UUID paymentId, String reason);
+
+    /**
+     * Refunds a COD payment if its associated order is {@code DELIVERED},
+     * or cancels the payment if cash was never collected (pre-delivery).
+     */
+    void refundOrCancelCodPayment(Payment payment, String reason);
 
 }

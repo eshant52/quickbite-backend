@@ -56,11 +56,15 @@ public interface PaymentProcessingService {
     Optional<PaymentResult> reconcileAllPaymentAttempts(UUID orderId);
 
     /**
-     * Emits a refund request event for any successful online payment associated with the order.
-     * Cash on Delivery (COD) payments and unpaid attempts are ignored.
+     * Handles refunding or cancelling any successful payment associated with the order:
+     * <ul>
+     *   <li><b>Online payments:</b> emits a {@code PaymentRefundRequestedEvent} to refund via the gateway.</li>
+     *   <li><b>COD payments:</b> marks the payment {@code REFUNDED} only if the order is {@code DELIVERED};
+     *       otherwise marks the uncollected COD payment {@code CANCELLED}.</li>
+     * </ul>
      *
      * @param orderId the order's UUID
-     * @param reason  the reason for refund
+     * @param reason  the reason for refund or cancellation
      */
     void refundSuccessfulPayment(UUID orderId, String reason);
 }

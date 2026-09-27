@@ -239,6 +239,16 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public AssignedDeliveryAgentResponse getAssignedDeliveryAgent(UUID orderId, UUID restaurantId, UUID ownerId) {
+        Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
+        if (order.getDeliveryAgent() == null) {
+            throw new ResourceNotFoundException("No delivery agent assigned to this order yet");
+        }
+        return AssignedDeliveryAgentResponse.from(order.getDeliveryAgent());
+    }
+
+    @Override
     @Transactional
     public OrderResponse acceptOrder(UUID orderId, UUID restaurantId, UUID ownerId) {
         Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
@@ -253,7 +263,10 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     @Transactional
     public OrderResponse declineOrder(UUID orderId, UUID restaurantId, UUID ownerId) {
         Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
-        return OrderResponse.from(orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.DECLINED));
+        Order updated = orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.DECLINED);
+        paymentService.refundSuccessfulPayment(updated.getId(), "Order declined by restaurant");
+        paymentService.cancelPendingPayments(updated.getId(), "Order declined by restaurant");
+        return OrderResponse.from(updated);
     }
 
     @Override

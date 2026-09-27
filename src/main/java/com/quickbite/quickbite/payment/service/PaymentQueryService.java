@@ -19,4 +19,13 @@ public interface PaymentQueryService {
      * @throws com.quickbite.quickbite.payment.exception.PaymentNotFoundException if no payment is found for the given order and customer
      */
     PaymentResponse getPaymentByOrderId(UUID orderId, UUID customerId);
+
+    /**
+     * Retrieves the payment details and attempt history for any order (Admin/Support).
+     *
+     * @param orderId the UUID of the order
+     * @return PaymentResponse containing payment details and all attempt histories
+     * @throws com.quickbite.quickbite.payment.exception.PaymentNotFoundException if no payment is found for the order
+     */
+    PaymentResponse getPaymentByOrderIdForAdmin(UUID orderId);
 }

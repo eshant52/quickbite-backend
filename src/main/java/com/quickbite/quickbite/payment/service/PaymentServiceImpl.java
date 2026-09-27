@@ -2,10 +2,7 @@ package com.quickbite.quickbite.payment.service;
 
 import com.quickbite.quickbite.common.exception.BadRequestException;
 import com.quickbite.quickbite.order.model.Order;
-import com.quickbite.quickbite.payment.dto.CodPaymentResult;
-import com.quickbite.quickbite.payment.dto.GatewayOrderDetails;
 import com.quickbite.quickbite.payment.dto.GatewayWebhookEvent;
-import com.quickbite.quickbite.payment.dto.OnlinePaymentResult;
 import com.quickbite.quickbite.payment.dto.PaymentAttemptSummary;
 import com.quickbite.quickbite.payment.dto.PaymentResponse;
 import com.quickbite.quickbite.payment.dto.PaymentResult;
@@ -17,12 +14,10 @@ import com.quickbite.quickbite.payment.repository.PaymentRepository;
 import com.quickbite.quickbite.payment.service.gateway.PaymentGateway;
 import com.quickbite.quickbite.payment.service.strategy.PaymentStrategy;
 import com.quickbite.quickbite.common.event.payment.PaymentRefundRequestedEvent;
-import com.quickbite.quickbite.payment.dto.GatewayOrderStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
@@ -35,6 +30,7 @@ public class PaymentServiceImpl implements PaymentProcessingService, PaymentQuer
     private final List<PaymentStrategy> strategies;
     private final PaymentGateway paymentGateway;
     private final PaymentLifecycleService paymentLifecycle;
+    private final PaymentReconciliationService paymentReconciliationService;
     private final ApplicationEventPublisher eventPublisher;
 
     public PaymentServiceImpl(
@@ -42,11 +38,13 @@ public class PaymentServiceImpl implements PaymentProcessingService, PaymentQuer
             List<PaymentStrategy> strategies,
             PaymentGateway paymentGateway,
             PaymentLifecycleService paymentLifecycle,
+            PaymentReconciliationService paymentReconciliationService,
             ApplicationEventPublisher eventPublisher) {
         this.paymentRepository = paymentRepository;
         this.strategies = strategies;
         this.paymentGateway = paymentGateway;
         this.paymentLifecycle = paymentLifecycle;
+        this.paymentReconciliationService = paymentReconciliationService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -69,130 +67,48 @@ public class PaymentServiceImpl implements PaymentProcessingService, PaymentQuer
     public void refundSuccessfulPayment(UUID orderId, String reason) {
         List<Payment> successfulPayments = paymentRepository.findByOrderIdAndCurrentStatus(orderId, PaymentStatus.SUCCESS);
         for (Payment payment : successfulPayments) {
-            if (payment.getPaymentMethod() != null && payment.getPaymentMethod().isOnline()
-                    && payment.getGatewayPaymentId() != null && !payment.getGatewayPaymentId().isBlank()) {
+            if (payment.getPaymentMethod() == null) {
+                continue;
+            }
+
+            if (payment.getPaymentMethod().isOnline()
+                    && payment.getGatewayPaymentId() != null
+                    && !payment.getGatewayPaymentId().isBlank()) {
                 eventPublisher.publishEvent(new PaymentRefundRequestedEvent(
                         payment.getId(),
                         payment.getGatewayPaymentId(),
                         payment.getAmount(),
                         reason
                 ));
+            } else if (payment.getPaymentMethod() == PaymentMethod.COD) {
+                paymentLifecycle.refundOrCancelCodPayment(payment, reason);
             }
         }
     }
 
     @Override
     public Optional<PaymentResult> reconcileAllPaymentAttempts(UUID orderId) {
-        List<Payment> attempts = paymentRepository.findAttemptsForReconciliation(
-                orderId, List.of(PaymentStatus.REFUNDED, PaymentStatus.REFUND_FAILED));
-
-        Set<String> successGatewayOrderIds = new HashSet<>();
-        Map<String, GatewayOrderDetails> orderDetailsCache = new HashMap<>();
-        boolean isPaid = false;
-        PaymentResult winningResult = null;
-
-        for (Payment payment : attempts) {
-            String gatewayOrderId = payment.getGatewayOrderId();
-
-            if (successGatewayOrderIds.contains(gatewayOrderId)) {
-                if (payment.getCurrentStatus() == PaymentStatus.PENDING) {
-                    paymentLifecycle.reconcileExpiredPayment(payment.getId(), "Superseded by winning attempt");
-                }
-                continue;
-            }
-
-            // Case A: Payment is ALREADY recorded as SUCCESS in our database
-            if (payment.getCurrentStatus() == PaymentStatus.SUCCESS) {
-                if (!isPaid) {
-                    isPaid = true;
-                    winningResult = toPaymentResult(payment);
-                } else {
-                    eventPublisher.publishEvent(new PaymentRefundRequestedEvent(
-                            payment.getId(),
-                            payment.getGatewayPaymentId(),
-                            payment.getAmount(),
-                            "Auto-refund: Duplicate successful payment on retried order"
-                    ));
-                }
-                successGatewayOrderIds.add(gatewayOrderId);
-                continue;
-            }
-
-            // Case B: Payment is PENDING or CANCELLED locally — query live status from Gateway
-            GatewayOrderDetails orderDetails = orderDetailsCache.computeIfAbsent(
-                    gatewayOrderId, paymentGateway::fetchOrderStatus);
-
-            if (orderDetails.status() == GatewayOrderStatus.PAID) {
-                Optional<Payment> existingPaidPayment = paymentRepository.findByGatewayOrderIdAndGatewayPaymentIdAndCurrentStatus(
-                        gatewayOrderId,
-                        orderDetails.gatewayPaymentId(),
-                        PaymentStatus.SUCCESS
-                );
-
-                if (existingPaidPayment.isPresent()) {
-                    payment = existingPaidPayment.get();
-                } else {
-                    paymentLifecycle.reconcilePaidPayment(payment.getId(), orderDetails.gatewayPaymentId());
-                }
-
-                if (!isPaid) {
-                    // For existing payment already marked as SUCCESS, we can safely return the existing payment details without creating a new one.
-                    isPaid = true;
-                    winningResult = new OnlinePaymentResult(
-                            payment.getId(),
-                            orderId,
-                            payment.getTransactionId(),
-                            payment.getPaymentMethod(),
-                            PaymentStatus.SUCCESS,
-                            payment.getAmount(),
-                            payment.getGatewayOrderId(),
-                            paymentGateway.getPublishableKey()
-                    );
-                } else {
-                    eventPublisher.publishEvent(new PaymentRefundRequestedEvent(
-                            payment.getId(),
-                            orderDetails.gatewayPaymentId(),
-                            payment.getAmount(),
-                            "Auto-refund: Duplicate payment captured at gateway on retried order"
-                    ));
-                }
-
-                successGatewayOrderIds.add(gatewayOrderId);
-            } else if (orderDetails.status() == GatewayOrderStatus.EXPIRED) {
-                if (payment.getCurrentStatus() == PaymentStatus.PENDING) {
-                    paymentLifecycle.reconcileExpiredPayment(payment.getId(), "Gateway order EXPIRED");
-                }
-            }
-        }
-
-        return Optional.ofNullable(winningResult);
+        return paymentReconciliationService.reconcileAllPaymentAttempts(orderId);
     }
 
-    private PaymentResult toPaymentResult(Payment payment) {
-        if (!payment.getPaymentMethod().isOnline()) {
-            return new CodPaymentResult(
-                    payment.getId(),
-                    payment.getOrder().getId(),
-                    payment.getTransactionId(),
-                    payment.getAmount()
-            );
-        }
-        return new OnlinePaymentResult(
-                payment.getId(),
-                payment.getOrder().getId(),
-                payment.getTransactionId(),
-                payment.getPaymentMethod(),
-                payment.getCurrentStatus(),
-                payment.getAmount(),
-                payment.getGatewayOrderId(),
-                paymentGateway.getPublishableKey()
+    @Override
+    public PaymentResponse getPaymentByOrderId(UUID orderId, UUID customerId) {
+        return resolvePaymentResponse(
+                orderId,
+                () -> paymentRepository.findAllByOrderIdAndCustomerId(orderId, customerId)
         );
     }
 
     @Override
-    @Transactional
-    public PaymentResponse getPaymentByOrderId(UUID orderId, UUID customerId) {
-        List<Payment> payments = paymentRepository.findAllByOrderIdAndCustomerId(orderId, customerId);
+    public PaymentResponse getPaymentByOrderIdForAdmin(UUID orderId) {
+        return resolvePaymentResponse(
+                orderId,
+                () -> paymentRepository.findAllByOrderIdOrderByCreatedAtAsc(orderId)
+        );
+    }
+
+    private PaymentResponse resolvePaymentResponse(UUID orderId, java.util.function.Supplier<List<Payment>> paymentsLoader) {
+        List<Payment> payments = paymentsLoader.get();
         if (payments.isEmpty()) {
             throw new PaymentNotFoundException("Payment not found for order " + orderId);
         }
@@ -201,8 +117,8 @@ public class PaymentServiceImpl implements PaymentProcessingService, PaymentQuer
         // synchronize with the gateway so polling reflects the live status immediately.
         Payment latest = payments.getLast();
         if (latest.getCurrentStatus() == PaymentStatus.PENDING && latest.getGatewayOrderId() != null) {
-            reconcileAllPaymentAttempts(orderId);
-            payments = paymentRepository.findAllByOrderIdAndCustomerId(orderId, customerId);
+            paymentReconciliationService.reconcileAllPaymentAttempts(orderId);
+            payments = paymentsLoader.get();
         }
 
         // First Success Wins:
@@ -214,30 +130,10 @@ public class PaymentServiceImpl implements PaymentProcessingService, PaymentQuer
                 .orElse(payments.getLast());
 
         List<PaymentAttemptSummary> attempts = payments.stream()
-                .map(p -> new PaymentAttemptSummary(
-                        p.getId(),
-                        p.getTransactionId(),
-                        p.getPaymentMethod(),
-                        p.getAmount(),
-                        p.getCurrentStatus(),
-                        p.getGatewayOrderId(),
-                        p.getGatewayPaymentId(),
-                        p.getCreatedAt()
-                ))
+                .map(PaymentAttemptSummary::from)
                 .toList();
 
-        return new PaymentResponse(
-                primaryPayment.getId(),
-                orderId,
-                primaryPayment.getTransactionId(),
-                primaryPayment.getPaymentMethod(),
-                primaryPayment.getAmount(),
-                primaryPayment.getCurrentStatus(),
-                primaryPayment.getGatewayOrderId(),
-                primaryPayment.getGatewayPaymentId(),
-                primaryPayment.getCreatedAt(),
-                attempts
-        );
+        return PaymentResponse.from(primaryPayment, orderId, attempts);
     }
 
     @Override

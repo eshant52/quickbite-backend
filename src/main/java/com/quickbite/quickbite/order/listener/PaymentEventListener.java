@@ -61,8 +61,9 @@ public class PaymentEventListener {
      * Handles payment SUCCESS.
      *
      * <ul>
-     *   <li>{@code AWAITING_PAYMENT → PLACED}: normal checkout flow — publishes
-     *       {@link OrderPlacedEvent} (AFTER_COMMIT) for downstream notifications.</li>
+     *   <li>{@code AWAITING_PAYMENT / PAYMENT_FAILED → PLACED}: normal checkout or
+     *       reconciled/retried payment flow — publishes {@link OrderPlacedEvent}
+     *       (AFTER_COMMIT) for downstream notifications.</li>
      *   <li>{@code ABANDONED / CANCELLED}: late capture — requests auto-refund via
      *       {@link PaymentRefundRequestedEvent} (AFTER_COMMIT, handled by
      *       {@code PaymentRefundListener}).</li>
@@ -76,7 +77,7 @@ public class PaymentEventListener {
 
         OrderStatus current = order.getCurrentStatus();
 
-        if (current == OrderStatus.AWAITING_PAYMENT) {
+        if (current == OrderStatus.AWAITING_PAYMENT || current == OrderStatus.PAYMENT_FAILED) {
             order.setCurrentStatus(OrderStatus.PLACED);
             order.setRestaurantAcceptanceDeadline(Instant.now().plus(orderProperties.restaurantAcceptanceWindow()));
             orderRepository.save(order);
@@ -93,7 +94,9 @@ public class PaymentEventListener {
                     order.getCreatedAt()
             ));
 
-        } else if (current == OrderStatus.ABANDONED || current == OrderStatus.CANCELLED) {
+        } else if (current == OrderStatus.ABANDONED
+                || current == OrderStatus.CANCELLED
+                || current == OrderStatus.DECLINED) {
             log.warn("Payment {} succeeded for {} order {}. Evaluating auto-refund eligibility.",
                     event.paymentId(), current, order.getId());
 

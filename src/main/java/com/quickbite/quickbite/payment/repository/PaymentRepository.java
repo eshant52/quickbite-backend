@@ -36,6 +36,13 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             @Param("customerId") UUID customerId
     );
 
+    @Query("""
+    SELECT p FROM Payment p
+    WHERE p.order.id = :orderId
+    ORDER BY p.createdAt ASC
+    """)
+    List<Payment> findAllByOrderIdOrderByCreatedAtAsc(@Param("orderId") UUID orderId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Payment p WHERE p.gatewayOrderId = :gatewayOrderId")
     Optional<Payment> findByGatewayOrderIdForUpdate(@Param("gatewayOrderId") String gatewayOrderId);
@@ -52,7 +59,7 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     @Query("""
     SELECT p FROM Payment p
     WHERE p.order.id = :orderId
-        AND p.gatewayOrderId IS NOT NULL
+        AND (p.gatewayOrderId IS NOT NULL OR p.paymentMethod = PaymentMethod.COD)
         AND p.currentStatus NOT IN :excludedStatuses
     ORDER BY p.createdAt ASC
     """)

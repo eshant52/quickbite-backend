@@ -1,6 +1,7 @@
 package com.quickbite.quickbite.order.service;
 
 import com.quickbite.quickbite.common.dto.CursorPage;
+import com.quickbite.quickbite.order.dto.AssignedDeliveryAgentResponse;
 import com.quickbite.quickbite.order.dto.OrderResponse;
 import com.quickbite.quickbite.order.dto.OrderSummaryResponse;
 import com.quickbite.quickbite.order.model.OrderStatus;
@@ -11,6 +12,7 @@ public interface RestaurantOrderService {
     // Queries
     CursorPage<OrderSummaryResponse> listRestaurantOrders(UUID restaurantId, UUID ownerId, OrderStatus status, UUID cursor, int size);
     OrderResponse getRestaurantOrder(UUID orderId, UUID restaurantId, UUID ownerId);
+    AssignedDeliveryAgentResponse getAssignedDeliveryAgent(UUID orderId, UUID restaurantId, UUID ownerId);
 
     // State transitions
     OrderResponse acceptOrder(UUID orderId, UUID restaurantId, UUID ownerId);

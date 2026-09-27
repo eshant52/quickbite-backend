@@ -27,7 +27,11 @@ public class PaymentRefundListener {
         log.info("Processing asynchronous refund for payment {} (gatewayPaymentId: {}, amount: {})",
                 event.paymentId(), event.gatewayPaymentId(), event.amount());
         try {
-            paymentGateway.refund(event.gatewayPaymentId(), event.amount(), event.reason());
+            boolean isStubPayment = event.gatewayPaymentId() != null
+                    && event.gatewayPaymentId().startsWith("stub_pay_");
+            if (!isStubPayment) {
+                paymentGateway.refund(event.gatewayPaymentId(), event.amount(), event.reason());
+            }
             paymentLifecycle.markRefunded(event.paymentId(), event.reason());
             log.info("Successfully processed refund for payment {}", event.paymentId());
         } catch (Exception e) {

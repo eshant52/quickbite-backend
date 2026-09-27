@@ -5,10 +5,6 @@ import com.quickbite.quickbite.restaurant.model.Restaurant;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.delivery.model.DeliveryAgent;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
@@ -45,11 +41,9 @@ public class Order extends Base {
     private User customer;
 
     @ManyToOne
-    @JoinColumn(nullable = true)
+    @JoinColumn
     private DeliveryAgent deliveryAgent;
 
-    @NotBlank(message = "Delivery address is required")
-    @Size(max = 500, message = "Delivery address must be at most 500 characters")
     @Column(columnDefinition = "TEXT", nullable = false)
     private String deliveryAddress;
 
@@ -58,38 +52,24 @@ public class Order extends Base {
     private Point deliveryLocation;
 
     @Column(precision = 10, scale = 2, nullable = false)
-    @Digits(integer = 8, fraction = 2, message = "Sub total must have up to 8 digits and 2 decimal places")
-    @DecimalMin(value = "0.01", message = "Sub total must be greater than or equal to 0.01")
     private BigDecimal subtotal;
 
     @Column(precision = 10, scale = 2, nullable = false)
-    @Digits(integer = 8, fraction = 2, message = "Discount amount must have up to 8 digits and 2 decimal places")
-    @DecimalMin(value = "0.00", message = "Discount amount must be greater than or equal to 0.00")
     private BigDecimal discountAmount;
 
     @Column(precision = 10, scale = 2, nullable = false)
-    @Digits(integer = 8, fraction = 2, message = "Delivery fee must have up to 8 digits and 2 decimal places")
-    @DecimalMin(value = "0.00", message = "Delivery fee must be greater than or equal to 0.00")
     private BigDecimal deliveryFee;
 
     @Column(precision = 10, scale = 2, nullable = false)
-    @Digits(integer = 8, fraction = 2, message = "Platform fee must have up to 8 digits and 2 decimal places")
-    @DecimalMin(value = "0.00", message = "Platform fee must be greater than or equal to 0.00")
     private BigDecimal platformFee;
 
     @Column(precision = 10, scale = 2, nullable = false)
-    @Digits(integer = 8, fraction = 2, message = "Tax amount must have up to 8 digits and 2 decimal places")
-    @DecimalMin(value = "0.00", message = "Tax amount must be greater than or equal to 0.00")
     private BigDecimal taxAmount;
 
     @Column(precision = 10, scale = 2, nullable = false)
-    @Digits(integer = 8, fraction = 2, message = "Tip amount must have up to 8 digits and 2 decimal places")
-    @DecimalMin(value = "0.00", message = "Tip amount must be greater than or equal to 0.00")
     private BigDecimal tipAmount;
 
     @Column(precision = 10, scale = 2, nullable = false)
-    @Digits(integer = 8, fraction = 2, message = "Total amount must have up to 8 digits and 2 decimal places")
-    @DecimalMin(value = "0.01", message = "Total amount must be greater than or equal to 0.01")
     private BigDecimal totalAmount;
 
     @Enumerated(EnumType.STRING)
@@ -103,8 +83,9 @@ public class Order extends Base {
     private List<OrderItem> items;
 
     @OneToMany(mappedBy = "order")
+    @OrderBy("createdAt ASC")
     @NotAudited
-    private List<OrderStatusHistory> statusHistory;
+    private List<OrderStatusHistory> statusHistory = new java.util.ArrayList<>();
 
     /** Road-network delivery distance in metres, resolved at order creation. */
     @Column

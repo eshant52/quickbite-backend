@@ -159,8 +159,8 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int processAbandonmentBatch(Instant cutoff, int batchSize) {
-        List<Order> staleOrders = orderRepository.findByCurrentStatusAndCreatedAtBeforeForUpdateSkipLocked(
-                OrderStatus.AWAITING_PAYMENT,
+        List<Order> staleOrders = orderRepository.findByCurrentStatusInAndCreatedAtBeforeForUpdateSkipLocked(
+                List.of(OrderStatus.AWAITING_PAYMENT, OrderStatus.PAYMENT_FAILED),
                 cutoff,
                 Limit.of(batchSize)
         );
@@ -193,7 +193,11 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     @Override
     @Transactional
     public void cancelOrder(Order order) {
-        OrderStatus current = order.getCurrentStatus();
+        Order lockedOrder = order.getId() != null
+                ? orderRepository.findByIdForUpdate(order.getId()).orElse(order)
+                : order;
+
+        OrderStatus current = lockedOrder.getCurrentStatus();
         if (current == OrderStatus.CANCELLED) {
             return; // Idempotent
         }
@@ -204,22 +208,28 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
                     "Order cannot be cancelled once the restaurant has accepted it");
         }
 
-        order.setCurrentStatus(OrderStatus.CANCELLED);
-        order.setCancellationReason(OrderCancellationReason.CUSTOMER_CANCELLED);
-        orderRepository.save(order);
+        lockedOrder.setCurrentStatus(OrderStatus.CANCELLED);
+        lockedOrder.setCancellationReason(OrderCancellationReason.CUSTOMER_CANCELLED);
+        lockedOrder.setRestaurantAcceptanceDeadline(null);
+        if (lockedOrder != order) {
+            order.setCurrentStatus(OrderStatus.CANCELLED);
+            order.setCancellationReason(OrderCancellationReason.CUSTOMER_CANCELLED);
+            order.setRestaurantAcceptanceDeadline(null);
+        }
+        orderRepository.save(lockedOrder);
 
         OrderStatusHistory history = new OrderStatusHistory();
-        history.setOrder(order);
+        history.setOrder(lockedOrder);
         history.setOrderStatus(OrderStatus.CANCELLED);
         orderStatusHistoryRepository.save(history);
 
-        paymentService.refundSuccessfulPayment(order.getId(), "Order cancelled by customer");
-        paymentService.cancelPendingPayments(order.getId(), "Order cancelled by customer");
+        paymentService.refundSuccessfulPayment(lockedOrder.getId(), "Order cancelled by customer");
+        paymentService.cancelPendingPayments(lockedOrder.getId(), "Order cancelled by customer");
 
         eventPublisher.publishEvent(new OrderCancelledEvent(
-                order.getId(),
-                order.getCustomer().getId(),
-                order.getRestaurant().getId(),
+                lockedOrder.getId(),
+                lockedOrder.getCustomer().getId(),
+                lockedOrder.getRestaurant().getId(),
                 Instant.now()
         ));
     }
@@ -311,19 +321,35 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     @Override
     @Transactional
     public Order transitionStatus(Order order, OrderStatus expected, OrderStatus next) {
-        if (order.getCurrentStatus() != expected) {
+        Order lockedOrder = order.getId() != null
+                ? orderRepository.findByIdForUpdate(order.getId()).orElse(order)
+                : order;
+
+        if (lockedOrder.getCurrentStatus() != expected) {
             throw new OrderStateException(
-                    "Cannot transition order from " + order.getCurrentStatus() +
+                    "Cannot transition order from " + lockedOrder.getCurrentStatus() +
                     " to " + next + ". Expected status: " + expected);
         }
 
-        order.setCurrentStatus(next);
-        Order saved = orderRepository.save(order);
+        lockedOrder.setCurrentStatus(next);
+        if (expected == OrderStatus.PLACED) {
+            lockedOrder.setRestaurantAcceptanceDeadline(null);
+        }
+        if (lockedOrder != order) {
+            order.setCurrentStatus(next);
+            if (expected == OrderStatus.PLACED) {
+                order.setRestaurantAcceptanceDeadline(null);
+            }
+        }
+        Order saved = orderRepository.save(lockedOrder);
 
         OrderStatusHistory history = new OrderStatusHistory();
         history.setOrder(saved);
         history.setOrderStatus(next);
         orderStatusHistoryRepository.save(history);
+        if (saved.getStatusHistory() != null) {
+            saved.getStatusHistory().add(history);
+        }
 
         eventPublisher.publishEvent(new OrderStatusChangedEvent(
                 saved.getId(),
@@ -398,6 +424,9 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
         history.setOrder(savedOrder);
         history.setOrderStatus(initialStatus);
         orderStatusHistoryRepository.save(history);
+        if (savedOrder.getStatusHistory() != null) {
+            savedOrder.getStatusHistory().add(history);
+        }
 
         return savedOrder;
     }
