@@ -1,0 +1,27 @@
+# ── Git & IDE ────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+*.iml
+
+# ── Secrets — NEVER in image ─────────────────────────────────────────────────
+.env
+.env.*
+src/main/resources/certs/
+
+# ── Dev-only infrastructure ───────────────────────────────────────────────────
+docker-compose.yml
+postgres-setup/
+redis-setup/
+
+# ── Build outputs (Stage 1 handles its own build) ────────────────────────────
+target/
+
+# ── Docs & misc ───────────────────────────────────────────────────────────────
+docs/
+README.md
+HELP.md
+AGENTS.md
+LICENSE

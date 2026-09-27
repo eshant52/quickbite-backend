@@ -4,6 +4,7 @@ import com.quickbite.quickbite.common.event.QuickBiteTopics;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,20 @@ import java.util.Map;
 @Configuration
 @EnableKafka
 public class KafkaConfig {
+
+    /**
+     * Number of replicas for main topics.
+     * Override to 3 in prod (application-prod.properties) to match MSK cluster broker count.
+     */
+    @Value("${quickbite.kafka.replication-factor:1}")
+    private short replicationFactor;
+
+    /**
+     * Default partition count for main topics.
+     * DLT topics always use 1 partition.
+     */
+    @Value("${quickbite.kafka.default-partitions:3}")
+    private int defaultPartitions;
 
     @Bean
     public ProducerFactory<String, Object> producerFactory(KafkaProperties kafkaProperties) {
@@ -86,8 +101,8 @@ public class KafkaConfig {
     @Bean
     public NewTopic orderEventsTopic() {
         return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS)
-                .partitions(3)
-                .replicas(1)
+                .partitions(defaultPartitions)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -95,7 +110,7 @@ public class KafkaConfig {
     public NewTopic orderEventsDltTopic() {
         return TopicBuilder.name(QuickBiteTopics.ORDER_EVENTS + QuickBiteTopics.DLT_SUFFIX)
                 .partitions(1)
-                .replicas(1)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -103,8 +118,8 @@ public class KafkaConfig {
     @Bean
     public NewTopic restaurantApplicationEventsTopic() {
         return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS)
-                .partitions(3)
-                .replicas(1)
+                .partitions(defaultPartitions)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -112,7 +127,7 @@ public class KafkaConfig {
     public NewTopic restaurantApplicationEventsDltTopic() {
         return TopicBuilder.name(QuickBiteTopics.RESTAURANT_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX)
                 .partitions(1)
-                .replicas(1)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -120,8 +135,8 @@ public class KafkaConfig {
     @Bean
     public NewTopic cuisineEventsTopic() {
         return TopicBuilder.name(QuickBiteTopics.CUISINE_EVENTS)
-                .partitions(3)
-                .replicas(1)
+                .partitions(defaultPartitions)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -129,7 +144,7 @@ public class KafkaConfig {
     public NewTopic cuisineEventsDltTopic() {
         return TopicBuilder.name(QuickBiteTopics.CUISINE_EVENTS + QuickBiteTopics.DLT_SUFFIX)
                 .partitions(1)
-                .replicas(1)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -137,8 +152,8 @@ public class KafkaConfig {
     @Bean
     public NewTopic paymentEventsTopic() {
         return TopicBuilder.name(QuickBiteTopics.PAYMENT_EVENTS)
-                .partitions(3)
-                .replicas(1)
+                .partitions(defaultPartitions)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -146,15 +161,15 @@ public class KafkaConfig {
     public NewTopic paymentEventsDltTopic() {
         return TopicBuilder.name(QuickBiteTopics.PAYMENT_EVENTS + QuickBiteTopics.DLT_SUFFIX)
                 .partitions(1)
-                .replicas(1)
+                .replicas(replicationFactor)
                 .build();
     }
 
     @Bean
     public NewTopic deliveryAgentApplicationEventsTopic() {
         return TopicBuilder.name(QuickBiteTopics.DELIVERY_AGENT_APPLICATION_EVENTS)
-                .partitions(3)
-                .replicas(1)
+                .partitions(defaultPartitions)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -162,15 +177,15 @@ public class KafkaConfig {
     public NewTopic deliveryAgentApplicationEventsDltTopic() {
         return TopicBuilder.name(QuickBiteTopics.DELIVERY_AGENT_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX)
                 .partitions(1)
-                .replicas(1)
+                .replicas(replicationFactor)
                 .build();
     }
 
     @Bean
     public NewTopic vehicleApplicationEventsTopic() {
         return TopicBuilder.name(QuickBiteTopics.VEHICLE_APPLICATION_EVENTS)
-                .partitions(3)
-                .replicas(1)
+                .partitions(defaultPartitions)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -178,7 +193,7 @@ public class KafkaConfig {
     public NewTopic vehicleApplicationEventsDltTopic() {
         return TopicBuilder.name(QuickBiteTopics.VEHICLE_APPLICATION_EVENTS + QuickBiteTopics.DLT_SUFFIX)
                 .partitions(1)
-                .replicas(1)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -186,8 +201,8 @@ public class KafkaConfig {
     @Bean
     public NewTopic deliveryEventsTopic() {
         return TopicBuilder.name(QuickBiteTopics.DELIVERY_EVENTS)
-                .partitions(3)
-                .replicas(1)
+                .partitions(defaultPartitions)
+                .replicas(replicationFactor)
                 .build();
     }
 
@@ -195,7 +210,10 @@ public class KafkaConfig {
     public NewTopic deliveryEventsDltTopic() {
         return TopicBuilder.name(QuickBiteTopics.DELIVERY_EVENTS + QuickBiteTopics.DLT_SUFFIX)
                 .partitions(1)
-                .replicas(1)
+                .replicas(replicationFactor)
                 .build();
     }
 }
+
+
+

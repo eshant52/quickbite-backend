@@ -29,7 +29,7 @@ import java.util.stream.IntStream;
  * the {@link CompositeRoutingGateway} will catch it and fall through to the next provider.
  */
 @Component
-@ConditionalOnProperty(name = "quickbite.routing.osrm-enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "quickbite.routing.osrm-enabled", havingValue = "true")
 public class OsrmRoutingAdapter extends AbstractRoutingAdapter {
 
     private final RestClient restClient;

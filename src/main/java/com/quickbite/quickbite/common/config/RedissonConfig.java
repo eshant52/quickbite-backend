@@ -16,6 +16,10 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>Configuration is sourced from {@link RedissonProperties}
  * ({@code quickbite.redisson.*} in {@code application.properties}).
+ *
+ * <p>In production (AWS ElastiCache), set {@code quickbite.redisson.ssl=true} and supply
+ * {@code quickbite.redisson.username} / {@code quickbite.redisson.password} to enable TLS
+ * and RBAC authentication.
  */
 @Configuration
 public class RedissonConfig {
@@ -29,10 +33,23 @@ public class RedissonConfig {
     @Bean(destroyMethod = "shutdown")
     public RedissonClient redissonClient() {
         Config config = new Config();
-        config.useSingleServer()
-                .setAddress("redis://" + properties.host() + ":" + properties.port())
+
+        // Use rediss:// (TLS) in production; redis:// (plain) in dev
+        String scheme = properties.ssl() ? "rediss://" : "redis://";
+        var server = config.useSingleServer()
+                .setAddress(scheme + properties.host() + ":" + properties.port())
                 .setConnectionPoolSize(properties.connectionPoolSize())
                 .setConnectionMinimumIdleSize(properties.connectionMinimumIdleSize());
+
+        // Apply credentials when provided (required for AWS ElastiCache RBAC)
+        if (properties.username() != null && !properties.username().isBlank()) {
+            server.setUsername(properties.username());
+        }
+        if (properties.password() != null && !properties.password().isBlank()) {
+            server.setPassword(properties.password());
+        }
+
         return Redisson.create(config);
     }
 }
+
