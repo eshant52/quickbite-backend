@@ -1,7 +1,6 @@
 package com.quickbite.quickbite.payment.model;
 
 import com.quickbite.quickbite.common.model.Base;
-import com.quickbite.quickbite.payment.model.Payment;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;

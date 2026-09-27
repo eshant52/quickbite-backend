@@ -3,8 +3,6 @@ package com.quickbite.quickbite.payment.model;
 import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.order.model.Order;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Digits;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
@@ -45,8 +43,6 @@ public class Payment extends Base {
     private PaymentMethod paymentMethod;
 
     @Column(precision = 10, scale = 2, nullable = false)
-    @Digits(integer = 8, fraction = 2, message = "Amount must have up to 8 digits and 2 decimal places")
-    @DecimalMin(value = "0.01", message = "Amount must be greater than or equal to 0.01")
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
