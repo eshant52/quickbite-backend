@@ -26,7 +26,7 @@ public interface DeliveryOfferRepository extends JpaRepository<DeliveryOffer, UU
             List<DeliveryOfferStatus> statuses
     );
 
-    @Query("SELECT o.agent.id FROM DeliveryOffer o WHERE o.orderId = :orderId")
+    @Query("SELECT o.agent.id FROM DeliveryOffer o WHERE o.order.id = :orderId")
     Set<UUID> findOfferedAgentIdsByOrderId(@Param("orderId") UUID orderId);
 
     @Query("""

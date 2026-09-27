@@ -3,10 +3,7 @@ package com.quickbite.quickbite.delivery.model;
 import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.common.model.DocumentVerificationStatus;
 import com.quickbite.quickbite.user.model.User;
-import com.quickbite.quickbite.delivery.model.DeliveryAgent;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
@@ -31,11 +28,9 @@ public class DeliveryAgentDocument extends Base {
     @Column(columnDefinition = "delivery_agent_document_type", nullable = false)
     private DeliveryAgentDocumentType type;
 
-    @Size(max = 500, message = "Description must be at most 500 characters")
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @NotBlank(message = "URL is required")
     @Column(columnDefinition = "TEXT", nullable = false)
     private String url;
 
@@ -45,13 +40,12 @@ public class DeliveryAgentDocument extends Base {
     @Column(columnDefinition = "document_verification_status", nullable = false)
     private DocumentVerificationStatus status;
 
-    @Size(max = 500, message = "Remarks must be at most 500 characters")
     @Column(columnDefinition = "TEXT")
     private String remarks;
 
     private Instant reviewedAt;
 
     @ManyToOne
-    @JoinColumn(nullable = true)
+    @JoinColumn
     private User reviewedBy;
 }

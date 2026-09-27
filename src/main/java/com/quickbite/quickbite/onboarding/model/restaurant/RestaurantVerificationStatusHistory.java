@@ -4,7 +4,6 @@ import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.restaurant.model.RestaurantVerificationStatus;
 import com.quickbite.quickbite.user.model.User;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
@@ -30,7 +29,6 @@ public class RestaurantVerificationStatusHistory extends Base {
     @Column(columnDefinition = "restaurant_verification_status", nullable = false)
     private RestaurantVerificationStatus status;
 
-    @Size(max = 500, message = "Remarks must be at most 500 characters")
     @Column(columnDefinition = "TEXT")
     private String remarks;
 }

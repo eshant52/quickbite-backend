@@ -1,6 +1,7 @@
 package com.quickbite.quickbite.delivery.model;
 
 import com.quickbite.quickbite.common.model.Base;
+import com.quickbite.quickbite.order.model.Order;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -9,8 +10,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -27,8 +28,9 @@ import java.util.UUID;
 )
 public class DeliveryOffer extends Base {
 
-    @Column(nullable = false)
-    private UUID orderId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", nullable = false)
+    private Order order;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "agent_id", nullable = false)
@@ -38,7 +40,7 @@ public class DeliveryOffer extends Base {
     private int roundNumber;
 
     @Column(precision = 5, scale = 2, nullable = false)
-    private double radiusKm;
+    private BigDecimal radiusKm;
 
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)

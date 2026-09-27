@@ -21,7 +21,7 @@ public interface OrderDispatchRepository extends JpaRepository<OrderDispatch, UU
     Optional<OrderDispatch> findByOrderId(UUID orderId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT d FROM OrderDispatch d WHERE d.orderId = :orderId")
+    @Query("SELECT d FROM OrderDispatch d WHERE d.order.id = :orderId")
     Optional<OrderDispatch> findByOrderIdForUpdate(@Param("orderId") UUID orderId);
 
     @Query(value = """

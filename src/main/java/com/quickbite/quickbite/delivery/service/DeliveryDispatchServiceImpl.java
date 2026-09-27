@@ -333,7 +333,7 @@ public class DeliveryDispatchServiceImpl implements DeliveryDispatchService {
 
                 // ATOMIC WRITE IN SHORT TRANSACTION:
                 lifecycleService.recordCreatedOffer(
-                        order.getId(),
+                        order,
                         agent,
                         r,
                         roundConfig.radiusKm(),

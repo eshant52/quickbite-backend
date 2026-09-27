@@ -172,7 +172,7 @@ class DeliveryDispatchLifecycleServiceImplTest {
         offer.setStatus(DeliveryOfferStatus.PENDING);
 
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
 
         when(userRepository.findById(agentUserId)).thenReturn(Optional.of(agentUser));
@@ -193,17 +193,18 @@ class DeliveryDispatchLifecycleServiceImplTest {
     @DisplayName("recordCreatedOffer creates PENDING offer, updates dispatch round and timer, and publishes event")
     void recordCreatedOffer_success() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setCurrentRound(0);
 
         when(orderDispatchRepository.findByOrderId(orderId)).thenReturn(Optional.of(dispatch));
 
         Instant expiresAt = Instant.now().plusSeconds(45);
-        DeliveryOffer created = lifecycleService.recordCreatedOffer(orderId, agent, 1, 6.0, expiresAt);
+        DeliveryOffer created = lifecycleService.recordCreatedOffer(order, agent, 1, 6.0, expiresAt);
 
+        assertThat(created.getOrder()).isEqualTo(order);
         assertThat(created.getStatus()).isEqualTo(DeliveryOfferStatus.PENDING);
         assertThat(created.getRoundNumber()).isEqualTo(1);
-        assertThat(created.getRadiusKm()).isEqualTo(6.0);
+        assertThat(created.getRadiusKm()).isEqualByComparingTo("6.0");
         assertThat(created.getExpiresAt()).isEqualTo(expiresAt);
 
         verify(deliveryOfferRepository).save(created);
@@ -218,7 +219,7 @@ class DeliveryDispatchLifecycleServiceImplTest {
     @DisplayName("recordRetryAttempt updates dispatch currentRound and nextAttemptAt")
     void recordRetryAttempt_success() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
 
         when(orderDispatchRepository.findByOrderId(orderId)).thenReturn(Optional.of(dispatch));
 
@@ -234,7 +235,7 @@ class DeliveryDispatchLifecycleServiceImplTest {
     @DisplayName("markDispatchExhausted marks dispatch EXHAUSTED, withdraws pending offer, publishes event, and returns true")
     void markDispatchExhausted_success() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
 
         DeliveryOffer pendingOffer = new DeliveryOffer();
@@ -258,7 +259,7 @@ class DeliveryDispatchLifecycleServiceImplTest {
     @DisplayName("markDispatchExhausted propagates OptimisticLockException without publishing event (Fix C1)")
     void markDispatchExhausted_versionConflict_doesNotPublishEvent() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
 
         when(orderDispatchRepository.findByOrderId(orderId)).thenReturn(Optional.of(dispatch));
@@ -275,7 +276,7 @@ class DeliveryDispatchLifecycleServiceImplTest {
     @DisplayName("markDispatchExhausted returns false and skips event when order is already terminal (Fix H4)")
     void markDispatchExhausted_alreadyTerminalOrder_returnsFalseAndSkipsEvent() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
 
         order.setCurrentStatus(OrderStatus.CANCELLED);

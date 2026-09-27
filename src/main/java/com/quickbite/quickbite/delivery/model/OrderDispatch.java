@@ -1,6 +1,7 @@
 package com.quickbite.quickbite.delivery.model;
 
 import com.quickbite.quickbite.common.model.Base;
+import com.quickbite.quickbite.order.model.Order;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,7 +11,6 @@ import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -23,8 +23,9 @@ import java.util.UUID;
 )
 public class OrderDispatch extends Base {
 
-    @Column(nullable = false, unique = true)
-    private UUID orderId;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", nullable = false, unique = true)
+    private Order order;
 
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)

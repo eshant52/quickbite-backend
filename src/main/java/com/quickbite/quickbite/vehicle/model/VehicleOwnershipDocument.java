@@ -41,7 +41,7 @@ public class VehicleOwnershipDocument extends Base {
     private DocumentVerificationStatus status;
 
     @ManyToOne
-    @JoinColumn(nullable = true)
+    @JoinColumn
     private User reviewedBy;
 
     private Instant reviewedAt;

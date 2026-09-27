@@ -1,9 +1,7 @@
 package com.quickbite.quickbite.restaurant.model;
 
 import com.quickbite.quickbite.common.model.Base;
-import com.quickbite.quickbite.restaurant.model.Restaurant;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
@@ -29,11 +27,9 @@ public class RestaurantHours extends Base {
     @Column(columnDefinition = "day_of_week", nullable = false)
     private DayOfWeek dayOfWeek;
 
-    @NotNull(message = "Open time is required")
     @Column(nullable = false)
     private LocalTime openTime;
 
-    @NotNull(message = "Close time is required")
     @Column(nullable = false)
     private LocalTime closeTime;
 }

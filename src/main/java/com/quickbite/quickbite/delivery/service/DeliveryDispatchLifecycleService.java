@@ -3,6 +3,7 @@ package com.quickbite.quickbite.delivery.service;
 import com.quickbite.quickbite.delivery.model.DeliveryAgent;
 import com.quickbite.quickbite.delivery.model.DeliveryOffer;
 import com.quickbite.quickbite.delivery.model.OrderDispatch;
+import com.quickbite.quickbite.order.model.Order;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -43,7 +44,7 @@ public interface DeliveryDispatchLifecycleService {
      * and nextAttemptAt, and publishes a DeliveryOfferCreatedEvent.
      */
     DeliveryOffer recordCreatedOffer(
-            UUID orderId,
+            Order order,
             DeliveryAgent agent,
             int roundNumber,
             double radiusKm,

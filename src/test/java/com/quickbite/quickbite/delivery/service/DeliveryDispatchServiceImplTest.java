@@ -132,7 +132,7 @@ class DeliveryDispatchServiceImplTest {
     @DisplayName("initiateDispatch creates OrderDispatch, selects candidate, and delegates atomic offer creation")
     void initiateDispatch_candidateFound_createsPendingOffer() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(Instant.now());
         dispatch.setCurrentRound(0);
@@ -148,7 +148,7 @@ class DeliveryDispatchServiceImplTest {
         dispatchService.initiateDispatch(orderId);
 
         verify(lifecycleService).recordCreatedOffer(
-                eq(orderId),
+                eq(order),
                 eq(agent),
                 eq(0),
                 eq(3.0),
@@ -160,7 +160,7 @@ class DeliveryDispatchServiceImplTest {
     @DisplayName("initiateDispatch stays in Round 0 and schedules retry if Round 0 has no candidates")
     void initiateDispatch_noRound0Candidates_staysInRound0AndSchedulesRetry() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(Instant.now());
         dispatch.setCurrentRound(0);
@@ -185,7 +185,7 @@ class DeliveryDispatchServiceImplTest {
     void processDueDispatch_round0WindowElapsed_escalatesToRound1() {
         Instant startedAt = Instant.now().minus(Duration.ofMinutes(2).plusSeconds(1));
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(startedAt);
         dispatch.setCurrentRound(0);
@@ -202,7 +202,7 @@ class DeliveryDispatchServiceImplTest {
         dispatchService.processDueDispatch(orderId);
 
         verify(lifecycleService).recordCreatedOffer(
-                eq(orderId),
+                eq(order),
                 eq(agent),
                 eq(1),
                 eq(6.0),
@@ -214,7 +214,7 @@ class DeliveryDispatchServiceImplTest {
     @DisplayName("rejectOffer immediately offers to next candidate in the same round")
     void rejectOffer_candidateAvailableInSameRound_offersToNextCandidate() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(Instant.now());
         dispatch.setCurrentRound(0);
@@ -233,7 +233,7 @@ class DeliveryDispatchServiceImplTest {
         dispatchService.rejectOffer(orderId, agentUserId);
 
         verify(lifecycleService).recordCreatedOffer(
-                eq(orderId),
+                eq(order),
                 eq(nextAgent),
                 eq(0),
                 eq(3.0),
@@ -246,7 +246,7 @@ class DeliveryDispatchServiceImplTest {
     void rejectOffer_noOtherCandidateInCurrentRound_schedulesRetryInCurrentRound() {
         Instant startedAt = Instant.now().minusSeconds(30);
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(startedAt);
         dispatch.setCurrentRound(0);
@@ -271,7 +271,7 @@ class DeliveryDispatchServiceImplTest {
         // Offer was sent at 1m45s, rejected at 2m10s (past round 0's 2-minute deadline)
         Instant startedAt = Instant.now().minus(Duration.ofMinutes(2).plusSeconds(10));
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(startedAt);
         dispatch.setCurrentRound(0);
@@ -290,7 +290,7 @@ class DeliveryDispatchServiceImplTest {
         dispatchService.rejectOffer(orderId, agentUserId);
 
         verify(lifecycleService).recordCreatedOffer(
-                eq(orderId),
+                eq(order),
                 eq(nextAgent),
                 eq(1),
                 eq(6.0),
@@ -333,7 +333,7 @@ class DeliveryDispatchServiceImplTest {
     @DisplayName("processDueDispatch exhausts dispatch when deadline has expired")
     void processDueDispatch_deadlineExpired_exhaustsAndCancels() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setDispatchDeadline(Instant.now().minusSeconds(1)); // deadline passed
 
@@ -351,7 +351,7 @@ class DeliveryDispatchServiceImplTest {
     @DisplayName("processDueDispatch does not cancel order if markDispatchExhausted returns false")
     void processDueDispatch_deadlineExpiredButMarkExhaustedFalse_skipsOrderCancel() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setDispatchDeadline(Instant.now().minusSeconds(1));
 
@@ -370,7 +370,7 @@ class DeliveryDispatchServiceImplTest {
     void getOfferSummary_success() {
         DeliveryOffer offer = new DeliveryOffer();
         offer.setId(UUID.randomUUID());
-        offer.setOrderId(orderId);
+        offer.setOrder(order);
         offer.setAgent(agent);
         offer.setStatus(DeliveryOfferStatus.PENDING);
         offer.setExpiresAt(Instant.now().plusSeconds(120));
@@ -407,7 +407,7 @@ class DeliveryDispatchServiceImplTest {
     @DisplayName("processDueDispatch does not expire offer if still within offer window")
     void processDueDispatch_activeOfferPending_doesNotExpire() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(Instant.now().minusSeconds(10));
         dispatch.setDispatchDeadline(Instant.now().plus(Duration.ofMinutes(9)));
@@ -427,7 +427,7 @@ class DeliveryDispatchServiceImplTest {
     void processDueDispatch_allRoundsExpired_exhaustsDispatch() {
         Instant startedAt = Instant.now().minus(Duration.ofMinutes(10).plusSeconds(1));
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(startedAt);
         dispatch.setCurrentRound(2);
@@ -448,7 +448,7 @@ class DeliveryDispatchServiceImplTest {
     @DisplayName("processDueDispatch honors active pending offer even if overall dispatch deadline has passed")
     void processDueDispatch_activeOfferPendingPastDispatchDeadline_doesNotCancelPrematurely() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(Instant.now().minus(Duration.ofMinutes(10)));
         // Dispatch deadline passed 5 seconds ago:
@@ -470,7 +470,7 @@ class DeliveryDispatchServiceImplTest {
     @DisplayName("processDueDispatch exhausts when active offer expires after dispatch deadline")
     void processDueDispatch_offerExpiresAfterDispatchDeadline_exhaustsDispatch() {
         OrderDispatch dispatch = new OrderDispatch();
-        dispatch.setOrderId(orderId);
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(Instant.now().minus(Duration.ofMinutes(11)));
         // Dispatch deadline passed 60 seconds ago:

@@ -3,10 +3,7 @@ package com.quickbite.quickbite.cart.model;
 import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
-import com.quickbite.quickbite.cart.model.CartItem;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Digits;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -32,8 +29,6 @@ public class Cart extends Base {
     private List<CartItem> items = new ArrayList<>();
 
     @Column(precision = 10, scale = 2, nullable = false)
-    @Digits(integer = 8, fraction = 2, message = "Total price must have up to 8 digits and 2 decimal places")
-    @DecimalMin(value = "0.01", message = "Total price must be greater than or equal to 0.01")
     private BigDecimal totalPrice;
 
     @Column(nullable = false)

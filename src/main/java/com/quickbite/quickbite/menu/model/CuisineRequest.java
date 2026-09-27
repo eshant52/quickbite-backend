@@ -3,8 +3,6 @@ package com.quickbite.quickbite.menu.model;
 import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.user.model.User;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
@@ -26,8 +24,6 @@ import java.time.Instant;
 @Table(name = "cuisine_requests")
 public class CuisineRequest extends Base {
 
-    @NotBlank(message = "Cuisine name is required")
-    @Size(min = 2, max = 100, message = "Cuisine name must be between 2 and 100 characters")
     @Column(length = 100, nullable = false)
     private String name;
 
@@ -47,7 +43,6 @@ public class CuisineRequest extends Base {
 
     private Instant reviewedAt;
 
-    @Size(max = 500, message = "Remarks must be at most 500 characters")
     @Column(columnDefinition = "TEXT")
     private String remarks;
 

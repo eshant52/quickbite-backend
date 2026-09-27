@@ -26,6 +26,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -77,7 +78,7 @@ public class DeliveryDispatchLifecycleServiceImpl implements DeliveryDispatchLif
 
         Instant now = Instant.now();
         OrderDispatch dispatch = existing.orElseGet(OrderDispatch::new);
-        dispatch.setOrderId(order.getId());
+        dispatch.setOrder(order);
         dispatch.setStatus(DeliveryDispatchStatus.FINDING_AGENT);
         dispatch.setStartedAt(now);
         dispatch.setCurrentRound(0);
@@ -128,7 +129,7 @@ public class DeliveryDispatchLifecycleServiceImpl implements DeliveryDispatchLif
     @Override
     @Transactional
     public DeliveryOffer recordCreatedOffer(
-            UUID orderId,
+            Order order,
             DeliveryAgent agent,
             int roundNumber,
             double radiusKm,
@@ -136,16 +137,16 @@ public class DeliveryDispatchLifecycleServiceImpl implements DeliveryDispatchLif
     ) {
         Instant now = Instant.now();
         DeliveryOffer offer = new DeliveryOffer();
-        offer.setOrderId(orderId);
+        offer.setOrder(order);
         offer.setAgent(agent);
         offer.setRoundNumber(roundNumber);
-        offer.setRadiusKm(radiusKm);
+        offer.setRadiusKm(BigDecimal.valueOf(radiusKm));
         offer.setStatus(DeliveryOfferStatus.PENDING);
         offer.setOfferedAt(now);
         offer.setExpiresAt(expiresAt);
         deliveryOfferRepository.save(offer);
 
-        orderDispatchRepository.findByOrderId(orderId).ifPresent(dispatch -> {
+        orderDispatchRepository.findByOrderId(order.getId()).ifPresent(dispatch -> {
             dispatch.setCurrentRound(roundNumber);
             dispatch.setNextAttemptAt(expiresAt);
             orderDispatchRepository.save(dispatch);
@@ -153,7 +154,7 @@ public class DeliveryDispatchLifecycleServiceImpl implements DeliveryDispatchLif
 
         eventPublisher.publishEvent(new DeliveryOfferCreatedEvent(
                 offer.getId(),
-                orderId,
+                order.getId(),
                 agent.getId(),
                 roundNumber,
                 radiusKm,

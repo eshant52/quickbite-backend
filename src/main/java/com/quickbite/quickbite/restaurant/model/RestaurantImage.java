@@ -1,9 +1,7 @@
 package com.quickbite.quickbite.restaurant.model;
 
 import com.quickbite.quickbite.common.model.Base;
-import com.quickbite.quickbite.restaurant.model.Restaurant;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,7 +14,6 @@ public class RestaurantImage extends Base {
     @JoinColumn(nullable = false)
     private Restaurant restaurant;
 
-    @NotBlank(message = "Image URL is required")
     @Column(columnDefinition = "TEXT", nullable = false)
     private String imageUrl;
 

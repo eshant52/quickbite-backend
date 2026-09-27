@@ -5,11 +5,6 @@ import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.model.Address;
 import com.quickbite.quickbite.menu.model.MenuItem;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
@@ -33,13 +28,9 @@ public class Restaurant extends Base {
     @JoinColumn(nullable = false)
     private User owner;
 
-    @NotBlank(message = "Restaurant name is required")
-    @Size(min = 2, max = 200, message = "Restaurant name must be between 2 and 200 characters")
     @Column(length = 200, nullable = false)
     private String name;
 
-    @NotBlank(message = "Description is required")
-    @Size(max = 2000, message = "Description must be at most 2000 characters")
     @Column(columnDefinition = "TEXT", nullable = false)
     private String description;
 
@@ -49,9 +40,6 @@ public class Restaurant extends Base {
     private Address address;
 
     @Column(precision = 3, scale = 2)
-    @Digits(integer = 1, fraction = 2, message = "Average rating must have up to 1 digit and 2 decimal places")
-    @DecimalMin(value = "0.00", message = "Average rating must be greater than or equal to 0.00")
-    @DecimalMax(value = "5.00", message = "Average rating must be less than or equal to 5.00")
     private BigDecimal avgRating;
 
     @Column(nullable = false)
