@@ -16,6 +16,8 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findUserByEmail(String email);
 
+    Optional<User> findUserByPhoneNumber(String phoneNumber);
+
     /**
      * Used by the notification listener to fan-out events to all users of a given role (e.g. all admins).
      *
@@ -27,4 +29,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmailIgnoreCase(String email);
 
     boolean existsByPhoneNumber(String phoneNumber);
+
 }

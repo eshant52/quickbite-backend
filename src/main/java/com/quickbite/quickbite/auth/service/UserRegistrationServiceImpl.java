@@ -1,7 +1,7 @@
 package com.quickbite.quickbite.auth.service;
 
 import com.quickbite.quickbite.auth.dto.RegisterRequest;
-import com.quickbite.quickbite.auth.exception.AuthenticationException;
+import com.quickbite.quickbite.common.exception.ResourceConflictException;
 import com.quickbite.quickbite.user.dto.UserResponseDto;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.model.UserRole;
@@ -52,7 +52,12 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
     private User registerUser(RegisterRequest registerRequest) {
         userRepository.findUserByEmail(registerRequest.email())
                 .ifPresent(_ -> {
-                    throw new AuthenticationException("Email is already registered");
+                    throw new ResourceConflictException("Email is already registered");
+                });
+
+        userRepository.findUserByPhoneNumber(registerRequest.phoneNumber())
+                .ifPresent(_ -> {
+                    throw new ResourceConflictException("Phone number is already registered");
                 });
 
         User user = new User();
