@@ -36,6 +36,10 @@ public interface PaymentLifecycleService {
      */
     void processOnlinePaymentSuccess(String gatewayOrderId, String gatewayPaymentId);
 
+    default void processOnlinePaymentSuccess(UUID customerId, String gatewayOrderId, String gatewayPaymentId) {
+        processOnlinePaymentSuccess(gatewayOrderId, gatewayPaymentId);
+    }
+
     /**
      * Processes online payment failure reported by gateway.
      */

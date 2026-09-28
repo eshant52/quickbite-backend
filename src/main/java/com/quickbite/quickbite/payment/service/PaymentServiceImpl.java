@@ -20,6 +20,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 @Service
 public class PaymentServiceImpl implements PaymentProcessingService, PaymentQueryService, PaymentWebhookService {
@@ -107,7 +108,7 @@ public class PaymentServiceImpl implements PaymentProcessingService, PaymentQuer
         );
     }
 
-    private PaymentResponse resolvePaymentResponse(UUID orderId, java.util.function.Supplier<List<Payment>> paymentsLoader) {
+    private PaymentResponse resolvePaymentResponse(UUID orderId, Supplier<List<Payment>> paymentsLoader) {
         List<Payment> payments = paymentsLoader.get();
         if (payments.isEmpty()) {
             throw new PaymentNotFoundException("Payment not found for order " + orderId);
@@ -142,12 +143,12 @@ public class PaymentServiceImpl implements PaymentProcessingService, PaymentQuer
     }
 
     @Override
-    public void verifyOnlinePayment(String gatewayOrderId, String gatewayPaymentId, String gatewaySignature) {
+    public void verifyOnlinePayment(UUID customerId, String gatewayOrderId, String gatewayPaymentId, String gatewaySignature) {
         // 1. Cryptographic verification first — throws PaymentVerificationException on failure
         paymentGateway.verifyPaymentSignature(gatewayOrderId, gatewayPaymentId, gatewaySignature);
 
-        // 2. Delegate state transition and order sync to payment lifecycle service
-        paymentLifecycle.processOnlinePaymentSuccess(gatewayOrderId, gatewayPaymentId);
+        // 2. Delegate state transition, ownership verification, and order sync to payment lifecycle service
+        paymentLifecycle.processOnlinePaymentSuccess(customerId, gatewayOrderId, gatewayPaymentId);
     }
 
     @Override

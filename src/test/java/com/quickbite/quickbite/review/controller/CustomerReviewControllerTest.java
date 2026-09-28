@@ -96,9 +96,10 @@ class CustomerReviewControllerTest {
     @Test
     @DisplayName("getReview - returns HTTP 200 OK with ReviewResponse")
     void getReview_Success() {
-        when(reviewService.getReview(reviewId)).thenReturn(mockResponse);
+        when(authenticatedSessionResolver.userIdFromJwt(jwt)).thenReturn(customerId);
+        when(reviewService.getReview(reviewId, customerId)).thenReturn(mockResponse);
 
-        ResponseEntity<ReviewResponse> response = controller.getReview(reviewId);
+        ResponseEntity<ReviewResponse> response = controller.getReview(jwt, reviewId);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(mockResponse);

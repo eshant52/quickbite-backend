@@ -21,7 +21,7 @@ import java.util.UUID;
  * at URL level and @PreAuthorize at method level as inner guard).
  */
 @RestController
-@RequestMapping("/api/v1/restaurant/applications")
+@RequestMapping("/api/v1/restaurant-owner/applications")
 @PreAuthorize("hasRole('RESTAURANT_OWNER')")
 public class RestaurantApplicationController {
 

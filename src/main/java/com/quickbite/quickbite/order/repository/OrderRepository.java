@@ -54,6 +54,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("""
             SELECT o FROM Order o
+            JOIN FETCH o.restaurant
             WHERE o.customer.id = :customerId
               AND (:cursor IS NULL OR o.id < :cursor)
             ORDER BY o.id DESC
@@ -66,6 +67,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("""
             SELECT o FROM Order o
+            JOIN FETCH o.restaurant
             WHERE o.restaurant.id = :restaurantId
               AND (:status IS NULL OR o.currentStatus = :status)
               AND (:cursor IS NULL OR o.id < :cursor)

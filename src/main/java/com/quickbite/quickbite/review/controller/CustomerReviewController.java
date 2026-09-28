@@ -54,9 +54,11 @@ public class CustomerReviewController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ReviewResponse> getReview(
+            @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID id
     ) {
-        return ResponseEntity.ok(customerReviewService.getReview(id));
+        UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);
+        return ResponseEntity.ok(customerReviewService.getReview(id, customerId));
     }
 
     @PutMapping("/{id}")

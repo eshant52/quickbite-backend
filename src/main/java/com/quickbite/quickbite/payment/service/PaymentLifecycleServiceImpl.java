@@ -105,9 +105,22 @@ public class PaymentLifecycleServiceImpl implements PaymentLifecycleService {
     @Override
     @Transactional
     public void processOnlinePaymentSuccess(String gatewayOrderId, String gatewayPaymentId) {
+        processOnlinePaymentSuccess(null, gatewayOrderId, gatewayPaymentId);
+    }
+
+    @Override
+    @Transactional
+    public void processOnlinePaymentSuccess(UUID customerId, String gatewayOrderId, String gatewayPaymentId) {
         Payment payment = paymentRepository.findByGatewayOrderIdForUpdate(gatewayOrderId)
                 .orElseThrow(() -> new PaymentNotFoundException(
                         "Payment not found for gateway order: " + gatewayOrderId));
+        if (customerId != null
+                && payment.getOrder() != null
+                && payment.getOrder().getCustomer() != null
+                && !payment.getOrder().getCustomer().getId().equals(customerId)) {
+            throw new PaymentNotFoundException(
+                    "Payment not found for gateway order: " + gatewayOrderId);
+        }
         applySuccessTransition(payment, gatewayPaymentId);
     }
 
@@ -295,7 +308,7 @@ public class PaymentLifecycleServiceImpl implements PaymentLifecycleService {
         }
 
         // Online SUCCESS payments captured money and can only transition to REFUNDED / REFUND_FAILED.
-        // Only COD payments may transition from SUCCESS -> CANCELLED (when cancelled prior to delivery).
+        // Only COD payments may transition from SUCCESS -> CANCELLED (when canceled prior to delivery).
         if (previousStatus == PaymentStatus.SUCCESS
                 && payment.getPaymentMethod() != null
                 && payment.getPaymentMethod().isOnline()) {

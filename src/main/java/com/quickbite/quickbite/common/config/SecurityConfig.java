@@ -69,12 +69,8 @@ public class SecurityConfig {
                         ).hasAuthority("SCOPE_AUTH")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/customer/**").hasRole("CUSTOMER")
-                        .requestMatchers("/api/v1/restaurant/**").hasRole("RESTAURANT_OWNER")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/delivery-agent/register").hasAuthority("SCOPE_API")
-                        .requestMatchers(
-                                "/api/v1/delivery-partner/**",
-                                "/api/v1/delivery-agent/**"
-                        ).hasRole("DELIVERY_AGENT")
+                        .requestMatchers("/api/v1/restaurant-owner/**").hasRole("RESTAURANT_OWNER")
+                        .requestMatchers("/api/v1/delivery-agent/**").hasRole("DELIVERY_AGENT")
                         .anyRequest().hasAuthority("SCOPE_API"))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))

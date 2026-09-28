@@ -88,7 +88,7 @@ class UserRegistrationServiceImplTest {
             return u;
         });
 
-        UserResponseDto response = userRegistrationService.registerRestaurant(registerRequest);
+        UserResponseDto response = userRegistrationService.registerRestaurantOwner(registerRequest);
 
         assertThat(response).isNotNull();
         assertThat(response.role()).isEqualTo(UserRole.RESTAURANT_OWNER);
@@ -112,7 +112,7 @@ class UserRegistrationServiceImplTest {
             return u;
         });
 
-        UserResponseDto response = userRegistrationService.registerDeliveryPartner(registerRequest);
+        UserResponseDto response = userRegistrationService.registerDeliveryAgent(registerRequest);
 
         assertThat(response).isNotNull();
         assertThat(response.role()).isEqualTo(UserRole.DELIVERY_AGENT);

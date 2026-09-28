@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/restaurants/{restaurantId}/menu-items")
+@RequestMapping("/api/v1/restaurant-owner/restaurants/{restaurantId}/menu-items")
 @PreAuthorize("hasRole('RESTAURANT_OWNER')")
 public class MenuItemOwnerController {
 

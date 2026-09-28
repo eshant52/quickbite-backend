@@ -22,6 +22,9 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     @Query("""
             SELECT r FROM Review r
+            JOIN FETCH r.customer
+            JOIN FETCH r.restaurant
+            JOIN FETCH r.order
             WHERE r.restaurant.id = :restaurantId
               AND (:cursor IS NULL OR r.id < :cursor)
             ORDER BY r.id DESC
@@ -34,6 +37,9 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     @Query("""
             SELECT r FROM Review r
+            JOIN FETCH r.customer
+            JOIN FETCH r.restaurant
+            JOIN FETCH r.order
             WHERE r.customer.id = :customerId
               AND (:cursor IS NULL OR r.id < :cursor)
             ORDER BY r.id DESC
@@ -46,6 +52,9 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     @Query("""
             SELECT r FROM Review r
+            JOIN FETCH r.customer
+            JOIN FETCH r.restaurant
+            JOIN FETCH r.order
             WHERE (:restaurantId IS NULL OR r.restaurant.id = :restaurantId)
               AND (:cursor IS NULL OR r.id < :cursor)
             ORDER BY r.id DESC

@@ -37,6 +37,17 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler({
+            org.springframework.web.method.annotation.HandlerMethodValidationException.class,
+            jakarta.validation.ConstraintViolationException.class
+    })
+    public ProblemDetail handleConstraintOrMethodValidationException(Exception ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problemDetail.setTitle("Validation Failed");
+        problemDetail.setDetail(ex.getMessage() != null ? ex.getMessage() : "One or more validation errors occurred.");
+        return problemDetail;
+    }
+
     // 404 status exception
     @ExceptionHandler(ResourceNotFoundException.class)
     public ProblemDetail handleResourceNotFoundException(ResourceNotFoundException ex) {

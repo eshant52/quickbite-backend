@@ -52,8 +52,11 @@ public class PaymentController {
      */
     @PostMapping("/verify")
     public ResponseEntity<Void> verifyOnlinePayment(
+            @AuthenticationPrincipal Jwt jwt,
             @RequestBody @Valid OnlinePaymentVerifyRequest request) {
+        UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);
         paymentProcessingService.verifyOnlinePayment(
+                customerId,
                 request.gatewayOrderId(),
                 request.gatewayPaymentId(),
                 request.gatewaySignature()

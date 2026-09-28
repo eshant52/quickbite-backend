@@ -16,6 +16,7 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, UUID> {
 
     @Query("""
     SELECT m FROM MenuItem m
+    JOIN FETCH m.cuisine
     WHERE m.restaurant.id = :restaurantId
         AND (:cursor IS NULL OR m.id > :cursor)
         AND (:availableOnly = false OR m.isAvailable = true)

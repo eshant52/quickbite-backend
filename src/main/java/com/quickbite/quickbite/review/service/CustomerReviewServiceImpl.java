@@ -84,8 +84,8 @@ public class CustomerReviewServiceImpl implements CustomerReviewService {
 
     @Override
     @Transactional(readOnly = true)
-    public ReviewResponse getReview(UUID reviewId) {
-        Review review = reviewRepository.findById(reviewId)
+    public ReviewResponse getReview(UUID reviewId, UUID customerId) {
+        Review review = reviewRepository.findByIdAndCustomerId(reviewId, customerId)
                 .orElseThrow(() -> new ReviewNotFoundException(reviewId));
         return ReviewResponse.from(review);
     }

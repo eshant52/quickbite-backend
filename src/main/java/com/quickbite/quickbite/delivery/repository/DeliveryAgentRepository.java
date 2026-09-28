@@ -65,6 +65,8 @@ public interface DeliveryAgentRepository extends JpaRepository<DeliveryAgent, UU
 
     @Query("""
             SELECT da FROM DeliveryAgent da
+            JOIN FETCH da.user
+            LEFT JOIN FETCH da.currentVehicle
             WHERE (:status IS NULL OR da.currentStatus = :status)
               AND (:cursor IS NULL OR da.id < :cursor)
             ORDER BY da.id DESC

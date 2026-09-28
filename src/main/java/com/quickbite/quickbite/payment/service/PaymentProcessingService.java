@@ -22,16 +22,17 @@ public interface PaymentProcessingService {
 
     /**
      * Verifies the HMAC-SHA256 signature returned by the gateway's Checkout UI to the client,
-     * then transitions payment → SUCCESS and order → PLACED atomically.
+     * verifies customer ownership, and transitions payment → SUCCESS and order → PLACED atomically.
      *
      * <p>Idempotent: if the payment is already SUCCESS, returns silently.
      *
+     * @param customerId       Authenticated customer UUID owning the order.
      * @param gatewayOrderId   Gateway's order ID (Razorpay: razorpay_order_id).
      * @param gatewayPaymentId Gateway's payment ID (Razorpay: razorpay_payment_id).
      * @param gatewaySignature HMAC-SHA256 signature from the client.
      * @throws com.quickbite.quickbite.payment.exception.PaymentVerificationException if signature is invalid.
      */
-    void verifyOnlinePayment(String gatewayOrderId, String gatewayPaymentId, String gatewaySignature);
+    void verifyOnlinePayment(UUID customerId, String gatewayOrderId, String gatewayPaymentId, String gatewaySignature);
 
 
     /**

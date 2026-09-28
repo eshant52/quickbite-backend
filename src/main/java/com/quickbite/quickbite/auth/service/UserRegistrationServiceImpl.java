@@ -32,7 +32,7 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
     }
 
     @Override
-    public UserResponseDto registerRestaurant(RegisterRequest registerRequest) {
+    public UserResponseDto registerRestaurantOwner(RegisterRequest registerRequest) {
         User user = registerUser(registerRequest);
         user.setRole(UserRole.RESTAURANT_OWNER);
         user.setActive(false);
@@ -41,7 +41,7 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
     }
 
     @Override
-    public UserResponseDto registerDeliveryPartner(RegisterRequest registerRequest) {
+    public UserResponseDto registerDeliveryAgent(RegisterRequest registerRequest) {
         User user = registerUser(registerRequest);
         user.setRole(UserRole.DELIVERY_AGENT);
         user.setActive(false);

@@ -10,6 +10,7 @@ import com.quickbite.quickbite.restaurant.dto.UpdateRestaurantRequest;
 import com.quickbite.quickbite.restaurant.model.RestaurantVerificationStatus;
 import com.quickbite.quickbite.restaurant.service.RestaurantOwnerService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,7 +21,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/restaurants")
+@RequestMapping("/api/v1/restaurant-owner/restaurants")
 @PreAuthorize("hasRole('RESTAURANT_OWNER')")
 public class RestaurantOwnerController {
 
@@ -35,7 +36,7 @@ public class RestaurantOwnerController {
         this.authenticatedSessionResolver = authenticatedSessionResolver;
     }
 
-    @GetMapping("/my")
+    @GetMapping
     public ResponseEntity<CursorPage<RestaurantSummaryResponse>> listMyRestaurants(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(value = "status", required = false) RestaurantVerificationStatus status,
@@ -46,7 +47,7 @@ public class RestaurantOwnerController {
         return ResponseEntity.ok(restaurantOwnerService.listMyRestaurants(ownerId, status, cursor, size));
     }
 
-    @GetMapping("/{id}/owner")
+    @GetMapping("/{id}")
     public ResponseEntity<RestaurantResponse> getMyRestaurant(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID id
@@ -69,7 +70,7 @@ public class RestaurantOwnerController {
     public ResponseEntity<RestaurantResponse> setHours(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID id,
-            @RequestBody @Valid List<RestaurantHoursRequest> hours
+            @RequestBody @NotEmpty(message = "At least one operating hour entry is required") List<@Valid RestaurantHoursRequest> hours
     ) {
         UUID ownerId = authenticatedSessionResolver.userIdFromJwt(jwt);
         return ResponseEntity.ok(restaurantOwnerService.setHours(id, ownerId, hours));

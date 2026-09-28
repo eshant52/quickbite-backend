@@ -5,6 +5,7 @@ import com.quickbite.quickbite.restaurant.model.Restaurant;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.envers.Audited;
 import org.hibernate.envers.NotAudited;
 import org.hibernate.envers.RelationTargetAuditMode;
@@ -30,6 +31,7 @@ public class MenuItem extends Base {
     private String description;
 
     @OneToMany(mappedBy = "menuItem", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
     @NotAudited
     private List<MenuItemImage> images = new ArrayList<>();
 

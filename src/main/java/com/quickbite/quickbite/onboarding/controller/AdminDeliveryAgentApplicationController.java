@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/admin/delivery-agent-applications")
+@RequestMapping("/api/v1/admin/delivery-agents/applications")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminDeliveryAgentApplicationController {
 

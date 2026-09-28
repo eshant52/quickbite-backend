@@ -53,30 +53,30 @@ class UserRegistrationControllerTest {
     }
 
     @Test
-    @DisplayName("registerDeliveryPartner - returns 201 CREATED")
-    void registerDeliveryPartner_success() {
+    @DisplayName("registerDeliveryAgent - returns 201 CREATED")
+    void registerDeliveryAgent_success() {
         Instant now = Instant.now();
         UserResponseDto dto = new UserResponseDto(UUID.randomUUID(), "John Doe", "john@example.com", "9876543210", UserRole.DELIVERY_AGENT, true, now, now, now);
-        when(userRegistrationService.registerDeliveryPartner(any(RegisterRequest.class))).thenReturn(dto);
+        when(userRegistrationService.registerDeliveryAgent(any(RegisterRequest.class))).thenReturn(dto);
 
-        ResponseEntity<UserResponseDto> response = controller.registerDeliveryPartner(request);
+        ResponseEntity<UserResponseDto> response = controller.registerDeliveryAgent(request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isEqualTo(dto);
-        verify(userRegistrationService).registerDeliveryPartner(any(RegisterRequest.class));
+        verify(userRegistrationService).registerDeliveryAgent(any(RegisterRequest.class));
     }
 
     @Test
-    @DisplayName("registerRestaurant - returns 201 CREATED")
-    void registerRestaurant_success() {
+    @DisplayName("registerRestaurantOwner - returns 201 CREATED")
+    void registerRestaurantOwner_success() {
         Instant now = Instant.now();
         UserResponseDto dto = new UserResponseDto(UUID.randomUUID(), "John Doe", "john@example.com", "9876543210", UserRole.RESTAURANT_OWNER, true, now, now, now);
-        when(userRegistrationService.registerRestaurant(any(RegisterRequest.class))).thenReturn(dto);
+        when(userRegistrationService.registerRestaurantOwner(any(RegisterRequest.class))).thenReturn(dto);
 
-        ResponseEntity<UserResponseDto> response = controller.registerRestaurant(request);
+        ResponseEntity<UserResponseDto> response = controller.registerRestaurantOwner(request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isEqualTo(dto);
-        verify(userRegistrationService).registerRestaurant(any(RegisterRequest.class));
+        verify(userRegistrationService).registerRestaurantOwner(any(RegisterRequest.class));
     }
 }

@@ -14,7 +14,7 @@ public interface CustomerReviewService {
 
     ReviewResponse submitReview(UUID customerId, CreateReviewRequest request);
 
-    ReviewResponse getReview(UUID reviewId);
+    ReviewResponse getReview(UUID reviewId, UUID customerId);
 
     CursorPage<ReviewResponse> getMyReviews(UUID customerId, UUID cursor, int size);
 

@@ -21,7 +21,7 @@ import java.util.UUID;
  * All endpoints require ROLE_ADMIN + SCOPE_API.
  */
 @RestController
-@RequestMapping("/api/v1/admin/restaurant/applications")
+@RequestMapping("/api/v1/admin/restaurants/applications")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminRestaurantApplicationController {
 
@@ -40,8 +40,8 @@ public class AdminRestaurantApplicationController {
      * Defaults to SUBMITTED (the queue admins normally work from).
      *
      * <pre>
-     *   First page:  GET /api/v1/admin/restaurant/applications?status=SUBMITTED&size=20
-     *   Next pages:  GET /api/v1/admin/restaurant/applications?status=SUBMITTED&cursor=&lt;nextCursor&gt;&size=20
+     *   First page:  GET /api/v1/admin/restaurants/applications?status=SUBMITTED&size=20
+     *   Next pages:  GET /api/v1/admin/restaurants/applications?status=SUBMITTED&cursor=&lt;nextCursor&gt;&size=20
      * </pre>
      *
      * Results are ordered by application ID (= creation time, since IDs are UUIDv7).

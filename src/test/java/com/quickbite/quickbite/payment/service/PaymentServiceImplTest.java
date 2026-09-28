@@ -284,12 +284,13 @@ class PaymentServiceImplTest {
         }
 
         @Test
-        @DisplayName("verifyOnlinePayment checks signature and delegates to paymentLifecycle")
+        @DisplayName("verifyOnlinePayment checks signature and delegates to paymentLifecycle with customerId")
         void verifyOnlinePayment_success() {
-            paymentService.verifyOnlinePayment("order_rzp_1", "pay_rzp_1", "sig_rzp_1");
+            UUID customerId = UUID.randomUUID();
+            paymentService.verifyOnlinePayment(customerId, "order_rzp_1", "pay_rzp_1", "sig_rzp_1");
 
             verify(paymentGateway).verifyPaymentSignature("order_rzp_1", "pay_rzp_1", "sig_rzp_1");
-            verify(paymentLifecycle).processOnlinePaymentSuccess("order_rzp_1", "pay_rzp_1");
+            verify(paymentLifecycle).processOnlinePaymentSuccess(customerId, "order_rzp_1", "pay_rzp_1");
         }
 
         @Test

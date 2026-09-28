@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/cart")
+@RequestMapping("/api/v1/customer/cart")
 @PreAuthorize("hasRole('CUSTOMER')")
 public class CartController {
     private final CartService cartService;

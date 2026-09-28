@@ -27,7 +27,7 @@ import java.util.UUID;
  * Step 3: Submit / reopen.
  */
 @RestController
-@RequestMapping("/api/v1/onboarding/delivery-agent")
+@RequestMapping("/api/v1/delivery-agent/applications")
 @PreAuthorize("hasRole('DELIVERY_AGENT')")
 public class DeliveryAgentApplicationController {
 
@@ -107,7 +107,7 @@ public class DeliveryAgentApplicationController {
     // Details and documents for the vehicle are handled by VehicleApplicationController
     // using the vehicleAppId returned by these endpoints.
 
-    @PostMapping("/{id}/vehicle/applications/start")
+    @PostMapping("/{id}/vehicles/start")
     public ResponseEntity<VehicleApplicationResponse> startVehicleApplication(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID id
@@ -117,7 +117,7 @@ public class DeliveryAgentApplicationController {
                 .body(applicationService.startVehicleApplication(id, agentUserId));
     }
 
-    @GetMapping("/{id}/vehicle/applications/current")
+    @GetMapping("/{id}/vehicles/current")
     public ResponseEntity<VehicleApplicationResponse> getCurrentVehicleApplication(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID id

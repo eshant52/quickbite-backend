@@ -5,6 +5,8 @@ import com.quickbite.quickbite.onboarding.dto.vehicle.*;
 import com.quickbite.quickbite.onboarding.service.vehicle.VehicleApplicationService;
 import com.quickbite.quickbite.vehicle.model.VehicleOwnershipDocumentType;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,7 +22,7 @@ import java.util.UUID;
  *
  * Used by two flows:
  *  - Flow 1 (Onboarding):  vehicleAppId is obtained from DeliveryAgentApplicationController
- *                           (POST /{id}/vehicle/applications/start), then details/docs filled here.
+ *                           (POST /{id}/vehicles/start), then details/docs filled here.
  *  - Flow 2 (Standalone):  Approved agents POST /start to create a new standalone vehicle application,
  *                           then fill details/docs using the same endpoints.
  *
@@ -32,7 +34,7 @@ import java.util.UUID;
  * Step 3: Submit / reopen  (POST /{id}/submit, POST /{id}/reopen).
  */
 @RestController
-@RequestMapping("/api/v1/onboarding/vehicle-applications")
+@RequestMapping("/api/v1/delivery-agent/vehicles/applications")
 @PreAuthorize("hasRole('DELIVERY_AGENT')")
 public class VehicleApplicationController {
 
@@ -51,7 +53,7 @@ public class VehicleApplicationController {
 
     @GetMapping("/check-vin")
     public ResponseEntity<CheckVinResponse> checkVin(
-            @RequestParam String vin
+            @RequestParam @NotBlank(message = "VIN is required") @Size(min = 6, max = 30, message = "VIN must be between 6 and 30 characters") String vin
     ) {
         return ResponseEntity.ok(vehicleApplicationService.checkVin(vin));
     }

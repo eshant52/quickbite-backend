@@ -167,7 +167,7 @@ class CustomerReviewServiceImplTest {
     class GetReviewTests {
 
         @Test
-        @DisplayName("Gets single review by ID")
+        @DisplayName("Gets single review by ID and customerId")
         void getReview_Success() {
             UUID reviewId = UUID.randomUUID();
             Review review = new Review();
@@ -177,21 +177,21 @@ class CustomerReviewServiceImplTest {
             review.setOrder(order);
             review.setRating(4);
 
-            when(reviewRepository.findById(reviewId)).thenReturn(Optional.of(review));
+            when(reviewRepository.findByIdAndCustomerId(reviewId, customerId)).thenReturn(Optional.of(review));
 
-            ReviewResponse response = reviewService.getReview(reviewId);
+            ReviewResponse response = reviewService.getReview(reviewId, customerId);
 
             assertThat(response.id()).isEqualTo(reviewId);
             assertThat(response.rating()).isEqualTo(4);
         }
 
         @Test
-        @DisplayName("Throws 404 when review not found")
+        @DisplayName("Throws 404 when review not found for customer")
         void getReview_NotFound() {
             UUID reviewId = UUID.randomUUID();
-            when(reviewRepository.findById(reviewId)).thenReturn(Optional.empty());
+            when(reviewRepository.findByIdAndCustomerId(reviewId, customerId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> reviewService.getReview(reviewId))
+            assertThatThrownBy(() -> reviewService.getReview(reviewId, customerId))
                     .isInstanceOf(ReviewNotFoundException.class);
         }
 

@@ -27,15 +27,15 @@ public class UserRegistrationController {
                 .body(userRegistrationService.registerCustomer(RegisterRequest.xssValidate(registerRequest)));
     }
 
-    @PostMapping("/delivery-partner")
-    public ResponseEntity<UserResponseDto> registerDeliveryPartner(@RequestBody @Valid RegisterRequest registerRequest) {
+    @PostMapping("/delivery-agent")
+    public ResponseEntity<UserResponseDto> registerDeliveryAgent(@RequestBody @Valid RegisterRequest registerRequest) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(userRegistrationService.registerDeliveryPartner(RegisterRequest.xssValidate(registerRequest)));
+                .body(userRegistrationService.registerDeliveryAgent(RegisterRequest.xssValidate(registerRequest)));
     }
 
-    @PostMapping("/restaurant")
-    public ResponseEntity<UserResponseDto> registerRestaurant(@RequestBody @Valid RegisterRequest registerRequest) {
+    @PostMapping("/restaurant-owner")
+    public ResponseEntity<UserResponseDto> registerRestaurantOwner(@RequestBody @Valid RegisterRequest registerRequest) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(userRegistrationService.registerRestaurant(RegisterRequest.xssValidate(registerRequest)));
+                .body(userRegistrationService.registerRestaurantOwner(RegisterRequest.xssValidate(registerRequest)));
     }
 }
