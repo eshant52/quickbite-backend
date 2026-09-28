@@ -41,9 +41,9 @@ class PaymentEventListenerTest {
     @Mock private OrderRepository orderRepository;
     @Mock private OrderStatusHistoryRepository orderStatusHistoryRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
-    @Mock private com.quickbite.quickbite.common.config.property.OrderProperties orderProperties;
+    private final com.quickbite.quickbite.common.config.property.OrderProperties orderProperties =
+            new com.quickbite.quickbite.common.config.property.OrderProperties(15, 100, "0 */5 * * * *", 5, java.time.Duration.ofMinutes(2));
 
-    @InjectMocks
     private PaymentEventListener listener;
 
     private UUID orderId;
@@ -54,7 +54,7 @@ class PaymentEventListenerTest {
 
     @BeforeEach
     void setUp() {
-        org.mockito.Mockito.lenient().when(orderProperties.restaurantAcceptanceWindow()).thenReturn(java.time.Duration.ofMinutes(2));
+        listener = new PaymentEventListener(orderRepository, orderStatusHistoryRepository, eventPublisher, orderProperties);
 
         orderId = UUID.randomUUID();
         paymentId = UUID.randomUUID();

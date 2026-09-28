@@ -18,7 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
-@Component
+@Component("notificationPaymentEventListener")
 public class PaymentEventListener {
     private final Logger log = LoggerFactory.getLogger(PaymentEventListener.class);
 

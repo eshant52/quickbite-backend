@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -33,7 +32,6 @@ public class DeliveryDispatchScheduler {
     }
 
     @Scheduled(fixedDelayString = "${quickbite.dispatch.scheduler-poll-interval-ms:5000}")
-    @Transactional(readOnly = true)
     public void sweepDueDispatches() {
         Instant now = Instant.now();
         List<UUID> dueOrderIds = orderDispatchRepository.findDueDispatches(now, BATCH_SIZE);

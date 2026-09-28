@@ -30,7 +30,6 @@ public interface OrderDispatchRepository extends JpaRepository<OrderDispatch, UU
               AND d.next_attempt_at <= :now
             ORDER BY d.next_attempt_at ASC
             LIMIT :limit
-            FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
     List<UUID> findDueDispatches(
             @Param("now") Instant now,

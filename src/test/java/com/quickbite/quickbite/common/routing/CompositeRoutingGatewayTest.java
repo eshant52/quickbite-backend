@@ -1,8 +1,6 @@
 package com.quickbite.quickbite.common.routing;
 
 import com.quickbite.quickbite.common.routing.adapter.HaversineFallbackAdapter;
-import com.quickbite.quickbite.common.routing.adapter.MapboxRoutingAdapter;
-import com.quickbite.quickbite.common.routing.adapter.OsrmRoutingAdapter;
 import com.quickbite.quickbite.common.routing.exception.RoutingProviderUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,10 +18,10 @@ import static org.mockito.Mockito.*;
 class CompositeRoutingGatewayTest {
 
     @Mock
-    private OsrmRoutingAdapter osrm;
+    private RoutingGateway osrm;
 
     @Mock
-    private MapboxRoutingAdapter mapbox;
+    private RoutingGateway mapbox;
 
     private HaversineFallbackAdapter haversine;
     private CompositeRoutingGateway gateway;

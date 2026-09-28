@@ -36,7 +36,7 @@ import java.util.UUID;
  * changes are written in the <em>same</em> DB transaction. If the transaction rolls back,
  * both the payment update and the order update roll back together, preserving consistency.
  */
-@Component
+@Component("orderPaymentEventListener")
 public class PaymentEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentEventListener.class);

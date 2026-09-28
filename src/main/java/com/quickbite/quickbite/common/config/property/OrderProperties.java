@@ -1,6 +1,7 @@
 package com.quickbite.quickbite.common.config.property;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 import java.time.Duration;
 
@@ -35,6 +36,7 @@ public record OrderProperties(
          */
         Duration restaurantAcceptanceWindow
 ) {
+    @ConstructorBinding
     public OrderProperties {
         if (abandonTtlMinutes <= 0) {
             abandonTtlMinutes = 15;
