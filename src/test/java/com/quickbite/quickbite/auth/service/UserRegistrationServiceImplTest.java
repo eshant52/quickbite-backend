@@ -2,6 +2,7 @@ package com.quickbite.quickbite.auth.service;
 
 import com.quickbite.quickbite.auth.dto.RegisterRequest;
 import com.quickbite.quickbite.auth.exception.AuthenticationException;
+import com.quickbite.quickbite.common.exception.ResourceConflictException;
 import com.quickbite.quickbite.user.dto.UserResponseDto;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.model.UserRole;
@@ -77,7 +78,7 @@ class UserRegistrationServiceImplTest {
     }
 
     @Test
-    @DisplayName("registerRestaurant - successfully registers restaurant owner as inactive pending onboarding")
+    @DisplayName("registerRestaurant - successfully registers restaurant owner as active for onboarding")
     void registerRestaurant_success() {
         when(userRepository.findUserByEmail(registerRequest.email())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(registerRequest.password())).thenReturn("encodedPassword");
@@ -97,11 +98,11 @@ class UserRegistrationServiceImplTest {
         verify(userRepository).save(captor.capture());
         User savedUser = captor.getValue();
         assertThat(savedUser.getRole()).isEqualTo(UserRole.RESTAURANT_OWNER);
-        assertThat(savedUser.isActive()).isFalse();
+        assertThat(savedUser.isActive()).isTrue();
     }
 
     @Test
-    @DisplayName("registerDeliveryPartner - successfully registers delivery partner as inactive pending onboarding")
+    @DisplayName("registerDeliveryPartner - successfully registers delivery partner as active for onboarding")
     void registerDeliveryPartner_success() {
         when(userRepository.findUserByEmail(registerRequest.email())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(registerRequest.password())).thenReturn("encodedPassword");
@@ -121,17 +122,31 @@ class UserRegistrationServiceImplTest {
         verify(userRepository).save(captor.capture());
         User savedUser = captor.getValue();
         assertThat(savedUser.getRole()).isEqualTo(UserRole.DELIVERY_AGENT);
-        assertThat(savedUser.isActive()).isFalse();
+        assertThat(savedUser.isActive()).isTrue();
     }
 
     @Test
-    @DisplayName("registerCustomer - duplicate email throws AuthenticationException")
-    void register_duplicateEmail_throwsAuthenticationException() {
+    @DisplayName("registerCustomer - duplicate email throws ResourceConflictException")
+    void register_duplicateEmail_throwsResourceConflictException() {
         when(userRepository.findUserByEmail(registerRequest.email())).thenReturn(Optional.of(new User()));
 
         assertThatThrownBy(() -> userRegistrationService.registerCustomer(registerRequest))
-                .isInstanceOf(AuthenticationException.class)
+                .isInstanceOf(ResourceConflictException.class)
                 .hasMessage("Email is already registered");
+
+        verify(userRepository, never()).save(any());
+        verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    @DisplayName("registerCustomer - duplicate phone number throws ResourceConflictException")
+    void register_duplicatePhoneNumber_throwsResourceConflictException() {
+        when(userRepository.findUserByEmail(registerRequest.email())).thenReturn(Optional.empty());
+        when(userRepository.findUserByPhoneNumber(registerRequest.phoneNumber())).thenReturn(Optional.of(new User()));
+
+        assertThatThrownBy(() -> userRegistrationService.registerCustomer(registerRequest))
+                .isInstanceOf(ResourceConflictException.class)
+                .hasMessage("Phone number is already registered");
 
         verify(userRepository, never()).save(any());
         verify(passwordEncoder, never()).encode(any());

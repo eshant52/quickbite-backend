@@ -35,7 +35,7 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
     public UserResponseDto registerRestaurantOwner(RegisterRequest registerRequest) {
         User user = registerUser(registerRequest);
         user.setRole(UserRole.RESTAURANT_OWNER);
-        user.setActive(false);
+        user.setActive(true);
 
         return UserResponseDto.toDto(userRepository.save(user));
     }
@@ -44,7 +44,7 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
     public UserResponseDto registerDeliveryAgent(RegisterRequest registerRequest) {
         User user = registerUser(registerRequest);
         user.setRole(UserRole.DELIVERY_AGENT);
-        user.setActive(false);
+        user.setActive(true);
 
         return UserResponseDto.toDto(userRepository.save(user));
     }
@@ -65,7 +65,7 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
         user.setEmail(registerRequest.email());
         user.setPhoneNumber(registerRequest.phoneNumber());
         user.setPasswordHash(passwordEncoder.encode(registerRequest.password()));
-        user.setActive(false);
+        user.setActive(true);
 
         return user;
     }
