@@ -21,31 +21,77 @@ import java.util.UUID;
 public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
     Optional<Restaurant> findByIdAndOwner(UUID id, User owner);
 
-    @Query("""
-                SELECT r FROM Restaurant r
-                WHERE r.owner = :owner
-                  AND (:status IS NULL OR r.currentStatus = :status)
-                  AND (:cursor IS NULL OR r.id < :cursor)
-                ORDER BY r.id DESC
-            """)
-    List<Restaurant> findByOwnerWithCursor(
-            @Param("owner") User owner,
-            @Param("status") RestaurantVerificationStatus status,
-            @Param("cursor") UUID cursor,
+    List<Restaurant> findByOwnerAndCurrentStatusOrderByIdDesc(
+            User owner,
+            RestaurantVerificationStatus status,
             Limit limit
     );
 
-    @Query("""
-                SELECT r FROM Restaurant r
-                WHERE (:status IS NULL OR r.currentStatus = :status)
-                  AND (:cursor IS NULL OR r.id < :cursor)
-                ORDER BY r.id DESC
-            """)
-    List<Restaurant> findAllWithCursor(
-            @Param("status") RestaurantVerificationStatus status,
-            @Param("cursor") UUID cursor,
+    List<Restaurant> findByOwnerAndCurrentStatusAndIdLessThanOrderByIdDesc(
+            User owner,
+            RestaurantVerificationStatus status,
+            UUID cursor,
             Limit limit
     );
+
+    List<Restaurant> findByOwnerOrderByIdDesc(
+            User owner,
+            Limit limit
+    );
+
+    List<Restaurant> findByOwnerAndIdLessThanOrderByIdDesc(
+            User owner,
+            UUID cursor,
+            Limit limit
+    );
+
+    default List<Restaurant> findByOwnerWithCursor(
+            User owner,
+            RestaurantVerificationStatus status,
+            UUID cursor,
+            Limit limit
+    ) {
+        if (status != null) {
+            return cursor == null
+                    ? findByOwnerAndCurrentStatusOrderByIdDesc(owner, status, limit)
+                    : findByOwnerAndCurrentStatusAndIdLessThanOrderByIdDesc(owner, status, cursor, limit);
+        } else {
+            return cursor == null
+                    ? findByOwnerOrderByIdDesc(owner, limit)
+                    : findByOwnerAndIdLessThanOrderByIdDesc(owner, cursor, limit);
+        }
+    }
+
+    List<Restaurant> findByCurrentStatusOrderByIdDesc(
+            RestaurantVerificationStatus status,
+            Limit limit
+    );
+
+    List<Restaurant> findByCurrentStatusAndIdLessThanOrderByIdDesc(
+            RestaurantVerificationStatus status,
+            UUID cursor,
+            Limit limit
+    );
+
+    List<Restaurant> findAllByOrderByIdDesc(Limit limit);
+
+    List<Restaurant> findByIdLessThanOrderByIdDesc(UUID cursor, Limit limit);
+
+    default List<Restaurant> findAllWithCursor(
+            RestaurantVerificationStatus status,
+            UUID cursor,
+            Limit limit
+    ) {
+        if (status != null) {
+            return cursor == null
+                    ? findByCurrentStatusOrderByIdDesc(status, limit)
+                    : findByCurrentStatusAndIdLessThanOrderByIdDesc(status, cursor, limit);
+        } else {
+            return cursor == null
+                    ? findAllByOrderByIdDesc(limit)
+                    : findByIdLessThanOrderByIdDesc(cursor, limit);
+        }
+    }
 
     /**
      * Finds approved, open restaurants within a given radius of a customer location.
