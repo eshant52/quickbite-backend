@@ -486,9 +486,11 @@ class RestaurantApplicationServiceImplTest {
 
 
         @Test
-        @DisplayName("upserts document — deletes existing entry for same type before inserting")
-        void upsertDeletesExistingType() {
+        @DisplayName("upserts document — updates existing entry for same type")
+        void upsertUpdatesExistingType() {
             RestaurantApplicationDocument existing = new RestaurantApplicationDocument();
+            existing.setType(RestaurantDocumentType.PAN);
+            existing.setUrl("old.pdf");
             when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(draftApp));
             when(documentRepository.findByApplicationAndType(draftApp, RestaurantDocumentType.PAN))
@@ -498,8 +500,9 @@ class RestaurantApplicationServiceImplTest {
 
             service.addDocument(appId, ownerId, new RestaurantApplicationDocumentRequest(RestaurantDocumentType.PAN, "new.pdf"));
 
-            verify(documentRepository).delete(existing);
-            verify(documentRepository).save(any(RestaurantApplicationDocument.class));
+            assertThat(existing.getUrl()).isEqualTo("new.pdf");
+            verify(documentRepository, never()).delete(any());
+            verify(documentRepository).save(existing);
         }
     }
 

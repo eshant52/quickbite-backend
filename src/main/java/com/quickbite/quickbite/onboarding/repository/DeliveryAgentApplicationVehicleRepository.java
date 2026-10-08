@@ -34,28 +34,51 @@ public interface DeliveryAgentApplicationVehicleRepository extends JpaRepository
      */
     @Query("""
             SELECT dav FROM VehicleApplication dav
+            LEFT JOIN dav.application daa
+            LEFT JOIN daa.agent u1
+            LEFT JOIN dav.deliveryAgent da
+            LEFT JOIN da.user u2
             WHERE dav.id = :id
-              AND (
-                (dav.application IS NOT NULL AND dav.application.agent.id = :userId)
-                OR
-                (dav.deliveryAgent IS NOT NULL AND dav.deliveryAgent.user.id = :userId)
-              )
+              AND (u1.id = :userId OR u2.id = :userId)
             """)
     Optional<VehicleApplication> findByIdAndOwnerUserId(
             @Param("id") UUID id,
             @Param("userId") UUID userId
     );
 
-    @Query("""
-            SELECT dav FROM VehicleApplication dav
-            WHERE dav.deliveryAgent IS NOT NULL
-              AND (:status IS NULL OR dav.status = :status)
-              AND (:cursor IS NULL OR dav.id < :cursor)
-            ORDER BY dav.id DESC
-            """)
-    List<VehicleApplication> findStandaloneWithCursor(
-            @Param("status") ApplicationStatus status,
-            @Param("cursor") UUID cursor,
+    List<VehicleApplication> findByDeliveryAgentIsNotNullAndStatusOrderByIdDesc(
+            ApplicationStatus status,
             Limit limit
     );
+
+    List<VehicleApplication> findByDeliveryAgentIsNotNullAndStatusAndIdLessThanOrderByIdDesc(
+            ApplicationStatus status,
+            UUID cursor,
+            Limit limit
+    );
+
+    List<VehicleApplication> findByDeliveryAgentIsNotNullOrderByIdDesc(
+            Limit limit
+    );
+
+    List<VehicleApplication> findByDeliveryAgentIsNotNullAndIdLessThanOrderByIdDesc(
+            UUID cursor,
+            Limit limit
+    );
+
+    default List<VehicleApplication> findStandaloneWithCursor(
+            ApplicationStatus status,
+            UUID cursor,
+            Limit limit
+    ) {
+        if (status != null) {
+            return cursor == null
+                    ? findByDeliveryAgentIsNotNullAndStatusOrderByIdDesc(status, limit)
+                    : findByDeliveryAgentIsNotNullAndStatusAndIdLessThanOrderByIdDesc(status, cursor, limit);
+        } else {
+            return cursor == null
+                    ? findByDeliveryAgentIsNotNullOrderByIdDesc(limit)
+                    : findByDeliveryAgentIsNotNullAndIdLessThanOrderByIdDesc(cursor, limit);
+        }
+    }
 }

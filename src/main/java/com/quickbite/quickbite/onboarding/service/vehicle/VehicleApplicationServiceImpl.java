@@ -241,15 +241,16 @@ public class VehicleApplicationServiceImpl implements VehicleApplicationService,
             loadDraftVehicleApplication(vehicleApp);
         }
 
-        applicationVehicleDocumentRepository
+        VehicleApplicationDocument doc = applicationVehicleDocumentRepository
                 .findByApplicationVehicleAndType(vehicleApp, request.type())
-                .ifPresent(applicationVehicleDocumentRepository::delete);
-
-        VehicleApplicationDocument newDoc = new VehicleApplicationDocument();
-        newDoc.setApplicationVehicle(vehicleApp);
-        newDoc.setType(request.type());
-        newDoc.setUrl(request.url());
-        VehicleApplicationDocument saved = applicationVehicleDocumentRepository.save(newDoc);
+                .orElseGet(() -> {
+                    VehicleApplicationDocument newDoc = new VehicleApplicationDocument();
+                    newDoc.setApplicationVehicle(vehicleApp);
+                    newDoc.setType(request.type());
+                    return newDoc;
+                });
+        doc.setUrl(request.url());
+        VehicleApplicationDocument saved = applicationVehicleDocumentRepository.save(doc);
 
         // Sync vehicleComplete on onboard application if this is an onboarding vehicle
         if (onboardApp != null) {

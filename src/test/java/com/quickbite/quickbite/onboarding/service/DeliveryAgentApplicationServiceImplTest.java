@@ -173,6 +173,35 @@ class DeliveryAgentApplicationServiceImplTest {
         }
 
         @Test
+        @DisplayName("addDocument updates existing document if present")
+        void addDocument_updatesExistingDoc() {
+            DeliveryAgentApplicationDocument existing = new DeliveryAgentApplicationDocument();
+            existing.setId(UUID.randomUUID());
+            existing.setType(DeliveryAgentDocumentType.AADHAR);
+            existing.setUrl("https://s3.amazonaws.com/old-aadhar.jpg");
+
+            when(userRepository.findById(userId)).thenReturn(Optional.of(agentUser));
+            when(applicationRepository.findByIdAndAgent(appId, agentUser)).thenReturn(Optional.of(application));
+            when(applicationDocumentRepository.findByApplicationAndType(application, DeliveryAgentDocumentType.AADHAR))
+                    .thenReturn(Optional.of(existing));
+            when(applicationDocumentRepository.existsByApplicationAndType(application, DeliveryAgentDocumentType.AADHAR))
+                    .thenReturn(true);
+            when(applicationDocumentRepository.existsByApplicationAndType(application, DeliveryAgentDocumentType.DRIVING_LICENSE))
+                    .thenReturn(true);
+            when(applicationDocumentRepository.save(any(DeliveryAgentApplicationDocument.class))).thenAnswer(i -> i.getArgument(0));
+
+            DeliveryAgentApplicationDocumentRequest req = new DeliveryAgentApplicationDocumentRequest(
+                    DeliveryAgentDocumentType.AADHAR, "https://s3.amazonaws.com/new-aadhar.jpg");
+
+            var res = applicationService.addDocument(appId, userId, req);
+
+            assertThat(res).isNotNull();
+            assertThat(existing.getUrl()).isEqualTo("https://s3.amazonaws.com/new-aadhar.jpg");
+            verify(applicationDocumentRepository, never()).delete(any());
+            verify(applicationDocumentRepository).save(existing);
+        }
+
+        @Test
         @DisplayName("startVehicleApplication creates new vehicle application linked to main application")
         void startVehicleApplication_createsNew() {
             when(userRepository.findById(userId)).thenReturn(Optional.of(agentUser));

@@ -192,6 +192,7 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
 
         // Replace-all strategy: delete existing and re-insert
         hoursRepository.deleteAllByApplication(app);
+        hoursRepository.flush();
 
         List<RestaurantApplicationHours> newHours = request.hours().stream()
                 .map(entry -> {
@@ -262,13 +263,15 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
     public RestaurantApplicationDocumentResponse addDocument(UUID appId, UUID ownerId, RestaurantApplicationDocumentRequest request) {
         RestaurantApplication app = loadDraftApplication(appId, ownerId);
 
-        // Upsert: delete existing entry for this type, then insert fresh
-        documentRepository.findByApplicationAndType(app, request.type())
-                .ifPresent(documentRepository::delete);
-
-        RestaurantApplicationDocument document = new RestaurantApplicationDocument();
-        document.setApplication(app);
-        document.setType(request.type());
+        // Upsert: update existing entry for this type, or create new if absent
+        RestaurantApplicationDocument document = documentRepository
+                .findByApplicationAndType(app, request.type())
+                .orElseGet(() -> {
+                    RestaurantApplicationDocument newDoc = new RestaurantApplicationDocument();
+                    newDoc.setApplication(app);
+                    newDoc.setType(request.type());
+                    return newDoc;
+                });
         document.setUrl(request.url());
         RestaurantApplicationDocument savedDoc = documentRepository.save(document);
 

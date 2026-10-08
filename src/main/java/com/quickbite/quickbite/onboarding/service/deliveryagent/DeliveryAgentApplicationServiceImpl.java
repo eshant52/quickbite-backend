@@ -163,11 +163,14 @@ public class DeliveryAgentApplicationServiceImpl implements DeliveryAgentApplica
     @Override
     public DeliveryAgentApplicationDocumentResponse addDocument(UUID appId, UUID agentUserId, DeliveryAgentApplicationDocumentRequest request) {
         DeliveryAgentApplication application = loadDraftApplication(appId, agentUserId);
-        applicationDocumentRepository.findByApplicationAndType(application, request.type())
-                .ifPresent(applicationDocumentRepository::delete);
-        DeliveryAgentApplicationDocument document = new DeliveryAgentApplicationDocument();
-        document.setApplication(application);
-        document.setType(request.type());
+        DeliveryAgentApplicationDocument document = applicationDocumentRepository
+                .findByApplicationAndType(application, request.type())
+                .orElseGet(() -> {
+                    DeliveryAgentApplicationDocument newDoc = new DeliveryAgentApplicationDocument();
+                    newDoc.setApplication(application);
+                    newDoc.setType(request.type());
+                    return newDoc;
+                });
         document.setUrl(request.url());
         DeliveryAgentApplicationDocument savedDoc = applicationDocumentRepository.save(document);
         checkAndUpdateDocumentsComplete(application);
