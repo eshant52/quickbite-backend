@@ -1,5 +1,7 @@
 package com.quickbite.quickbite.onboarding.service;
 
+import com.quickbite.quickbite.allotment.model.AdminAllotment;
+import com.quickbite.quickbite.allotment.model.AllotmentReferenceType;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationSubmittedEvent;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationApprovedEvent;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationRejectedEvent;
@@ -516,8 +518,15 @@ class RestaurantApplicationServiceImplTest {
         @Test
         @DisplayName("changes status to SUBMITTED and publishes Kafka event when all steps complete")
         void submitsSuccessfully() {
+            AdminAllotment allotment = new AdminAllotment();
+            User admin = new User();
+            admin.setId(UUID.randomUUID());
+            allotment.setAdmin(admin);
+
             when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
             when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(completeApp));
+            when(adminAllotmentService.allot(appId, AllotmentReferenceType.RESTAURANT_APPLICATION))
+                    .thenReturn(List.of(allotment));
             when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             RestaurantApplicationResponse response = service.submitApplication(appId, ownerId);
@@ -532,6 +541,23 @@ class RestaurantApplicationServiceImplTest {
             assertThat(event.applicationId()).isEqualTo(appId);
             assertThat(event.ownerId()).isEqualTo(ownerId);
             assertThat(event.restaurantName()).isEqualTo("Spice Route");
+        }
+
+        @Test
+        @DisplayName("throws ApplicationStateException when no admin allotment is available")
+        void throwsWhenNoAdminAllotmentAvailable() {
+            when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+            when(applicationRepository.findByIdAndOwner(appId, owner)).thenReturn(Optional.of(completeApp));
+            when(adminAllotmentService.allot(appId, AllotmentReferenceType.RESTAURANT_APPLICATION))
+                    .thenReturn(List.of());
+
+            assertThatThrownBy(() -> service.submitApplication(appId, ownerId))
+                    .isInstanceOf(ApplicationStateException.class)
+                    .hasMessageContaining("No administrator available for allotment");
+
+            assertThat(completeApp.getStatus()).isEqualTo(ApplicationStatus.DRAFT);
+            verify(applicationRepository, never()).save(any());
+            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test

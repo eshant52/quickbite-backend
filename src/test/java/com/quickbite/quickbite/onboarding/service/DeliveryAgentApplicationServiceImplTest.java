@@ -1,8 +1,10 @@
 package com.quickbite.quickbite.onboarding.service;
 
+import com.quickbite.quickbite.allotment.model.AdminAllotment;
 import com.quickbite.quickbite.allotment.model.AllotmentReferenceType;
 import com.quickbite.quickbite.allotment.service.AdminAllotmentService;
 import com.quickbite.quickbite.common.exception.BadRequestException;
+import com.quickbite.quickbite.onboarding.exception.ApplicationStateException;
 import com.quickbite.quickbite.delivery.model.DeliveryAgentDocumentType;
 import com.quickbite.quickbite.delivery.repository.DeliveryAgentDocumentRepository;
 import com.quickbite.quickbite.delivery.repository.DeliveryAgentRepository;
@@ -240,14 +242,40 @@ class DeliveryAgentApplicationServiceImplTest {
             application.setDocumentsComplete(true);
             application.setVehicleComplete(true);
 
+            AdminAllotment allotment = new AdminAllotment();
+            User admin = new User();
+            admin.setId(UUID.randomUUID());
+            allotment.setAdmin(admin);
+
             when(userRepository.findById(userId)).thenReturn(Optional.of(agentUser));
             when(applicationRepository.findByIdAndAgent(appId, agentUser)).thenReturn(Optional.of(application));
+            when(adminAllotmentService.allot(appId, AllotmentReferenceType.DELIVERY_AGENT))
+                    .thenReturn(List.of(allotment));
             when(applicationRepository.save(any(DeliveryAgentApplication.class))).thenAnswer(i -> i.getArgument(0));
 
             DeliveryAgentApplicationResponse res = applicationService.submitApplication(appId, userId);
 
             assertThat(res.status()).isEqualTo(ApplicationStatus.SUBMITTED);
             verify(adminAllotmentService).allot(appId, AllotmentReferenceType.DELIVERY_AGENT);
+        }
+
+        @Test
+        @DisplayName("submitApplication throws ApplicationStateException when no admin allotment is available")
+        void submitApplication_throwsWhenNoAdminAvailable() {
+            application.setDocumentsComplete(true);
+            application.setVehicleComplete(true);
+
+            when(userRepository.findById(userId)).thenReturn(Optional.of(agentUser));
+            when(applicationRepository.findByIdAndAgent(appId, agentUser)).thenReturn(Optional.of(application));
+            when(adminAllotmentService.allot(appId, AllotmentReferenceType.DELIVERY_AGENT))
+                    .thenReturn(List.of());
+
+            assertThatThrownBy(() -> applicationService.submitApplication(appId, userId))
+                    .isInstanceOf(ApplicationStateException.class)
+                    .hasMessageContaining("No administrator available for allotment");
+
+            assertThat(application.getStatus()).isEqualTo(ApplicationStatus.DRAFT);
+            verify(applicationRepository, never()).save(any());
         }
 
         @Test

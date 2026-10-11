@@ -224,6 +224,12 @@ public class DeliveryAgentApplicationServiceImpl implements DeliveryAgentApplica
             throw new BadRequestException("Please ensure all mandatory vehicle documents are uploaded and vehicle details are complete before submitting the application.");
         }
 
+        // Allot review task to admins
+        List<AdminAllotment> allottedAdmins = adminAllotmentService.allot(application.getId(), AllotmentReferenceType.DELIVERY_AGENT);
+        if (allottedAdmins == null || allottedAdmins.isEmpty()) {
+            throw new ApplicationStateException("No administrator available for allotment. Application cannot be submitted.");
+        }
+
         application.setStatus(ApplicationStatus.SUBMITTED);
         DeliveryAgentApplication saved = applicationRepository.save(application);
 
@@ -235,9 +241,6 @@ public class DeliveryAgentApplicationServiceImpl implements DeliveryAgentApplica
                 });
 
         recordDeliveryAgentVerificationHistory(saved, DeliveryAgentVerificationStatus.PENDING, null, "Application submitted");
-
-        // Allot review task to admins
-        List<AdminAllotment> allottedAdmins = adminAllotmentService.allot(saved.getId(), AllotmentReferenceType.DELIVERY_AGENT);
 
         eventPublisher.publishEvent(new DeliveryAgentApplicationSubmittedEvent(
                 saved.getId(),

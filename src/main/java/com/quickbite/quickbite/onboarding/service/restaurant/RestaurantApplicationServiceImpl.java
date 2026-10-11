@@ -305,11 +305,14 @@ public class RestaurantApplicationServiceImpl implements RestaurantApplicationSe
                             "details, address, hours, images, and required documents.");
         }
 
+        // Allot request to workload-balanced admins
+        List<AdminAllotment> adminAllotments = adminAllotmentService.allot(app.getId(), AllotmentReferenceType.RESTAURANT_APPLICATION);
+        if (adminAllotments == null || adminAllotments.isEmpty()) {
+            throw new ApplicationStateException("No administrator available for allotment. Application cannot be submitted.");
+        }
+
         app.setStatus(ApplicationStatus.SUBMITTED);
         RestaurantApplication savedApp = applicationRepository.save(app);
-
-        // Allot request to workload-balanced admins
-        List<AdminAllotment> adminAllotments = adminAllotmentService.allot(savedApp.getId(), AllotmentReferenceType.RESTAURANT_APPLICATION);
 
         recordStatusHistory(savedApp, null, RestaurantVerificationStatus.PENDING, "Application submitted for review");
 

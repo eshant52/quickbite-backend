@@ -336,10 +336,13 @@ public class VehicleApplicationServiceImpl implements VehicleApplicationService,
             throw new BadRequestException("This vehicle application is part of the main onboarding. Please submit the main application instead.");
         }
 
+        List<AdminAllotment> adminAllotments = adminAllotmentService.allot(vehicleApp.getId(), AllotmentReferenceType.VEHICLE_APPLICATION);
+        if (adminAllotments == null || adminAllotments.isEmpty()) {
+            throw new ApplicationStateException("No administrator available for allotment. Application cannot be submitted.");
+        }
+
         vehicleApp.setStatus(ApplicationStatus.SUBMITTED);
         VehicleApplication saved = applicationVehicleRepository.save(vehicleApp);
-
-        List<AdminAllotment> adminAllotments = adminAllotmentService.allot(saved.getId(), AllotmentReferenceType.VEHICLE_APPLICATION);
 
         eventPublisher.publishEvent(new VehicleApplicationSubmittedEvent(
                 saved.getId(),

@@ -1,8 +1,10 @@
 package com.quickbite.quickbite.onboarding.service;
 
+import com.quickbite.quickbite.allotment.model.AdminAllotment;
 import com.quickbite.quickbite.allotment.model.AllotmentReferenceType;
 import com.quickbite.quickbite.allotment.service.AdminAllotmentService;
 import com.quickbite.quickbite.common.exception.BadRequestException;
+import com.quickbite.quickbite.onboarding.exception.ApplicationStateException;
 import com.quickbite.quickbite.delivery.model.DeliveryAgent;
 import com.quickbite.quickbite.delivery.repository.DeliveryAgentRepository;
 import com.quickbite.quickbite.onboarding.dto.vehicle.VehicleApplicationResponse;
@@ -130,6 +132,11 @@ class VehicleApplicationServiceImplTest {
         @Test
         @DisplayName("Submits standalone application and allots to admin when RC and Insurance are present")
         void submitVehicleApplication_success() {
+            AdminAllotment allotment = new AdminAllotment();
+            User admin = new User();
+            admin.setId(UUID.randomUUID());
+            allotment.setAdmin(admin);
+
             // Using the new dual-flow ownership lookup
             when(applicationVehicleRepository.findByIdAndOwnerUserId(vehicleAppId, userId))
                     .thenReturn(Optional.of(vehicleApp));
@@ -137,12 +144,34 @@ class VehicleApplicationServiceImplTest {
                     vehicleApp, VehicleOwnershipDocumentType.RC)).thenReturn(true);
             when(applicationVehicleDocumentRepository.existsByApplicationVehicleAndType(
                     vehicleApp, VehicleOwnershipDocumentType.INSURANCE)).thenReturn(true);
+            when(adminAllotmentService.allot(vehicleAppId, AllotmentReferenceType.VEHICLE_APPLICATION))
+                    .thenReturn(List.of(allotment));
             when(applicationVehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             VehicleApplicationResponse res = vehicleApplicationService.submitVehicleApplication(vehicleAppId, userId);
 
             assertThat(res.status()).isEqualTo(ApplicationStatus.SUBMITTED);
             verify(adminAllotmentService).allot(vehicleAppId, AllotmentReferenceType.VEHICLE_APPLICATION);
+        }
+
+        @Test
+        @DisplayName("submitVehicleApplication throws ApplicationStateException when no admin allotment is available")
+        void submitVehicleApplication_throwsWhenNoAdminAvailable() {
+            when(applicationVehicleRepository.findByIdAndOwnerUserId(vehicleAppId, userId))
+                    .thenReturn(Optional.of(vehicleApp));
+            when(applicationVehicleDocumentRepository.existsByApplicationVehicleAndType(
+                    vehicleApp, VehicleOwnershipDocumentType.RC)).thenReturn(true);
+            when(applicationVehicleDocumentRepository.existsByApplicationVehicleAndType(
+                    vehicleApp, VehicleOwnershipDocumentType.INSURANCE)).thenReturn(true);
+            when(adminAllotmentService.allot(vehicleAppId, AllotmentReferenceType.VEHICLE_APPLICATION))
+                    .thenReturn(List.of());
+
+            assertThatThrownBy(() -> vehicleApplicationService.submitVehicleApplication(vehicleAppId, userId))
+                    .isInstanceOf(ApplicationStateException.class)
+                    .hasMessageContaining("No administrator available for allotment");
+
+            assertThat(vehicleApp.getStatus()).isEqualTo(ApplicationStatus.DRAFT);
+            verify(applicationVehicleRepository, never()).save(any());
         }
 
         @Test
