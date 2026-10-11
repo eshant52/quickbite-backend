@@ -22,15 +22,27 @@ public interface DeliveryAgentApplicationRepository extends JpaRepository<Delive
 
     boolean existsByAgentAndStatusIn(User agent, List<ApplicationStatus> statuses);
 
-    @Query("""
-            SELECT da FROM DeliveryAgentApplication da
-            WHERE (:status IS NULL OR da.status = :status)
-              AND (:cursor IS NULL OR da.id < :cursor)
-            ORDER BY da.id DESC
-            """)
-    List<DeliveryAgentApplication> findWithCursor(
-            @Param("status") ApplicationStatus status,
-            @Param("cursor") UUID cursor,
+    List<DeliveryAgentApplication> findByStatusOrderByIdDesc(ApplicationStatus status, Limit limit);
+
+    List<DeliveryAgentApplication> findByStatusAndIdLessThanOrderByIdDesc(ApplicationStatus status, UUID cursor, Limit limit);
+
+    List<DeliveryAgentApplication> findAllByOrderByIdDesc(Limit limit);
+
+    List<DeliveryAgentApplication> findByIdLessThanOrderByIdDesc(UUID cursor, Limit limit);
+
+    default List<DeliveryAgentApplication> findWithCursor(
+            ApplicationStatus status,
+            UUID cursor,
             Limit limit
-    );
+    ) {
+        if (status != null) {
+            return cursor == null
+                    ? findByStatusOrderByIdDesc(status, limit)
+                    : findByStatusAndIdLessThanOrderByIdDesc(status, cursor, limit);
+        } else {
+            return cursor == null
+                    ? findAllByOrderByIdDesc(limit)
+                    : findByIdLessThanOrderByIdDesc(cursor, limit);
+        }
+    }
 }

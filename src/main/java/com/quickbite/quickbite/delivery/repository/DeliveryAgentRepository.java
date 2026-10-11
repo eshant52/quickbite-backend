@@ -67,13 +67,55 @@ public interface DeliveryAgentRepository extends JpaRepository<DeliveryAgent, UU
             SELECT da FROM DeliveryAgent da
             JOIN FETCH da.user
             LEFT JOIN FETCH da.currentVehicle
-            WHERE (:status IS NULL OR da.currentStatus = :status)
-              AND (:cursor IS NULL OR da.id < :cursor)
+            WHERE da.currentStatus = :status
             ORDER BY da.id DESC
             """)
-    List<DeliveryAgent> findWithCursor(
+    List<DeliveryAgent> findByCurrentStatusOrderByIdDesc(@Param("status") DeliveryAgentVerificationStatus status, Limit limit);
+
+    @Query("""
+            SELECT da FROM DeliveryAgent da
+            JOIN FETCH da.user
+            LEFT JOIN FETCH da.currentVehicle
+            WHERE da.currentStatus = :status
+              AND da.id < :cursor
+            ORDER BY da.id DESC
+            """)
+    List<DeliveryAgent> findByCurrentStatusAndIdLessThanOrderByIdDesc(
             @Param("status") DeliveryAgentVerificationStatus status,
             @Param("cursor") UUID cursor,
             Limit limit
     );
+
+    @Query("""
+            SELECT da FROM DeliveryAgent da
+            JOIN FETCH da.user
+            LEFT JOIN FETCH da.currentVehicle
+            ORDER BY da.id DESC
+            """)
+    List<DeliveryAgent> findAllFetchOrderByIdDesc(Limit limit);
+
+    @Query("""
+            SELECT da FROM DeliveryAgent da
+            JOIN FETCH da.user
+            LEFT JOIN FETCH da.currentVehicle
+            WHERE da.id < :cursor
+            ORDER BY da.id DESC
+            """)
+    List<DeliveryAgent> findByIdLessThanOrderByIdDesc(@Param("cursor") UUID cursor, Limit limit);
+
+    default List<DeliveryAgent> findWithCursor(
+            DeliveryAgentVerificationStatus status,
+            UUID cursor,
+            Limit limit
+    ) {
+        if (status != null) {
+            return cursor == null
+                    ? findByCurrentStatusOrderByIdDesc(status, limit)
+                    : findByCurrentStatusAndIdLessThanOrderByIdDesc(status, cursor, limit);
+        } else {
+            return cursor == null
+                    ? findAllFetchOrderByIdDesc(limit)
+                    : findByIdLessThanOrderByIdDesc(cursor, limit);
+        }
+    }
 }

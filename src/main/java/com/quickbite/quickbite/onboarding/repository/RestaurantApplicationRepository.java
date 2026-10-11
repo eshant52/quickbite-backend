@@ -26,16 +26,19 @@ public interface RestaurantApplicationRepository extends JpaRepository<Restauran
      * Fetch {@code limit} applications with {@code id > cursor} (or all when cursor is null).
      * Callers pass {@code Limit.of(requestedSize + 1)} to enable hasMore detection.
      */
-    @Query("""
-            SELECT a FROM RestaurantApplication a
-            WHERE a.status = :status
-              AND (:cursor IS NULL OR a.id > :cursor)
-            ORDER BY a.id ASC
-            """)
-    List<RestaurantApplication> findByStatusWithCursor(
-            @Param("status") ApplicationStatus status,
-            @Param("cursor") UUID cursor,
-            Limit limit);
+    List<RestaurantApplication> findByStatusOrderByIdAsc(ApplicationStatus status, Limit limit);
+
+    List<RestaurantApplication> findByStatusAndIdGreaterThanOrderByIdAsc(ApplicationStatus status, UUID cursor, Limit limit);
+
+    default List<RestaurantApplication> findByStatusWithCursor(
+            ApplicationStatus status,
+            UUID cursor,
+            Limit limit
+    ) {
+        return cursor == null
+                ? findByStatusOrderByIdAsc(status, limit)
+                : findByStatusAndIdGreaterThanOrderByIdAsc(status, cursor, limit);
+    }
 
     boolean existsByOwnerAndStatusIn(User owner, List<ApplicationStatus> statuses);
 }

@@ -21,15 +21,27 @@ public interface CuisineRequestRepository extends JpaRepository<CuisineRequest, 
 
     Page<CuisineRequest> findByRequestedBy(User requestedBy, Pageable pageable);
 
-    @Query("""
-    SELECT r FROM CuisineRequest r
-    WHERE (:cursor IS NULL OR r.id > :cursor)
-        AND (:status IS NULL OR r.status = :status)
-    ORDER BY r.id ASC
-    """)
-    List<CuisineRequest> findWithCursor(
-            @Param("cursor") UUID cursor,
-            @Param("status") CuisineStatus status,
+    List<CuisineRequest> findByStatusOrderByIdAsc(CuisineStatus status, Limit limit);
+
+    List<CuisineRequest> findByStatusAndIdGreaterThanOrderByIdAsc(CuisineStatus status, UUID cursor, Limit limit);
+
+    List<CuisineRequest> findAllByOrderByIdAsc(Limit limit);
+
+    List<CuisineRequest> findByIdGreaterThanOrderByIdAsc(UUID cursor, Limit limit);
+
+    default List<CuisineRequest> findWithCursor(
+            UUID cursor,
+            CuisineStatus status,
             Limit limit
-    );
+    ) {
+        if (status != null) {
+            return cursor == null
+                    ? findByStatusOrderByIdAsc(status, limit)
+                    : findByStatusAndIdGreaterThanOrderByIdAsc(status, cursor, limit);
+        } else {
+            return cursor == null
+                    ? findAllByOrderByIdAsc(limit)
+                    : findByIdGreaterThanOrderByIdAsc(cursor, limit);
+        }
+    }
 }

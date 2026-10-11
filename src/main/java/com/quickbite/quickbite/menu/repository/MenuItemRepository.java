@@ -18,16 +18,62 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, UUID> {
     SELECT m FROM MenuItem m
     JOIN FETCH m.cuisine
     WHERE m.restaurant.id = :restaurantId
-        AND (:cursor IS NULL OR m.id > :cursor)
-        AND (:availableOnly = false OR m.isAvailable = true)
+        AND m.isAvailable = true
     ORDER BY m.id ASC
     """)
-    List<MenuItem> findByRestaurantWithCursor(
+    List<MenuItem> findAvailableByRestaurantOrderByIdAsc(@Param("restaurantId") UUID restaurantId, Limit limit);
+
+    @Query("""
+    SELECT m FROM MenuItem m
+    JOIN FETCH m.cuisine
+    WHERE m.restaurant.id = :restaurantId
+        AND m.isAvailable = true
+        AND m.id > :cursor
+    ORDER BY m.id ASC
+    """)
+    List<MenuItem> findAvailableByRestaurantAndIdGreaterThanOrderByIdAsc(
             @Param("restaurantId") UUID restaurantId,
-            @Param("availableOnly") boolean availableOnly,
             @Param("cursor") UUID cursor,
             Limit limit
     );
+
+    @Query("""
+    SELECT m FROM MenuItem m
+    JOIN FETCH m.cuisine
+    WHERE m.restaurant.id = :restaurantId
+    ORDER BY m.id ASC
+    """)
+    List<MenuItem> findAllByRestaurantOrderByIdAsc(@Param("restaurantId") UUID restaurantId, Limit limit);
+
+    @Query("""
+    SELECT m FROM MenuItem m
+    JOIN FETCH m.cuisine
+    WHERE m.restaurant.id = :restaurantId
+        AND m.id > :cursor
+    ORDER BY m.id ASC
+    """)
+    List<MenuItem> findAllByRestaurantAndIdGreaterThanOrderByIdAsc(
+            @Param("restaurantId") UUID restaurantId,
+            @Param("cursor") UUID cursor,
+            Limit limit
+    );
+
+    default List<MenuItem> findByRestaurantWithCursor(
+            UUID restaurantId,
+            boolean availableOnly,
+            UUID cursor,
+            Limit limit
+    ) {
+        if (availableOnly) {
+            return cursor == null
+                    ? findAvailableByRestaurantOrderByIdAsc(restaurantId, limit)
+                    : findAvailableByRestaurantAndIdGreaterThanOrderByIdAsc(restaurantId, cursor, limit);
+        } else {
+            return cursor == null
+                    ? findAllByRestaurantOrderByIdAsc(restaurantId, limit)
+                    : findAllByRestaurantAndIdGreaterThanOrderByIdAsc(restaurantId, cursor, limit);
+        }
+    }
 
     Optional<MenuItem> findByIdAndRestaurantId(UUID id, UUID restaurantId);
 }

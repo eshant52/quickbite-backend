@@ -29,18 +29,30 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
      * UUIDv7 IDs are time-ordered, so {@code ORDER BY n.id ASC} is also
      * chronological — newest-first display is handled on the client.
      */
-    @Query("""
-            SELECT n FROM Notification n
-            WHERE n.recipient.id = :recipientId
-              AND (:cursor IS NULL OR n.id > :cursor)
-              AND (:unreadOnly = false OR n.isRead = false)
-            ORDER BY n.id ASC
-            """)
-    List<Notification> findWithCursor(
-            @Param("recipientId") UUID recipientId,
-            @Param("cursor") UUID cursor,
-            @Param("unreadOnly") boolean unreadOnly,
-            Limit limit);
+    List<Notification> findByRecipientIdAndIsReadFalseOrderByIdAsc(UUID recipientId, Limit limit);
+
+    List<Notification> findByRecipientIdAndIsReadFalseAndIdGreaterThanOrderByIdAsc(UUID recipientId, UUID cursor, Limit limit);
+
+    List<Notification> findByRecipientIdOrderByIdAsc(UUID recipientId, Limit limit);
+
+    List<Notification> findByRecipientIdAndIdGreaterThanOrderByIdAsc(UUID recipientId, UUID cursor, Limit limit);
+
+    default List<Notification> findWithCursor(
+            UUID recipientId,
+            UUID cursor,
+            boolean unreadOnly,
+            Limit limit
+    ) {
+        if (unreadOnly) {
+            return cursor == null
+                    ? findByRecipientIdAndIsReadFalseOrderByIdAsc(recipientId, limit)
+                    : findByRecipientIdAndIsReadFalseAndIdGreaterThanOrderByIdAsc(recipientId, cursor, limit);
+        } else {
+            return cursor == null
+                    ? findByRecipientIdOrderByIdAsc(recipientId, limit)
+                    : findByRecipientIdAndIdGreaterThanOrderByIdAsc(recipientId, cursor, limit);
+        }
+    }
 
     /** Fast unread badge count — no entity loading, no pagination. */
     long countByRecipientIdAndIsReadFalse(UUID recipientId);

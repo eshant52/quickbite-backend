@@ -26,14 +26,34 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
             JOIN FETCH r.restaurant
             JOIN FETCH r.order
             WHERE r.restaurant.id = :restaurantId
-              AND (:cursor IS NULL OR r.id < :cursor)
             ORDER BY r.id DESC
             """)
-    List<Review> findByRestaurantWithCursor(
+    List<Review> findByRestaurantIdOrderByIdDesc(@Param("restaurantId") UUID restaurantId, Limit limit);
+
+    @Query("""
+            SELECT r FROM Review r
+            JOIN FETCH r.customer
+            JOIN FETCH r.restaurant
+            JOIN FETCH r.order
+            WHERE r.restaurant.id = :restaurantId
+              AND r.id < :cursor
+            ORDER BY r.id DESC
+            """)
+    List<Review> findByRestaurantIdAndIdLessThanOrderByIdDesc(
             @Param("restaurantId") UUID restaurantId,
             @Param("cursor") UUID cursor,
             Limit limit
     );
+
+    default List<Review> findByRestaurantWithCursor(
+            UUID restaurantId,
+            UUID cursor,
+            Limit limit
+    ) {
+        return cursor == null
+                ? findByRestaurantIdOrderByIdDesc(restaurantId, limit)
+                : findByRestaurantIdAndIdLessThanOrderByIdDesc(restaurantId, cursor, limit);
+    }
 
     @Query("""
             SELECT r FROM Review r
@@ -41,29 +61,69 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
             JOIN FETCH r.restaurant
             JOIN FETCH r.order
             WHERE r.customer.id = :customerId
-              AND (:cursor IS NULL OR r.id < :cursor)
             ORDER BY r.id DESC
             """)
-    List<Review> findByCustomerWithCursor(
-            @Param("customerId") UUID customerId,
-            @Param("cursor") UUID cursor,
-            Limit limit
-    );
+    List<Review> findByCustomerIdOrderByIdDesc(@Param("customerId") UUID customerId, Limit limit);
 
     @Query("""
             SELECT r FROM Review r
             JOIN FETCH r.customer
             JOIN FETCH r.restaurant
             JOIN FETCH r.order
-            WHERE (:restaurantId IS NULL OR r.restaurant.id = :restaurantId)
-              AND (:cursor IS NULL OR r.id < :cursor)
+            WHERE r.customer.id = :customerId
+              AND r.id < :cursor
             ORDER BY r.id DESC
             """)
-    List<Review> findAllWithCursor(
-            @Param("restaurantId") UUID restaurantId,
+    List<Review> findByCustomerIdAndIdLessThanOrderByIdDesc(
+            @Param("customerId") UUID customerId,
             @Param("cursor") UUID cursor,
             Limit limit
     );
+
+    default List<Review> findByCustomerWithCursor(
+            UUID customerId,
+            UUID cursor,
+            Limit limit
+    ) {
+        return cursor == null
+                ? findByCustomerIdOrderByIdDesc(customerId, limit)
+                : findByCustomerIdAndIdLessThanOrderByIdDesc(customerId, cursor, limit);
+    }
+
+    @Query("""
+            SELECT r FROM Review r
+            JOIN FETCH r.customer
+            JOIN FETCH r.restaurant
+            JOIN FETCH r.order
+            ORDER BY r.id DESC
+            """)
+    List<Review> findAllFetchOrderByIdDesc(Limit limit);
+
+    @Query("""
+            SELECT r FROM Review r
+            JOIN FETCH r.customer
+            JOIN FETCH r.restaurant
+            JOIN FETCH r.order
+            WHERE r.id < :cursor
+            ORDER BY r.id DESC
+            """)
+    List<Review> findAllFetchAndIdLessThanOrderByIdDesc(@Param("cursor") UUID cursor, Limit limit);
+
+    default List<Review> findAllWithCursor(
+            UUID restaurantId,
+            UUID cursor,
+            Limit limit
+    ) {
+        if (restaurantId != null) {
+            return cursor == null
+                    ? findByRestaurantIdOrderByIdDesc(restaurantId, limit)
+                    : findByRestaurantIdAndIdLessThanOrderByIdDesc(restaurantId, cursor, limit);
+        } else {
+            return cursor == null
+                    ? findAllFetchOrderByIdDesc(limit)
+                    : findAllFetchAndIdLessThanOrderByIdDesc(cursor, limit);
+        }
+    }
 
     @Query("SELECT AVG(r.rating) FROM Review r WHERE r.restaurant.id = :restaurantId")
     Double getAverageRatingForRestaurant(@Param("restaurantId") UUID restaurantId);
