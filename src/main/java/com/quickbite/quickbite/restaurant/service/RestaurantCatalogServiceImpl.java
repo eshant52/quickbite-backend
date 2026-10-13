@@ -10,6 +10,7 @@ import com.quickbite.quickbite.restaurant.exception.RestaurantNotFoundException;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
 import com.quickbite.quickbite.restaurant.model.RestaurantVerificationStatus;
 import com.quickbite.quickbite.restaurant.repository.RestaurantRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class RestaurantCatalogServiceImpl implements RestaurantCatalogService {
     }
 
     @Override
+    @Cacheable(value = "restaurant_profile", key = "#restaurantId")
     public RestaurantResponse getRestaurant(UUID restaurantId) {
         Restaurant restaurant = restaurantRepository.findById(restaurantId)
                 .orElseThrow(() -> new RestaurantNotFoundException("Restaurant not found"));

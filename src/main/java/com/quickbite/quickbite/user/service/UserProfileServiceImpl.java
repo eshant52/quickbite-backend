@@ -5,6 +5,8 @@ import com.quickbite.quickbite.user.dto.UpdateProfileRequest;
 import com.quickbite.quickbite.user.dto.UserProfileResponse;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,12 +24,14 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "user_profile", key = "#userId")
     public UserProfileResponse getProfile(UUID userId) {
         User user = loadUser(userId);
         return UserProfileResponse.from(user);
     }
 
     @Override
+    @CacheEvict(value = "user_profile", key = "#userId")
     public UserProfileResponse updateProfile(UUID userId, UpdateProfileRequest req) {
         User user = loadUser(userId);
 

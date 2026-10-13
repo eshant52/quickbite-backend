@@ -64,6 +64,13 @@ class QuickBiteApplicationTests {
     @Test
     void redisAndKafkaInfrastructureBeansLoad() {
         assertThat(cacheManager).isNotNull();
+        assertThat(cacheManager.getCacheNames()).contains(
+                "cuisines",
+                "restaurant_profile",
+                "restaurant_rating_summary",
+                "user_profile",
+                "user_addresses"
+        );
         assertThat(redisTemplate).isNotNull();
         assertThat(kafkaTemplate).isNotNull();
         assertThat(kafkaListenerContainerFactory).isNotNull();

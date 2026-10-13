@@ -5,6 +5,7 @@ import com.quickbite.quickbite.restaurant.exception.RestaurantNotFoundException;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
 import com.quickbite.quickbite.restaurant.repository.RestaurantRepository;
 import com.quickbite.quickbite.review.repository.ReviewRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -31,6 +32,7 @@ public class RestaurantRatingEventListener {
     }
 
     @EventListener
+    @CacheEvict(value = "restaurant_rating_summary", key = "#event.restaurantId()")
     public void onReviewChanged(ReviewChangedEvent event) {
         UUID restaurantId = event.restaurantId();
 

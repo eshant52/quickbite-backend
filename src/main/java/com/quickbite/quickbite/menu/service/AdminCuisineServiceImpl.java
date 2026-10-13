@@ -15,6 +15,7 @@ import com.quickbite.quickbite.menu.repository.CuisineRepository;
 import com.quickbite.quickbite.menu.repository.CuisineRequestRepository;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
@@ -57,6 +58,7 @@ public class AdminCuisineServiceImpl implements AdminCuisineService {
     }
 
     @Override
+    @CacheEvict(value = "cuisines", allEntries = true)
     public CuisineResponse approve(UUID requestId, UUID adminId) {
         CuisineRequest requestEntity = cuisineRequestRepository.findById(requestId)
                 .orElseThrow(() -> new CuisineNotFoundException("Cuisine request not found"));

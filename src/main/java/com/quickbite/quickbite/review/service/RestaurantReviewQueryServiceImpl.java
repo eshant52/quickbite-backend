@@ -8,6 +8,7 @@ import com.quickbite.quickbite.review.dto.RestaurantRatingSummaryResponse;
 import com.quickbite.quickbite.review.dto.ReviewResponse;
 import com.quickbite.quickbite.review.model.Review;
 import com.quickbite.quickbite.review.repository.ReviewRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +51,7 @@ public class RestaurantReviewQueryServiceImpl implements RestaurantReviewQuerySe
     }
 
     @Override
+    @Cacheable(value = "restaurant_rating_summary", key = "#restaurantId")
     public RestaurantRatingSummaryResponse getRestaurantRatingSummary(UUID restaurantId) {
         Restaurant restaurant = restaurantRepository.findById(restaurantId)
                 .orElseThrow(() -> new RestaurantNotFoundException("Restaurant not found with id: " + restaurantId));

@@ -12,6 +12,10 @@ import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializ
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+
 @Configuration
 public class RedisConfig {
 
@@ -35,7 +39,7 @@ public class RedisConfig {
     public CacheManager cacheManager(
             RedisConnectionFactory connectionFactory,
             CacheProperties cacheProperties) {
-        RedisCacheConfiguration cacheConfiguration = RedisCacheConfiguration.defaultCacheConfig()
+        RedisCacheConfiguration defaultConfiguration = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(cacheProperties.defaultTtl())
                 .prefixCacheNameWith(CACHE_KEY_PREFIX)
                 .disableCachingNullValues()
@@ -43,8 +47,16 @@ public class RedisConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(
                         GenericJacksonJsonRedisSerializer.builder().build()));
 
+        Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
+        cacheConfigurations.put("cuisines", defaultConfiguration.entryTtl(Duration.ofHours(24)));
+        cacheConfigurations.put("restaurant_profile", defaultConfiguration.entryTtl(Duration.ofMinutes(30)));
+        cacheConfigurations.put("restaurant_rating_summary", defaultConfiguration.entryTtl(Duration.ofHours(1)));
+        cacheConfigurations.put("user_profile", defaultConfiguration.entryTtl(Duration.ofMinutes(15)));
+        cacheConfigurations.put("user_addresses", defaultConfiguration.entryTtl(Duration.ofMinutes(15)));
+
         return RedisCacheManager.builder(connectionFactory)
-                .cacheDefaults(cacheConfiguration)
+                .cacheDefaults(defaultConfiguration)
+                .withInitialCacheConfigurations(cacheConfigurations)
                 .transactionAware()
                 .build();
     }

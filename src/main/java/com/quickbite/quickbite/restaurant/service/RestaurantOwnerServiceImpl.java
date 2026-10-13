@@ -17,6 +17,7 @@ import com.quickbite.quickbite.restaurant.repository.RestaurantImageRepository;
 import com.quickbite.quickbite.restaurant.repository.RestaurantRepository;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,6 +82,7 @@ public class RestaurantOwnerServiceImpl implements RestaurantOwnerService {
     }
 
     @Override
+    @CacheEvict(value = "restaurant_profile", key = "#restaurantId")
     public RestaurantResponse update(UUID restaurantId, UUID ownerId, UpdateRestaurantRequest req) {
         User owner = loadOwner(ownerId);
         Restaurant restaurant = loadOwnerRestaurant(restaurantId, owner);
@@ -93,6 +95,7 @@ public class RestaurantOwnerServiceImpl implements RestaurantOwnerService {
     }
 
     @Override
+    @CacheEvict(value = "restaurant_profile", key = "#restaurantId")
     public RestaurantResponse setHours(UUID restaurantId, UUID ownerId, List<RestaurantHoursRequest> hours) {
         User owner = loadOwner(ownerId);
         Restaurant restaurant = loadOwnerRestaurant(restaurantId, owner);
@@ -120,6 +123,7 @@ public class RestaurantOwnerServiceImpl implements RestaurantOwnerService {
     }
 
     @Override
+    @CacheEvict(value = "restaurant_profile", key = "#restaurantId")
     public RestaurantResponse addImage(UUID restaurantId, UUID ownerId, String imageUrl, int displayOrder) {
         User owner = loadOwner(ownerId);
         Restaurant restaurant = loadOwnerRestaurant(restaurantId, owner);
@@ -146,6 +150,7 @@ public class RestaurantOwnerServiceImpl implements RestaurantOwnerService {
     }
 
     @Override
+    @CacheEvict(value = "restaurant_profile", key = "#restaurantId")
     public RestaurantResponse removeImage(UUID restaurantId, UUID ownerId, UUID imageId) {
         User owner = loadOwner(ownerId);
         Restaurant restaurant = loadOwnerRestaurant(restaurantId, owner);
@@ -162,6 +167,7 @@ public class RestaurantOwnerServiceImpl implements RestaurantOwnerService {
     }
 
     @Override
+    @CacheEvict(value = "restaurant_profile", key = "#restaurantId")
     public RestaurantResponse toggleClosed(UUID restaurantId, UUID ownerId) {
         User owner = loadOwner(ownerId);
         Restaurant restaurant = loadOwnerRestaurant(restaurantId, owner);

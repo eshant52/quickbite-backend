@@ -2,6 +2,7 @@ package com.quickbite.quickbite.menu.service;
 
 import com.quickbite.quickbite.menu.dto.CuisineResponse;
 import com.quickbite.quickbite.menu.repository.CuisineRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ public class CuisineCatalogServiceImpl implements CuisineCatalogService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "cuisines", key = "'all'")
     public List<CuisineResponse> listApproved() {
         return cuisineRepository.findAll().stream()
                 .map(CuisineResponse::from)

@@ -12,6 +12,8 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,7 @@ public class UserAddressServiceImpl implements UserAddressService {
     }
 
     @Override
+    @CacheEvict(value = "user_addresses", key = "#userId")
     public AddressResponse addAddress(UUID userId, CreateAddressRequest req) {
         User user = loadUser(userId);
 
@@ -58,6 +61,7 @@ public class UserAddressServiceImpl implements UserAddressService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "user_addresses", key = "#userId")
     public List<AddressResponse> getAddresses(UUID userId) {
         User user = loadUser(userId);
         List<Address> addresses = addressRepository.findByUser(user);
@@ -67,6 +71,7 @@ public class UserAddressServiceImpl implements UserAddressService {
     }
 
     @Override
+    @CacheEvict(value = "user_addresses", key = "#userId")
     public AddressResponse updateAddress(UUID userId, UUID addressId, CreateAddressRequest req) {
         Address address = loadAddressOfUser(addressId, userId);
 
@@ -82,12 +87,14 @@ public class UserAddressServiceImpl implements UserAddressService {
     }
 
     @Override
+    @CacheEvict(value = "user_addresses", key = "#userId")
     public void deleteAddress(UUID userId, UUID addressId) {
         Address address = loadAddressOfUser(addressId, userId);
         addressRepository.delete(address);
     }
 
     @Override
+    @CacheEvict(value = "user_addresses", key = "#userId")
     public AddressResponse setDefaultAddress(UUID userId, UUID addressId) {
         Address address = loadAddressOfUser(addressId, userId);
         addressRepository.clearDefaultForUser(userId);
