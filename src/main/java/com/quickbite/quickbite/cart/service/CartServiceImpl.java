@@ -161,7 +161,7 @@ public class CartServiceImpl implements CartService {
      * If expired, automatically deletes the stale cart from the database.
      */
     private Optional<Cart> findActiveCart(User customer) {
-        return cartRepository.findByCustomer(customer).flatMap(cart -> {
+        return cartRepository.findDetailedByCustomer(customer).flatMap(cart -> {
             if (Instant.now().isAfter(cart.getExpiresAt())) {
                 cartRepository.delete(cart);
                 return Optional.empty();

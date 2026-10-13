@@ -15,9 +15,9 @@ import java.util.UUID;
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
 
     /**
-     * Cursor-based fetch of notifications for a recipient.
+     * Cursor-based fetch of notifications for a recipient in descending order (newest first).
      *
-     * Fetches at most {@code limit} items where {@code id > cursor} (or all items
+     * Fetches at most {@code limit} items where {@code id < cursor} (or all items
      * when {@code cursor} is {@code null} — first page).
      *
      * Callers should pass {@code Limit.of(requestedSize + 1)} to enable the
@@ -26,16 +26,15 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
      * The {@code :unreadOnly} flag filters to unread-only when {@code true};
      * when {@code false} all notifications are returned.
      *
-     * UUIDv7 IDs are time-ordered, so {@code ORDER BY n.id ASC} is also
-     * chronological — newest-first display is handled on the client.
+     * UUIDv7 IDs are time-ordered, so {@code ORDER BY n.id DESC} provides newest-first ordering.
      */
-    List<Notification> findByRecipientIdAndIsReadFalseOrderByIdAsc(UUID recipientId, Limit limit);
+    List<Notification> findByRecipientIdAndIsReadFalseOrderByIdDesc(UUID recipientId, Limit limit);
 
-    List<Notification> findByRecipientIdAndIsReadFalseAndIdGreaterThanOrderByIdAsc(UUID recipientId, UUID cursor, Limit limit);
+    List<Notification> findByRecipientIdAndIsReadFalseAndIdLessThanOrderByIdDesc(UUID recipientId, UUID cursor, Limit limit);
 
-    List<Notification> findByRecipientIdOrderByIdAsc(UUID recipientId, Limit limit);
+    List<Notification> findByRecipientIdOrderByIdDesc(UUID recipientId, Limit limit);
 
-    List<Notification> findByRecipientIdAndIdGreaterThanOrderByIdAsc(UUID recipientId, UUID cursor, Limit limit);
+    List<Notification> findByRecipientIdAndIdLessThanOrderByIdDesc(UUID recipientId, UUID cursor, Limit limit);
 
     default List<Notification> findWithCursor(
             UUID recipientId,
@@ -45,12 +44,12 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     ) {
         if (unreadOnly) {
             return cursor == null
-                    ? findByRecipientIdAndIsReadFalseOrderByIdAsc(recipientId, limit)
-                    : findByRecipientIdAndIsReadFalseAndIdGreaterThanOrderByIdAsc(recipientId, cursor, limit);
+                    ? findByRecipientIdAndIsReadFalseOrderByIdDesc(recipientId, limit)
+                    : findByRecipientIdAndIsReadFalseAndIdLessThanOrderByIdDesc(recipientId, cursor, limit);
         } else {
             return cursor == null
-                    ? findByRecipientIdOrderByIdAsc(recipientId, limit)
-                    : findByRecipientIdAndIdGreaterThanOrderByIdAsc(recipientId, cursor, limit);
+                    ? findByRecipientIdOrderByIdDesc(recipientId, limit)
+                    : findByRecipientIdAndIdLessThanOrderByIdDesc(recipientId, cursor, limit);
         }
     }
 

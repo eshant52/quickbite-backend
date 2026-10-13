@@ -5,6 +5,7 @@ import com.quickbite.quickbite.order.model.OrderStatus;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import org.springframework.data.domain.Limit;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -138,7 +139,13 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     Optional<Order> findByIdAndCustomerId(UUID id, UUID customerId);
 
+    @EntityGraph(attributePaths = {"restaurant", "deliveryAgent", "deliveryAgent.user", "items"})
+    Optional<Order> findDetailedByIdAndCustomerId(UUID id, UUID customerId);
+
     Optional<Order> findByIdAndRestaurantId(UUID id, UUID restaurantId);
+
+    @EntityGraph(attributePaths = {"restaurant", "deliveryAgent", "deliveryAgent.user", "items"})
+    Optional<Order> findDetailedByIdAndRestaurantId(UUID id, UUID restaurantId);
 
     @Query("""
             SELECT o.id FROM Order o

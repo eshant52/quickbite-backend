@@ -176,8 +176,7 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     @Override
     @Transactional(readOnly = true)
     public OrderResponse getMyOrder(UUID customerId, UUID orderId) {
-        User customer = loadUser(customerId);
-        Order order = orderRepository.findByIdAndCustomerId(orderId, customer.getId())
+        Order order = orderRepository.findDetailedByIdAndCustomerId(orderId, customerId)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         return OrderResponse.from(order);
     }
@@ -235,7 +234,11 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     @Override
     @Transactional(readOnly = true)
     public OrderResponse getRestaurantOrder(UUID orderId, UUID restaurantId, UUID ownerId) {
-        return OrderResponse.from(loadRestaurantOrder(orderId, restaurantId, ownerId));
+        User owner = loadUser(ownerId);
+        Restaurant restaurant = loadOwnedRestaurant(restaurantId, owner);
+        Order order = orderRepository.findDetailedByIdAndRestaurantId(orderId, restaurant.getId())
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+        return OrderResponse.from(order);
     }
 
     @Override

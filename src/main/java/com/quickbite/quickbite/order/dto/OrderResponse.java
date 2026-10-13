@@ -29,9 +29,15 @@ public record OrderResponse(
         Instant restaurantAcceptanceDeadline,
         AssignedDeliveryAgentResponse deliveryAgent,
         List<OrderStatusHistoryDto> statusHistory,
-        /** Road-network distance in metres from restaurant to customer. */
+
+        /*
+         * Road-network distance in metres from restaurant to customer.
+         */
         Double deliveryDistanceMeters,
-        /** Estimated driving seconds from restaurant to customer. */
+
+        /*
+         * Estimated driving seconds from restaurant to customer.
+         */
         Long estimatedDeliverySeconds,
         Instant createdAt
 ) {

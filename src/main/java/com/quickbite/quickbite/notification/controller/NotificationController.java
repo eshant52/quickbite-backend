@@ -43,11 +43,11 @@ public class NotificationController {
     /**
      * GET /api/v1/notifications?unread=false&cursor=&lt;uuid&gt;&size=20
      * <p>
-     * Returns a cursor page of the caller's notifications ordered by creation time (oldest first
-     * within a page — use {@code nextCursor} to walk forward in time).
+     * Returns a cursor page of the caller's notifications ordered by creation time (newest first
+     * within a page — use {@code nextCursor} to walk backward in time to older notifications).
      *
      * @param unreadOnly If {@code true}, only unread notifications are returned.
-     * @param cursor     Exclusive lower-bound UUIDv7 cursor from the previous response.
+     * @param cursor     Exclusive upper-bound UUIDv7 cursor from the previous response.
      *                   Omit (or pass {@code null}) for the first page.
      * @param size       Page size. Clamped to [1, 100]. Defaults to 20.
      */
