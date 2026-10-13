@@ -3,15 +3,19 @@ package com.quickbite.quickbite.cart.controller;
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.cart.dto.AddCartItemRequest;
 import com.quickbite.quickbite.cart.dto.CartResponse;
+import com.quickbite.quickbite.cart.dto.CheckoutPreviewResponse;
 import com.quickbite.quickbite.cart.dto.UpdateCartItemRequest;
+import com.quickbite.quickbite.cart.service.CartCheckoutService;
 import com.quickbite.quickbite.cart.service.CartService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @RestController
@@ -19,16 +23,30 @@ import java.util.UUID;
 @PreAuthorize("hasRole('CUSTOMER')")
 public class CartController {
     private final CartService cartService;
+    private final CartCheckoutService cartCheckoutService;
     private final AuthenticatedSessionResolver authenticatedSessionResolver;
 
-    public CartController(CartService cartService, AuthenticatedSessionResolver authenticatedSessionResolver) {
+    public CartController(
+            CartService cartService,
+            CartCheckoutService cartCheckoutService,
+            AuthenticatedSessionResolver authenticatedSessionResolver) {
         this.cartService = cartService;
+        this.cartCheckoutService = cartCheckoutService;
         this.authenticatedSessionResolver = authenticatedSessionResolver;
     }
 
     @GetMapping
     public ResponseEntity<CartResponse> getCart(@AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(cartService.getCart(authenticatedSessionResolver.userIdFromJwt(jwt)));
+    }
+
+    @GetMapping("/checkout-preview")
+    public ResponseEntity<CheckoutPreviewResponse> getCheckoutPreview(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam UUID addressId,
+            @RequestParam(required = false) @DecimalMin("0.00") BigDecimal tipAmount) {
+        return ResponseEntity.ok(cartCheckoutService.getCheckoutPreview(
+                authenticatedSessionResolver.userIdFromJwt(jwt), addressId, tipAmount));
     }
 
     @PostMapping("/items")

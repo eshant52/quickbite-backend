@@ -19,6 +19,7 @@ import com.quickbite.quickbite.menu.exception.MenuItemNotFoundException;
 import com.quickbite.quickbite.order.exception.OrderExpiredException;
 import com.quickbite.quickbite.order.exception.OrderNotFoundException;
 import com.quickbite.quickbite.order.exception.OrderStateException;
+import com.quickbite.quickbite.order.exception.PriceChangedException;
 import com.quickbite.quickbite.payment.exception.PaymentNotFoundException;
 import com.quickbite.quickbite.payment.exception.PaymentVerificationException;
 import com.quickbite.quickbite.restaurant.exception.RestaurantNotFoundException;
@@ -387,6 +388,17 @@ public class GlobalExceptionHandler {
         ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE);
         problemDetail.setTitle("Routing Service Unavailable");
         problemDetail.setDetail(ex.getMessage() != null ? ex.getMessage() : "Routing provider service is currently unavailable.");
+        return problemDetail;
+    }
+
+    @ExceptionHandler(PriceChangedException.class)
+    public ProblemDetail handlePriceChangedException(PriceChangedException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problemDetail.setTitle("Price Changed");
+        problemDetail.setDetail(ex.getMessage());
+        problemDetail.setProperty("expectedTotal", ex.getExpectedTotal());
+        problemDetail.setProperty("currentTotal", ex.getCurrentTotal());
+        problemDetail.setProperty("priceBreakdown", ex.getCurrentBreakdown());
         return problemDetail;
     }
 

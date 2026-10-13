@@ -10,6 +10,10 @@ import java.util.UUID;
 public record PlaceOrderRequest(
         @NotNull UUID addressId,
         @NotNull PaymentMethod paymentMethod,
-        @DecimalMin("0.00") BigDecimal tipAmount
+        @DecimalMin("0.00") BigDecimal tipAmount,
+        @DecimalMin("0.00") BigDecimal expectedTotal
 ) {
+    public PlaceOrderRequest(UUID addressId, PaymentMethod paymentMethod, BigDecimal tipAmount) {
+        this(addressId, paymentMethod, tipAmount, null);
+    }
 }

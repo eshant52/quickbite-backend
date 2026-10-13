@@ -161,4 +161,25 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getTitle()).isEqualTo("Invalid Argument");
         assertThat(problem.getDetail()).isEqualTo("Invalid argument");
     }
+
+    @Test
+    @DisplayName("handlePriceChangedException returns 409 Conflict with drift details")
+    void testPriceChangedException() {
+        com.quickbite.quickbite.common.dto.PriceBreakdown breakdown =
+                new com.quickbite.quickbite.common.dto.PriceBreakdown(
+                        java.math.BigDecimal.valueOf(100), java.math.BigDecimal.ZERO, java.math.BigDecimal.valueOf(20),
+                        java.math.BigDecimal.valueOf(5), java.math.BigDecimal.valueOf(5), java.math.BigDecimal.ZERO,
+                        java.math.BigDecimal.valueOf(130), 1000.0, 300L);
+        com.quickbite.quickbite.order.exception.PriceChangedException ex =
+                new com.quickbite.quickbite.order.exception.PriceChangedException(
+                        java.math.BigDecimal.valueOf(130), java.math.BigDecimal.valueOf(120), breakdown);
+
+        ProblemDetail problem = exceptionHandler.handlePriceChangedException(ex);
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(problem.getTitle()).isEqualTo("Price Changed");
+        assertThat(problem.getProperties()).containsEntry("expectedTotal", java.math.BigDecimal.valueOf(120));
+        assertThat(problem.getProperties()).containsEntry("currentTotal", java.math.BigDecimal.valueOf(130));
+        assertThat(problem.getProperties()).containsEntry("priceBreakdown", breakdown);
+    }
 }
