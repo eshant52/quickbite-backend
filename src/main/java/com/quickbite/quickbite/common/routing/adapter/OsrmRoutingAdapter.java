@@ -36,7 +36,7 @@ public class OsrmRoutingAdapter extends AbstractRoutingAdapter {
     private final String baseUrl;
 
     public OsrmRoutingAdapter(RoutingProperties properties) {
-        this.baseUrl = properties.osrmBaseUrl() != null ? properties.osrmBaseUrl() : "http://localhost:5000";
+        this.baseUrl = properties.osrmBaseUrl() != null ? properties.osrmBaseUrl() : "http://localhost:5001";
         this.restClient = restClient(this.baseUrl, properties.timeout());
     }
 

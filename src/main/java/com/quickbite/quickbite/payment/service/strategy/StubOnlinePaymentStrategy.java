@@ -30,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
  *       that can be used for local development without real gateway credentials.</li>
  * </ol>
  */
-@Profile("dev")
+@Profile("dev & !razorpay")
 @Component
 public class StubOnlinePaymentStrategy implements PaymentStrategy {
 

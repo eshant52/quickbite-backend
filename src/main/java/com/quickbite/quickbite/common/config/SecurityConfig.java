@@ -52,7 +52,8 @@ public class SecurityConfig {
                                 "/api/v1/webhooks/**",
                                 "/actuator/health",
                                 "/actuator/health/**",
-                                "/actuator/info"
+                                "/actuator/info",
+                                "/checkout.html"
                         ).permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -84,8 +85,9 @@ public class SecurityConfig {
                 .headers(headers -> headers
                         .contentTypeOptions(Customizer.withDefaults())
                         .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
-                        .xssProtection(xss -> xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
-                        .contentSecurityPolicy(csp -> csp.policyDirectives("script-src 'self'")))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com; frame-src 'self' https://api.razorpay.com; connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline';"
+                        )))
                 .build();
     }
 

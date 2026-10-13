@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuickBite - Razorpay UPI Checkout</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    :root {
+      --primary: #e23744;
+      --primary-dark: #c41e2a;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --text-main: #1c1c1c;
+      --text-muted: #686b78;
+      --border: #e9e9eb;
+      --success: #28a745;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 32px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 520px;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--primary);
+      letter-spacing: -0.5px;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      background: #ffebec;
+      color: var(--primary);
+      padding: 4px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .restaurant-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .restaurant-loc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .item-qty {
+      font-weight: 700;
+      color: var(--primary);
+      margin-right: 6px;
+    }
+
+    .item-name {
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    .bill-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .bill-row.total {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-top: 12px;
+    }
+
+    .btn-pay {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.2s ease, transform 0.1s ease;
+      box-shadow: 0 4px 14px rgba(226, 55, 68, 0.35);
+    }
+
+    .btn-pay:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-pay:active {
+      transform: scale(0.98);
+    }
+
+    .btn-pay:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .status-box {
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+      font-size: 13px;
+      line-height: 1.5;
+      display: none;
+    }
+
+    .status-box.info {
+      background: #eef7ff;
+      border: 1px solid #c7e2fe;
+      color: #0b5cad;
+      display: block;
+    }
+
+    .status-box.success {
+      background: #eafaf1;
+      border: 1px solid #b7ebd0;
+      color: #155724;
+      display: block;
+    }
+
+    .status-box.error {
+      background: #feeeee;
+      border: 1px solid #fad2d2;
+      color: #a71d2a;
+      display: block;
+    }
+
+    .log-box {
+      margin-top: 16px;
+      background: #1e1e24;
+      color: #b3b9c5;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-family: ui-monospace, Menlo, Monaco, monospace;
+      font-size: 11px;
+      max-height: 180px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    .upi-icons {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .tag {
+      background: #f1f2f6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 10px;
+      color: #4b4f56;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <div class="logo">⚡ QuickBite</div>
+      <div class="badge">Razorpay Test Gateway</div>
+    </div>
+
+    <!-- Order Summary Card -->
+    <div class="card">
+      <div class="restaurant-title">Haldiram's Planet Food - Dharampeth</div>
+      <div class="restaurant-loc">West High Court Road, Dharampeth, Nagpur</div>
+
+      <div class="item-row">
+        <div>
+          <span class="item-qty">2 ×</span>
+          <span class="item-name">Shahi Gulab Jamun (2 Pcs)</span>
+        </div>
+        <div style="font-weight: 600;">₹150.00</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="bill-row">
+        <span>Item Total</span>
+        <span>₹150.00</span>
+      </div>
+      <div class="bill-row">
+        <span>Delivery Fee (0.35 km)</span>
+        <span>₹20.00</span>
+      </div>
+      <div class="bill-row">
+        <span>Platform Fee</span>
+        <span>₹5.00</span>
+      </div>
+      <div class="bill-row">
+        <span>Taxes (5% GST)</span>
+        <span>₹7.50</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="bill-row total">
+        <span>To Pay</span>
+        <span>₹182.50</span>
+      </div>
+
+      <div class="upi-icons">
+        <span>Supported UPI:</span>
+        <span class="tag">GPay</span>
+        <span class="tag">PhonePe</span>
+        <span class="tag">Paytm</span>
+        <span class="tag">Scan QR</span>
+      </div>
+    </div>
+
+    <!-- Action Section -->
+    <button id="payBtn" class="btn-pay" onclick="handleCheckout()">
+      <span>Pay ₹182.50 with Razorpay</span>
+    </button>
+
+    <div id="statusBox" class="status-box"></div>
+    <div id="logBox" class="log-box" style="display: none;"></div>
+  </div>
+
+  <script>
+    const BASE_URL = window.location.origin;
+    const ADDRESS_ID = "01a12aaf-4f26-7df3-a6f2-45ffec06dbfb";
+    const MENU_ITEM_ID = "01a12644-4cf3-79a9-9908-278c7018020f";
+    const CUSTOMER_EMAIL = "eshantsonune52@gmail.com";
+    const CUSTOMER_PASSWORD = "Pass@123";
+
+    const payBtn = document.getElementById("payBtn");
+    const statusBox = document.getElementById("statusBox");
+    const logBox = document.getElementById("logBox");
+
+    function log(msg) {
+      logBox.style.display = "block";
+      logBox.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function setStatus(type, msg) {
+      statusBox.className = `status-box ${type}`;
+      statusBox.innerHTML = msg;
+    }
+
+    async function loginCustomer() {
+      log("Authenticating customer: " + CUSTOMER_EMAIL);
+      const headers = {
+        "Content-Type": "application/json",
+        "X-Client-Type": "web_browser"
+      };
+
+      const resp = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({ email: CUSTOMER_EMAIL, password: CUSTOMER_PASSWORD })
+      });
+
+      if (resp.status === 200) {
+        const data = await resp.json();
+        return data.accessToken;
+      }
+
+      if (resp.status === 409) {
+        log("Session limit reached (3). Evicting previous session...");
+        const errData = await resp.json();
+        const chToken = errData.challengeToken;
+
+        // List sessions & revoke one
+        const sessionsResp = await fetch(`${BASE_URL}/api/v1/auth/sessions`, {
+          headers: { "Authorization": `Bearer ${chToken}`, "X-Client-Type": "web_browser" }
+        });
+        if (sessionsResp.ok) {
+          const sessions = await sessionsResp.json();
+          if (sessions.length > 0) {
+            const sid = sessions[0].id || sessions[0].sessionId;
+            await fetch(`${BASE_URL}/api/v1/auth/sessions/${sid}`, {
+              method: "DELETE",
+              headers: { "Authorization": `Bearer ${chToken}`, "X-Client-Type": "web_browser" }
+            });
+            log("Evicted session: " + sid);
+          }
+        }
+
+        // Retry login
+        const retryResp = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+          method: "POST",
+          headers: headers,
+          body: JSON.stringify({ email: CUSTOMER_EMAIL, password: CUSTOMER_PASSWORD })
+        });
+        const retryData = await retryResp.json();
+        return retryData.accessToken;
+      }
+
+      throw new Error("Login failed with status " + resp.status);
+    }
+
+    async function handleCheckout() {
+      try {
+        payBtn.disabled = true;
+        payBtn.innerHTML = "<span>Setting up order...</span>";
+        setStatus("info", "Communicating with QuickBite & Razorpay...");
+
+        // 1. Authenticate
+        const token = await loginCustomer();
+        log("Authenticated successfully.");
+
+        const authHeaders = {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        };
+
+        // 2. Prepare Cart
+        log("Adding 2x Gulab Jamun to cart...");
+        await fetch(`${BASE_URL}/api/v1/customer/cart`, { method: "DELETE", headers: authHeaders });
+        await fetch(`${BASE_URL}/api/v1/customer/cart/items`, {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ menuItemId: MENU_ITEM_ID, quantity: 2 })
+        });
+
+        // 3. Place Order with paymentMethod: UPI
+        log("Creating order with paymentMethod: UPI...");
+        const orderResp = await fetch(`${BASE_URL}/api/v1/customer/orders`, {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({
+            addressId: ADDRESS_ID,
+            paymentMethod: "UPI",
+            tipAmount: 0.00
+          })
+        });
+
+        if (!orderResp.ok) {
+          const err = await orderResp.text();
+          throw new Error("Order creation failed: " + err);
+        }
+
+        const paymentResult = await orderResp.json();
+        log(`✓ Razorpay Order Created! ID: ${paymentResult.gatewayOrderId}`);
+        log(`Publishable Key: ${paymentResult.keyId}`);
+
+        setStatus("info", `<strong>Razorpay Modal Loading...</strong><br>Razorpay Order: <code>${paymentResult.gatewayOrderId}</code>`);
+
+        // 4. Launch Razorpay Checkout Modal
+        const options = {
+          key: paymentResult.keyId,
+          amount: Math.round(paymentResult.amount * 100),
+          currency: "INR",
+          name: "QuickBite",
+          description: "Order #" + paymentResult.orderId.substring(0, 8),
+          image: "https://cdn-icons-png.flaticon.com/512/3075/3075977.png",
+          order_id: paymentResult.gatewayOrderId,
+          prefill: {
+            name: "Eshant Sonune",
+            email: CUSTOMER_EMAIL,
+            contact: "9876543210"
+          },
+          theme: {
+            color: "#e23744"
+          },
+          handler: async function (response) {
+            log("Razorpay Checkout Succeeded!");
+            log("Payment ID: " + response.razorpay_payment_id);
+            log("Signature: " + response.razorpay_signature.substring(0, 16) + "...");
+
+            setStatus("info", "Verifying payment cryptographic signature with QuickBite backend...");
+
+            // 5. Verify Signature with Backend
+            const verifyResp = await fetch(`${BASE_URL}/api/v1/customer/payments/verify`, {
+              method: "POST",
+              headers: authHeaders,
+              body: JSON.stringify({
+                gatewayOrderId: response.razorpay_order_id,
+                gatewayPaymentId: response.razorpay_payment_id,
+                gatewaySignature: response.razorpay_signature
+              })
+            });
+
+            if (verifyResp.ok) {
+              log("✓ Signature Verified by QuickBite Backend!");
+              setStatus("success", `
+                <strong>🎉 Payment Verified & Successful!</strong><br>
+                Order ID: <code>${paymentResult.orderId}</code><br>
+                Payment ID: <code>${response.razorpay_payment_id}</code><br>
+                Order status transitioned to <strong>PLACED</strong>. Restaurant & Delivery dispatch notified!
+              `);
+              payBtn.innerHTML = "<span>✓ Order Placed</span>";
+            } else {
+              const err = await verifyResp.text();
+              setStatus("error", "Verification failed: " + err);
+              payBtn.disabled = false;
+              payBtn.innerHTML = "<span>Retry Payment</span>";
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              log("Razorpay modal closed by user.");
+              payBtn.disabled = false;
+              payBtn.innerHTML = "<span>Pay ₹182.50 with Razorpay</span>";
+            }
+          }
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.on('payment.failed', function (response) {
+          log("Payment failed: " + response.error.description);
+          setStatus("error", "Payment failed: " + response.error.description);
+          payBtn.disabled = false;
+          payBtn.innerHTML = "<span>Retry Payment</span>";
+        });
+
+        rzp.open();
+
+      } catch (err) {
+        console.error(err);
+        log("Error: " + err.message);
+        setStatus("error", err.message);
+        payBtn.disabled = false;
+        payBtn.innerHTML = "<span>Pay ₹182.50 with Razorpay</span>";
+      }
+    }
+  </script>
+</body>
+</html>

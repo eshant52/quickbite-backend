@@ -64,6 +64,7 @@ public class Payment extends Base {
      * or any other relevant information.
      * It is used for debugging and auditing purposes, and can be queried directly in PostgreSQL.
      */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String gatewayMetaData;
 

@@ -2,7 +2,6 @@ package com.quickbite.quickbite.payment.service.strategy;
 
 import com.quickbite.quickbite.common.utils.TransactionIdGenerator;
 import com.quickbite.quickbite.order.model.Order;
-import com.quickbite.quickbite.order.service.OrderLifecycleService;
 import com.quickbite.quickbite.payment.dto.GatewayOrder;
 import com.quickbite.quickbite.payment.dto.OnlinePaymentResult;
 import com.quickbite.quickbite.payment.dto.PaymentResult;
@@ -34,7 +33,7 @@ import org.springframework.stereotype.Component;
  * {@link PaymentGateway} — today {@code RazorpayGateway},
  * tomorrow {@code StripeGateway} — with zero changes here.
  */
-@Profile("!dev")
+@Profile({"!dev", "razorpay"})
 @Component
 public class OnlinePaymentStrategy implements PaymentStrategy {
 
@@ -45,7 +44,7 @@ public class OnlinePaymentStrategy implements PaymentStrategy {
     public OnlinePaymentStrategy(
             TransactionIdGenerator transactionIdGenerator,
             PaymentGateway paymentGateway,
-            PaymentLifecycleService paymentLifecycle, OrderLifecycleService orderLifecycleService) {
+            PaymentLifecycleService paymentLifecycle) {
         this.transactionIdGenerator = transactionIdGenerator;
         this.paymentGateway = paymentGateway;
         this.paymentLifecycle = paymentLifecycle;
