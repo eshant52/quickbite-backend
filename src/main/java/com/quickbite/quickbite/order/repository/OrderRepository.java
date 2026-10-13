@@ -24,29 +24,13 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     Optional<Order> findByIdForUpdate(@Param("id") UUID id);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")})
     @Query("""
-            SELECT o FROM Order o
-            WHERE o.currentStatus = :status
-              AND o.createdAt < :cutoff
-            ORDER BY o.createdAt ASC
-            """)
-    List<Order> findByCurrentStatusAndCreatedAtBeforeForUpdateSkipLocked(
-            @Param("status") OrderStatus status,
-            @Param("cutoff") Instant cutoff,
-            Limit limit
-    );
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")})
-    @Query("""
-            SELECT o FROM Order o
+            SELECT o.id FROM Order o
             WHERE o.currentStatus IN :statuses
               AND o.createdAt < :cutoff
             ORDER BY o.createdAt ASC
             """)
-    List<Order> findByCurrentStatusInAndCreatedAtBeforeForUpdateSkipLocked(
+    List<UUID> findStaleOrderIds(
             @Param("statuses") List<OrderStatus> statuses,
             @Param("cutoff") Instant cutoff,
             Limit limit
@@ -156,15 +140,13 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     Optional<Order> findByIdAndRestaurantId(UUID id, UUID restaurantId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")})
     @Query("""
-            SELECT o FROM Order o
+            SELECT o.id FROM Order o
             WHERE o.currentStatus = :status
               AND o.restaurantAcceptanceDeadline < :now
             ORDER BY o.restaurantAcceptanceDeadline ASC
             """)
-    List<Order> findByCurrentStatusAndRestaurantAcceptanceDeadlineBeforeForUpdateSkipLocked(
+    List<UUID> findUnacceptedOrderIds(
             @Param("status") OrderStatus status,
             @Param("now") Instant now,
             Limit limit

@@ -58,12 +58,9 @@ public interface OrderLifecycleService {
     void abandonOrder(Order order, String reason);
 
     /**
-     * Acquires up to {@code batchSize} stale {@code AWAITING_PAYMENT} orders created before {@code cutoff}
-     * using {@code FOR UPDATE SKIP LOCKED} in an isolated transaction, marks them {@code ABANDONED},
-     * cancels pending payments, and publishes lifecycle events.
-     *
-     * <p>Because {@code SKIP LOCKED} is used, multiple pods can execute this method concurrently
-     * without stepping on each other or waiting for row locks.
+     * Fetches up to {@code batchSize} stale order IDs in {@code AWAITING_PAYMENT} or {@code PAYMENT_FAILED}
+     * status created before {@code cutoff}, and delegates each to {@link #abandonOrderById(UUID, String)}
+     * in an isolated transaction.
      *
      * @param cutoff    the maximum creation timestamp for stale orders
      * @param batchSize the maximum number of orders to process in this batch
@@ -149,10 +146,8 @@ public interface OrderLifecycleService {
     boolean isTerminal(OrderStatus status);
 
     /**
-     * Acquires up to {@code batchSize} stale {@code PLACED} orders past their restaurant acceptance deadline
-     * using {@code FOR UPDATE SKIP LOCKED}, marks them {@code CANCELLED} with reason
-     * {@code RESTAURANT_UNRESPONSIVE}, cancels pending payments or refunds successful online payments,
-     * and publishes cancellation events.
+     * Fetches up to {@code batchSize} stale {@code PLACED} order IDs past their restaurant acceptance deadline,
+     * and delegates each to {@link #cancelUnacceptedOrder(UUID)} in an isolated transaction.
      *
      * @param now       current timestamp
      * @param batchSize maximum number of orders to process
@@ -161,11 +156,11 @@ public interface OrderLifecycleService {
     int processRestaurantAcceptanceTimeoutBatch(Instant now, int batchSize);
 
     /**
-     * Cancels a single unaccepted PLACED order in its own isolated transaction.
+     * Cancels a single unaccepted PLACED order in an isolated transaction.
      *
-     * @param order the unaccepted order to cancel
+     * @param orderId the ID of the unaccepted order to cancel
      */
-    void cancelUnacceptedOrder(Order order);
+    void cancelUnacceptedOrder(UUID orderId);
 
     /**
      * Cancels an order when proactive delivery dispatch fails to assign an agent within the max window.

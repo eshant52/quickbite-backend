@@ -7,10 +7,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -19,11 +22,21 @@ class RestaurantAcceptanceTimeoutSchedulerTest {
     @Mock
     private OrderLifecycleService orderLifecycleService;
 
+    @Mock
+    private RedissonClient redissonClient;
+
+    @Mock
+    private RLock rLock;
+
     private RestaurantAcceptanceTimeoutScheduler scheduler;
 
     @BeforeEach
-    void setUp() {
-        scheduler = new RestaurantAcceptanceTimeoutScheduler(orderLifecycleService);
+    void setUp() throws Exception {
+        lenient().when(redissonClient.getLock(anyString())).thenReturn(rLock);
+        lenient().when(rLock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
+        lenient().when(rLock.isHeldByCurrentThread()).thenReturn(true);
+
+        scheduler = new RestaurantAcceptanceTimeoutScheduler(orderLifecycleService, redissonClient);
     }
 
     @Test
@@ -36,6 +49,7 @@ class RestaurantAcceptanceTimeoutSchedulerTest {
         scheduler.sweepUnacceptedOrders();
 
         verify(orderLifecycleService, times(2)).processRestaurantAcceptanceTimeoutBatch(any(Instant.class), eq(50));
+        verify(rLock).unlock();
     }
 
     @Test
@@ -47,10 +61,22 @@ class RestaurantAcceptanceTimeoutSchedulerTest {
         scheduler.sweepUnacceptedOrders();
 
         verify(orderLifecycleService, times(1)).processRestaurantAcceptanceTimeoutBatch(any(Instant.class), eq(50));
+        verify(rLock).unlock();
     }
 
     @Test
-    @DisplayName("sweepUnacceptedOrders handles exceptions gracefully without rethrowing")
+    @DisplayName("sweepUnacceptedOrders skips processing when distributed lock is not acquired")
+    void sweepUnacceptedOrders_whenLockNotAcquired_skips() throws Exception {
+        when(rLock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(false);
+
+        scheduler.sweepUnacceptedOrders();
+
+        verifyNoInteractions(orderLifecycleService);
+        verify(rLock, never()).unlock();
+    }
+
+    @Test
+    @DisplayName("sweepUnacceptedOrders handles exceptions gracefully and releases lock")
     void sweepUnacceptedOrders_handlesException() {
         when(orderLifecycleService.processRestaurantAcceptanceTimeoutBatch(any(Instant.class), eq(50)))
                 .thenThrow(new RuntimeException("DB error"));
@@ -59,5 +85,6 @@ class RestaurantAcceptanceTimeoutSchedulerTest {
         scheduler.sweepUnacceptedOrders();
 
         verify(orderLifecycleService, times(1)).processRestaurantAcceptanceTimeoutBatch(any(Instant.class), eq(50));
+        verify(rLock).unlock();
     }
 }

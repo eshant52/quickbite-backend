@@ -157,34 +157,35 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int processAbandonmentBatch(Instant cutoff, int batchSize) {
-        List<Order> staleOrders = orderRepository.findByCurrentStatusInAndCreatedAtBeforeForUpdateSkipLocked(
+        List<UUID> staleOrderIds = orderRepository.findStaleOrderIds(
                 List.of(OrderStatus.AWAITING_PAYMENT, OrderStatus.PAYMENT_FAILED),
                 cutoff,
                 Limit.of(batchSize)
         );
 
-        if (staleOrders.isEmpty()) {
+        if (staleOrderIds.isEmpty()) {
             return 0;
         }
 
-        for (Order order : staleOrders) {
+        for (UUID orderId : staleOrderIds) {
             try {
-                abandonOrder(order, "Payment window expired (auto-abandoned)");
+                self().abandonOrderById(orderId, "Payment window expired (auto-abandoned)");
             } catch (Exception e) {
-                log.error("Failed to abandon order {}: {}", order.getId(), e.getMessage(), e);
+                log.error("Failed to abandon order {}: {}", orderId, e.getMessage(), e);
             }
         }
 
-        return staleOrders.size();
+        return staleOrderIds.size();
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void abandonOrderById(UUID orderId, String reason) {
-        Order order = orderRepository.findByIdForUpdate(orderId)
-                .orElseThrow(() -> new OrderNotFoundException("Order not found: " + orderId));
+        Order order = orderRepository.findByIdForUpdate(orderId).orElse(null);
+        if (order == null) {
+            return;
+        }
         // Re-check terminal state under lock in case another TX committed between the
         // TTL check in prepareOrderForRetry and this call.
         abandonOrder(order, reason);
@@ -235,39 +236,39 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int processRestaurantAcceptanceTimeoutBatch(Instant now, int batchSize) {
-        List<Order> unacceptedOrders = orderRepository
-                .findByCurrentStatusAndRestaurantAcceptanceDeadlineBeforeForUpdateSkipLocked(
+        List<UUID> unacceptedOrderIds = orderRepository.findUnacceptedOrderIds(
                 OrderStatus.PLACED,
                 now,
                 Limit.of(batchSize)
         );
 
-        if (unacceptedOrders.isEmpty()) {
+        if (unacceptedOrderIds.isEmpty()) {
             return 0;
         }
 
-        for (Order order : unacceptedOrders) {
+        for (UUID orderId : unacceptedOrderIds) {
             try {
-                self().cancelUnacceptedOrder(order);
+                self().cancelUnacceptedOrder(orderId);
             } catch (Exception e) {
-                log.error("Failed to cancel unaccepted order {}: {}", order.getId(), e.getMessage(), e);
+                log.error("Failed to cancel unaccepted order {}: {}", orderId, e.getMessage(), e);
             }
         }
 
-        return unacceptedOrders.size();
+        return unacceptedOrderIds.size();
     }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void cancelUnacceptedOrder(Order order) {
-        if (order.getCurrentStatus() != OrderStatus.PLACED) {
+    public void cancelUnacceptedOrder(UUID orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId).orElse(null);
+        if (order == null || order.getCurrentStatus() != OrderStatus.PLACED) {
             return;
         }
 
         order.setCurrentStatus(OrderStatus.CANCELLED);
         order.setCancellationReason(OrderCancellationReason.RESTAURANT_UNRESPONSIVE);
+        order.setRestaurantAcceptanceDeadline(null);
         Order saved = orderRepository.save(order);
 
         OrderStatusHistory history = new OrderStatusHistory();

@@ -275,6 +275,17 @@ class OrderLifecycleServiceImplTest {
             verify(orderRepository, never()).save(any());
             verify(paymentService, never()).cancelPendingPayments(any(), any());
         }
+
+        @Test
+        @DisplayName("Skips abandonment when order is not found")
+        void abandonOrderById_notFound_skips() {
+            when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.empty());
+
+            lifecycleService.abandonOrderById(orderId, "Payment window expired");
+
+            verify(orderRepository, never()).save(any());
+            verify(paymentService, never()).cancelPendingPayments(any(), any());
+        }
     }
 
     @Nested
@@ -385,23 +396,29 @@ class OrderLifecycleServiceImplTest {
         @DisplayName("Successfully locks and abandons batch of stale AWAITING_PAYMENT and PAYMENT_FAILED orders")
         void processAbandonmentBatch_success() {
             Instant cutoff = Instant.now().minus(15, ChronoUnit.MINUTES);
+            UUID id1 = UUID.randomUUID();
+            UUID id2 = UUID.randomUUID();
+
             Order order1 = new Order();
-            order1.setId(UUID.randomUUID());
+            order1.setId(id1);
             order1.setCustomer(customer);
             order1.setRestaurant(restaurant);
             order1.setCurrentStatus(OrderStatus.AWAITING_PAYMENT);
 
             Order order2 = new Order();
-            order2.setId(UUID.randomUUID());
+            order2.setId(id2);
             order2.setCustomer(customer);
             order2.setRestaurant(restaurant);
             order2.setCurrentStatus(OrderStatus.PAYMENT_FAILED);
 
-            when(orderRepository.findByCurrentStatusInAndCreatedAtBeforeForUpdateSkipLocked(
+            when(orderRepository.findStaleOrderIds(
                     eq(List.of(OrderStatus.AWAITING_PAYMENT, OrderStatus.PAYMENT_FAILED)),
                     eq(cutoff),
                     eq(Limit.of(100))))
-                    .thenReturn(List.of(order1, order2));
+                    .thenReturn(List.of(id1, id2));
+
+            when(orderRepository.findByIdForUpdate(id1)).thenReturn(Optional.of(order1));
+            when(orderRepository.findByIdForUpdate(id2)).thenReturn(Optional.of(order2));
 
             int processed = lifecycleService.processAbandonmentBatch(cutoff, 100);
 
@@ -419,7 +436,7 @@ class OrderLifecycleServiceImplTest {
         @DisplayName("Returns 0 when no stale orders found")
         void processAbandonmentBatch_empty() {
             Instant cutoff = Instant.now().minus(15, ChronoUnit.MINUTES);
-            when(orderRepository.findByCurrentStatusInAndCreatedAtBeforeForUpdateSkipLocked(
+            when(orderRepository.findStaleOrderIds(
                     eq(List.of(OrderStatus.AWAITING_PAYMENT, OrderStatus.PAYMENT_FAILED)),
                     eq(cutoff),
                     eq(Limit.of(100))))
@@ -436,23 +453,29 @@ class OrderLifecycleServiceImplTest {
         @DisplayName("Continues batch processing if one order throws exception")
         void processAbandonmentBatch_partialFailure() {
             Instant cutoff = Instant.now().minus(15, ChronoUnit.MINUTES);
+            UUID id1 = UUID.randomUUID();
+            UUID id2 = UUID.randomUUID();
+
             Order order1 = new Order();
-            order1.setId(UUID.randomUUID());
+            order1.setId(id1);
             order1.setCustomer(customer);
             order1.setRestaurant(restaurant);
             order1.setCurrentStatus(OrderStatus.AWAITING_PAYMENT);
 
             Order order2 = new Order();
-            order2.setId(UUID.randomUUID());
+            order2.setId(id2);
             order2.setCustomer(customer);
             order2.setRestaurant(restaurant);
             order2.setCurrentStatus(OrderStatus.PAYMENT_FAILED);
 
-            when(orderRepository.findByCurrentStatusInAndCreatedAtBeforeForUpdateSkipLocked(
+            when(orderRepository.findStaleOrderIds(
                     eq(List.of(OrderStatus.AWAITING_PAYMENT, OrderStatus.PAYMENT_FAILED)),
                     eq(cutoff),
                     eq(Limit.of(100))))
-                    .thenReturn(List.of(order1, order2));
+                    .thenReturn(List.of(id1, id2));
+
+            when(orderRepository.findByIdForUpdate(id1)).thenReturn(Optional.of(order1));
+            when(orderRepository.findByIdForUpdate(id2)).thenReturn(Optional.of(order2));
 
             when(orderRepository.save(order1)).thenThrow(new RuntimeException("DB error on order 1"));
             when(orderRepository.save(order2)).thenReturn(order2);
@@ -475,9 +498,10 @@ class OrderLifecycleServiceImplTest {
         void processRestaurantAcceptanceTimeoutBatch_success() {
             Instant now = Instant.now();
             order.setCurrentStatus(OrderStatus.PLACED);
-            when(orderRepository.findByCurrentStatusAndRestaurantAcceptanceDeadlineBeforeForUpdateSkipLocked(
+            when(orderRepository.findUnacceptedOrderIds(
                     eq(OrderStatus.PLACED), eq(now), eq(Limit.of(50))))
-                    .thenReturn(List.of(order));
+                    .thenReturn(List.of(orderId));
+            when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
             when(orderRepository.save(order)).thenReturn(order);
 
             int processed = lifecycleService.processRestaurantAcceptanceTimeoutBatch(now, 50);
@@ -485,6 +509,7 @@ class OrderLifecycleServiceImplTest {
             assertThat(processed).isEqualTo(1);
             assertThat(order.getCurrentStatus()).isEqualTo(OrderStatus.CANCELLED);
             assertThat(order.getCancellationReason()).isEqualTo(com.quickbite.quickbite.order.model.OrderCancellationReason.RESTAURANT_UNRESPONSIVE);
+            assertThat(order.getRestaurantAcceptanceDeadline()).isNull();
             verify(paymentService).refundSuccessfulPayment(eq(order.getId()), anyString());
             verify(paymentService).cancelPendingPayments(eq(order.getId()), anyString());
             verify(eventPublisher).publishEvent(any(com.quickbite.quickbite.common.event.order.OrderCancelledEvent.class));
@@ -510,21 +535,26 @@ class OrderLifecycleServiceImplTest {
         @DisplayName("processRestaurantAcceptanceTimeoutBatch continues processing remaining orders when one throws (Fix C4)")
         void processRestaurantAcceptanceTimeoutBatch_continuesOnSingleFailure() {
             Instant now = Instant.now();
+            UUID orderId1 = UUID.randomUUID();
+            UUID orderId2 = UUID.randomUUID();
+
             Order order1 = new Order();
-            order1.setId(UUID.randomUUID());
+            order1.setId(orderId1);
             order1.setCustomer(order.getCustomer());
             order1.setRestaurant(order.getRestaurant());
             order1.setCurrentStatus(OrderStatus.PLACED);
 
             Order order2 = new Order();
-            order2.setId(UUID.randomUUID());
+            order2.setId(orderId2);
             order2.setCustomer(order.getCustomer());
             order2.setRestaurant(order.getRestaurant());
             order2.setCurrentStatus(OrderStatus.PLACED);
 
-            when(orderRepository.findByCurrentStatusAndRestaurantAcceptanceDeadlineBeforeForUpdateSkipLocked(
+            when(orderRepository.findUnacceptedOrderIds(
                     eq(OrderStatus.PLACED), eq(now), eq(Limit.of(50))))
-                    .thenReturn(List.of(order1, order2));
+                    .thenReturn(List.of(orderId1, orderId2));
+            when(orderRepository.findByIdForUpdate(orderId1)).thenReturn(Optional.of(order1));
+            when(orderRepository.findByIdForUpdate(orderId2)).thenReturn(Optional.of(order2));
             when(orderRepository.save(order1)).thenThrow(new RuntimeException("DB error on order1"));
             when(orderRepository.save(order2)).thenReturn(order2);
 
@@ -534,6 +564,18 @@ class OrderLifecycleServiceImplTest {
             verify(orderRepository).save(order1);
             verify(orderRepository).save(order2);
             assertThat(order2.getCurrentStatus()).isEqualTo(OrderStatus.CANCELLED);
+        }
+
+        @Test
+        @DisplayName("cancelUnacceptedOrder skips if order not found or not in PLACED status")
+        void cancelUnacceptedOrder_nonPlacedStatus_skips() {
+            order.setCurrentStatus(OrderStatus.ACCEPTED);
+            when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
+
+            lifecycleService.cancelUnacceptedOrder(orderId);
+
+            verify(orderRepository, never()).save(any());
+            verify(eventPublisher, never()).publishEvent(any());
         }
     }
 }

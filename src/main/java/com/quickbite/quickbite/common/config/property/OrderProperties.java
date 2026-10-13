@@ -34,7 +34,27 @@ public record OrderProperties(
         /*
          * Acceptance window for the restaurant after order is placed.
          */
-        Duration restaurantAcceptanceWindow
+        Duration restaurantAcceptanceWindow,
+
+        /*
+         * Whether the Redisson delayed queue mechanism is enabled for order timeouts.
+         */
+        Boolean delayedQueueEnabled,
+
+        /*
+         * Redis queue name for restaurant acceptance timeout.
+         */
+        String acceptanceQueueName,
+
+        /*
+         * Redis queue name for order abandonment timeout.
+         */
+        String abandonmentQueueName,
+
+        /*
+         * Interval in milliseconds for the safety-net restaurant acceptance timeout sweep.
+         */
+        Long acceptancePollIntervalMs
 ) {
     @ConstructorBinding
     public OrderProperties {
@@ -45,7 +65,7 @@ public record OrderProperties(
             abandonBatchSize = 100;
         }
         if (abandonCron == null || abandonCron.isBlank()) {
-            abandonCron = "0 */5 * * * *";
+            abandonCron = "0 0 * * * *";
         }
         if (placeCooldownSeconds <= 0) {
             placeCooldownSeconds = 5;
@@ -53,13 +73,29 @@ public record OrderProperties(
         if (restaurantAcceptanceWindow == null || restaurantAcceptanceWindow.isZero() || restaurantAcceptanceWindow.isNegative()) {
             restaurantAcceptanceWindow = Duration.ofMinutes(2);
         }
+        if (delayedQueueEnabled == null) {
+            delayedQueueEnabled = true;
+        }
+        if (acceptanceQueueName == null || acceptanceQueueName.isBlank()) {
+            acceptanceQueueName = "quickbite:order:queue:acceptance-timeout";
+        }
+        if (abandonmentQueueName == null || abandonmentQueueName.isBlank()) {
+            abandonmentQueueName = "quickbite:order:queue:abandonment-timeout";
+        }
+        if (acceptancePollIntervalMs == null || acceptancePollIntervalMs <= 0) {
+            acceptancePollIntervalMs = 1800000L;
+        }
+    }
+
+    public OrderProperties(int abandonTtlMinutes, int abandonBatchSize, String abandonCron, int placeCooldownSeconds, Duration restaurantAcceptanceWindow) {
+        this(abandonTtlMinutes, abandonBatchSize, abandonCron, placeCooldownSeconds, restaurantAcceptanceWindow, true, null, null, null);
     }
 
     public OrderProperties(int abandonTtlMinutes, int abandonBatchSize, String abandonCron, int placeCooldownSeconds) {
-        this(abandonTtlMinutes, abandonBatchSize, abandonCron, placeCooldownSeconds, Duration.ofMinutes(2));
+        this(abandonTtlMinutes, abandonBatchSize, abandonCron, placeCooldownSeconds, Duration.ofMinutes(2), true, null, null, null);
     }
 
     public OrderProperties(int abandonTtlMinutes, int abandonBatchSize) {
-        this(abandonTtlMinutes, abandonBatchSize, "0 */5 * * * *", 5, Duration.ofMinutes(2));
+        this(abandonTtlMinutes, abandonBatchSize, "0 0 * * * *", 5, Duration.ofMinutes(2), true, null, null, null);
     }
 }
