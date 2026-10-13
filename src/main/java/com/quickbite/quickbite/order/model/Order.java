@@ -28,7 +28,11 @@ import java.util.List;
         indexes = {
                 // Partial index in PostgreSQL: ON orders (created_at) WHERE current_status = 'AWAITING_PAYMENT'
                 @Index(name = "idx_orders_awaiting_payment_created", columnList = "created_at"),
-                @Index(name = "idx_orders_restaurant_acceptance_deadline", columnList = "restaurant_acceptance_deadline")
+                @Index(name = "idx_orders_restaurant_acceptance_deadline", columnList = "restaurant_acceptance_deadline"),
+                @Index(name = "idx_orders_customer_id", columnList = "customer_id, id DESC"),
+                @Index(name = "idx_orders_restaurant_status", columnList = "restaurant_id, current_status, id DESC"),
+                @Index(name = "idx_orders_restaurant_id", columnList = "restaurant_id, id DESC"),
+                @Index(name = "idx_orders_delivery_agent", columnList = "delivery_agent_id")
         }
 )
 public class Order extends Base {

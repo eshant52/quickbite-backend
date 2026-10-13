@@ -16,7 +16,8 @@ import lombok.Setter;
         uniqueConstraints = @UniqueConstraint(name = "uq_reviews_order_id", columnNames = "order_id"),
         indexes = {
                 @Index(name = "idx_reviews_restaurant_id", columnList = "restaurant_id, id DESC"),
-                @Index(name = "idx_reviews_customer_id", columnList = "customer_id, ID DESC"),
+                @Index(name = "idx_reviews_customer_id", columnList = "customer_id, id DESC"),
+                @Index(name = "idx_reviews_restaurant_rating", columnList = "restaurant_id, rating")
         }
 )
 public class Review extends Base {

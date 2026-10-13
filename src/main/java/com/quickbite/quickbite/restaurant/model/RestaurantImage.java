@@ -8,7 +8,12 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "restaurant_images")
+@Table(
+        name = "restaurant_images",
+        indexes = {
+                @Index(name = "idx_restaurant_images_restaurant_id", columnList = "restaurant_id")
+        }
+)
 public class RestaurantImage extends Base {
     @ManyToOne
     @JoinColumn(nullable = false)

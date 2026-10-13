@@ -23,7 +23,13 @@ import java.util.List;
 @Setter
 @Audited
 @Entity
-@Table(name = "delivery_agents")
+@Table(
+        name = "delivery_agents",
+        indexes = {
+                @Index(name = "idx_delivery_agents_user_id", columnList = "user_id"),
+                @Index(name = "idx_delivery_agents_status", columnList = "current_status")
+        }
+)
 public class DeliveryAgent extends Base {
     @OneToOne
     @JoinColumn(nullable = false, unique = true)
@@ -50,6 +56,7 @@ public class DeliveryAgent extends Base {
 
     @Column(columnDefinition = "GEOMETRY(POINT, 4326)")
     @JdbcTypeCode(SqlTypes.GEOMETRY)
+    @NotAudited
     private Point lastLocation;
 
     @Enumerated(EnumType.STRING)

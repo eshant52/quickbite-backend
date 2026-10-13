@@ -11,7 +11,12 @@ import org.locationtech.jts.geom.Point;
 @Getter
 @Setter
 @Entity
-@Table(name = "addresses")
+@Table(
+        name = "addresses",
+        indexes = {
+                @Index(name = "idx_addresses_user_id", columnList = "user_id")
+        }
+)
 public class Address extends Base {
     @JoinColumn(nullable = false)
     @ManyToOne

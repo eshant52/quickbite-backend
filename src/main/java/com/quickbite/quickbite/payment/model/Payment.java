@@ -25,7 +25,8 @@ import java.util.List;
                 @UniqueConstraint(name = "uc_payments_transaction_id", columnNames = "transaction_id")
         },
         indexes = {
-                @Index(name = "idx_payments_gateway_order_id", columnList = "gateway_order_id")
+                @Index(name = "idx_payments_gateway_order_id", columnList = "gateway_order_id"),
+                @Index(name = "idx_payments_order_id_created", columnList = "order_id, created_at ASC")
         }
 )
 public class Payment extends Base {

@@ -12,7 +12,12 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @Setter
 @Entity
-@Table(name = "payment_status_history")
+@Table(
+        name = "payment_status_history",
+        indexes = {
+                @Index(name = "idx_payment_status_history_payment_id", columnList = "payment_id")
+        }
+)
 public class PaymentStatusHistory extends Base {
     @ManyToOne
     @JoinColumn(nullable = false)

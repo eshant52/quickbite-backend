@@ -15,7 +15,12 @@ import java.time.LocalTime;
 @Getter
 @Setter
 @Entity
-@Table(name = "restaurant_hours")
+@Table(
+        name = "restaurant_hours",
+        indexes = {
+                @Index(name = "idx_restaurant_hours_restaurant_id", columnList = "restaurant_id")
+        }
+)
 public class RestaurantHours extends Base {
     @ManyToOne
     @JoinColumn(nullable = false)

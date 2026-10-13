@@ -15,7 +15,12 @@ import java.time.Instant;
 @Getter
 @Setter
 @Entity
-@Table(name = "sessions")
+@Table(
+        name = "sessions",
+        indexes = {
+                @Index(name = "idx_sessions_user_active", columnList = "user_id, revoked_at, expires_at")
+        }
+)
 public class Session extends Base {
     @JoinColumn(nullable = false)
     @ManyToOne(fetch = FetchType.LAZY)

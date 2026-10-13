@@ -22,7 +22,13 @@ import java.util.List;
 @Setter
 @Audited
 @Entity
-@Table(name = "restaurants")
+@Table(
+        name = "restaurants",
+        indexes = {
+                @Index(name = "idx_restaurants_owner_id", columnList = "owner_id"),
+                @Index(name = "idx_restaurants_status", columnList = "current_status")
+        }
+)
 public class Restaurant extends Base {
     @ManyToOne
     @JoinColumn(nullable = false)

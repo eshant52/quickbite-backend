@@ -16,7 +16,12 @@ import java.time.Instant;
 @Getter
 @Setter
 @Entity
-@Table(name = "restaurant_documents")
+@Table(
+        name = "restaurant_documents",
+        indexes = {
+                @Index(name = "idx_restaurant_documents_restaurant_id", columnList = "restaurant_id")
+        }
+)
 public class RestaurantDocument extends Base {
     @ManyToOne
     @JoinColumn(nullable = false)

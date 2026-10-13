@@ -18,7 +18,13 @@ import java.util.List;
 @Setter
 @Audited
 @Entity
-@Table(name = "menu_items")
+@Table(
+        name = "menu_items",
+        indexes = {
+                @Index(name = "idx_menu_items_restaurant_available", columnList = "restaurant_id, is_available, id ASC"),
+                @Index(name = "idx_menu_items_restaurant_id", columnList = "restaurant_id, id ASC")
+        }
+)
 public class MenuItem extends Base {
     @ManyToOne
     @JoinColumn(nullable = false)

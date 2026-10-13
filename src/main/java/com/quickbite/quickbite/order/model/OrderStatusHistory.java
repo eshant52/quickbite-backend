@@ -13,7 +13,12 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @Setter
 @Entity
-@Table(name = "order_status_history")
+@Table(
+        name = "order_status_history",
+        indexes = {
+                @Index(name = "idx_order_status_history_order_created", columnList = "order_id, created_at ASC")
+        }
+)
 public class OrderStatusHistory extends Base {
     @ManyToOne
     @JoinColumn(nullable = false)
