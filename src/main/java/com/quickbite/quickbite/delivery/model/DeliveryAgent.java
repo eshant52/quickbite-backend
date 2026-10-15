@@ -26,7 +26,6 @@ import java.util.List;
 @Table(
         name = "delivery_agents",
         indexes = {
-                @Index(name = "idx_delivery_agents_user_id", columnList = "user_id"),
                 @Index(name = "idx_delivery_agents_status", columnList = "current_status")
         }
 )

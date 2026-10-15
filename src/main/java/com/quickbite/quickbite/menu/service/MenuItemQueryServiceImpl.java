@@ -5,6 +5,7 @@ import com.quickbite.quickbite.menu.dto.MenuItemResponse;
 import com.quickbite.quickbite.menu.exception.MenuItemNotFoundException;
 import com.quickbite.quickbite.menu.model.MenuItem;
 import com.quickbite.quickbite.menu.repository.MenuItemRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class MenuItemQueryServiceImpl implements MenuItemQueryService {
     }
 
     @Override
+    @Cacheable(value = "restaurant_menu", key = "'list:' + #restaurantId + ':' + #availableOnly + ':' + #cursor + ':' + #size", sync = true)
     public CursorPage<MenuItemResponse> listByRestaurant(UUID restaurantId, boolean availableOnly, UUID cursor, int size) {
         int pageSize = Math.clamp(size, 1, 100);
         List<MenuItem> menuItems = menuItemRepository.findByRestaurantWithCursor(
@@ -37,6 +39,7 @@ public class MenuItemQueryServiceImpl implements MenuItemQueryService {
     }
 
     @Override
+    @Cacheable(value = "restaurant_menu", key = "'item:' + #restaurantId + ':' + #itemId", sync = true)
     public MenuItemResponse getById(UUID restaurantId, UUID itemId) {
         return MenuItemResponse.from(
                 menuItemRepository.findByIdAndRestaurantId(itemId, restaurantId)

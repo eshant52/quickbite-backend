@@ -61,7 +61,7 @@ public class UserAddressServiceImpl implements UserAddressService {
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = "user_addresses", key = "#userId")
+    @Cacheable(value = "user_addresses", key = "#userId", sync = true)
     public List<AddressResponse> getAddresses(UUID userId) {
         User user = loadUser(userId);
         List<Address> addresses = addressRepository.findByUser(user);

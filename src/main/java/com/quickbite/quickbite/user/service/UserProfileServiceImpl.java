@@ -24,7 +24,7 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = "user_profile", key = "#userId")
+    @Cacheable(value = "user_profile", key = "#userId", sync = true)
     public UserProfileResponse getProfile(UUID userId) {
         User user = loadUser(userId);
         return UserProfileResponse.from(user);

@@ -19,7 +19,7 @@ public class CuisineCatalogServiceImpl implements CuisineCatalogService {
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = "cuisines", key = "'all'")
+    @Cacheable(value = "cuisines", key = "'all'", sync = true)
     public List<CuisineResponse> listApproved() {
         return cuisineRepository.findAll().stream()
                 .map(CuisineResponse::from)

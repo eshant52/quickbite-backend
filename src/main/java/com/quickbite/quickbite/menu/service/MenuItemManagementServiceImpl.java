@@ -15,6 +15,7 @@ import com.quickbite.quickbite.menu.repository.MenuItemRepository;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
 import com.quickbite.quickbite.restaurant.repository.RestaurantRepository;
 import org.jspecify.annotations.NonNull;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,7 @@ public class MenuItemManagementServiceImpl implements MenuItemManagementService 
     }
 
     @Override
+    @CacheEvict(value = "restaurant_menu", allEntries = true)
     public MenuItemResponse create(UUID restaurantId, UUID ownerId, MenuItemRequest req) {
         Restaurant restaurant = loadOwnedRestaurant(restaurantId, ownerId);
         Cuisine cuisine = loadApprovedCuisine(req.cuisineId());
@@ -52,6 +54,7 @@ public class MenuItemManagementServiceImpl implements MenuItemManagementService 
     }
 
     @Override
+    @CacheEvict(value = "restaurant_menu", allEntries = true)
     public MenuItemResponse update(UUID restaurantId, UUID itemId, UUID ownerId, MenuItemRequest req) {
         Restaurant restaurant = loadOwnedRestaurant(restaurantId, ownerId);
         Cuisine cuisine = loadApprovedCuisine(req.cuisineId());
@@ -61,6 +64,7 @@ public class MenuItemManagementServiceImpl implements MenuItemManagementService 
     }
 
     @Override
+    @CacheEvict(value = "restaurant_menu", allEntries = true)
     public void delete(UUID restaurantId, UUID itemId, UUID ownerId) {
         Restaurant restaurant = loadOwnedRestaurant(restaurantId, ownerId);
         MenuItem menuItem = menuItemRepository.findByIdAndRestaurantId(itemId, restaurant.getId())
@@ -69,6 +73,7 @@ public class MenuItemManagementServiceImpl implements MenuItemManagementService 
     }
 
     @Override
+    @CacheEvict(value = "restaurant_menu", allEntries = true)
     public MenuItemResponse addImage(UUID restaurantId, UUID itemId, UUID ownerId, MenuItemImageRequest req) {
         Restaurant restaurant = loadOwnedRestaurant(restaurantId, ownerId);
         MenuItem menuItem = menuItemRepository.findByIdAndRestaurantId(itemId, restaurant.getId())
@@ -85,6 +90,7 @@ public class MenuItemManagementServiceImpl implements MenuItemManagementService 
     }
 
     @Override
+    @CacheEvict(value = "restaurant_menu", allEntries = true)
     public void removeImage(UUID restaurantId, UUID itemId, UUID imageId, UUID ownerId) {
         Restaurant restaurant = loadOwnedRestaurant(restaurantId, ownerId);
         MenuItem menuItem = menuItemRepository.findByIdAndRestaurantId(itemId, restaurant.getId())

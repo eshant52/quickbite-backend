@@ -29,7 +29,7 @@ public class RestaurantCatalogServiceImpl implements RestaurantCatalogService {
     }
 
     @Override
-    @Cacheable(value = "restaurant_profile", key = "#restaurantId")
+    @Cacheable(value = "restaurant_profile", key = "#restaurantId", sync = true)
     public RestaurantResponse getRestaurant(UUID restaurantId) {
         Restaurant restaurant = restaurantRepository.findById(restaurantId)
                 .orElseThrow(() -> new RestaurantNotFoundException("Restaurant not found"));

@@ -51,7 +51,7 @@ public class RestaurantReviewQueryServiceImpl implements RestaurantReviewQuerySe
     }
 
     @Override
-    @Cacheable(value = "restaurant_rating_summary", key = "#restaurantId")
+    @Cacheable(value = "restaurant_rating_summary", key = "#restaurantId", sync = true)
     public RestaurantRatingSummaryResponse getRestaurantRatingSummary(UUID restaurantId) {
         Restaurant restaurant = restaurantRepository.findById(restaurantId)
                 .orElseThrow(() -> new RestaurantNotFoundException("Restaurant not found with id: " + restaurantId));
