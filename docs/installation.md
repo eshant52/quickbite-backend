@@ -1,126 +1,222 @@
-# Installation and Configuration
+# Installation and Configuration Guide
 
-This document provides instructions for installing and configuring the QuickBite application.
-
-## Installation Steps
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/eshant52/quickbite-backend.git
-   ```
-
-2. Create the local environment file:
-   ```bash
-   cp .env.local.example .env.local
-   ```
-   Add your environment variables in the `.env.local` file. Make sure to set the `REDIS_USERNAME` and `REDIS_PASSWORD`
-   variables for Redis authentication.
-
-3. Start the services:
-   ```bash
-   docker compose --env-file .env.local --profile full up -d
-   ```
-   
-4. Create the application environment file:
-   ```bash
-   cp .env.example .env
-   ```
-   Add your environment variables in the `.env` file. Make sure to set the required variables.
-
-   Also, if you are using IntelliJ IDEA, you can set the environment variables in the run configuration for the application by specifying the path to the `.env` file.
-
-5. Create Kafka topics manually when you want explicit local setup:
-      ```bash
-      docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh \
-        --bootstrap-server localhost:9092 --create \
-        --topic quickbite.order.events \
-        --partitions 3 --replication-factor 1
-
-      docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh \
-        --bootstrap-server localhost:9092 --create \
-        --topic quickbite.notification.events \
-        --partitions 3 --replication-factor 1
-
-      docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh \
-        --bootstrap-server localhost:9092 --create \
-        --topic quickbite.delivery.events \
-        --partitions 3 --replication-factor 1
-
-      docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh \
-        --bootstrap-server localhost:9092 --create \
-        --topic quickbite.order.events.DLQ \
-        --partitions 1 --replication-factor 1
-      ```
-
-      The application also declares these topics through Spring Kafka when it can connect to Kafka.
-
-6. Verify that the services are running:
-   ```bash
-   docker ps
-   ```
-
-7. Creating PostGIS extension for the PostgreSQL database:
-    1. Go to postgres:
-       ```bash
-       docker exec -it my-postgres psql -U <username> -d quickbite
-       ```
-    2. Create postgis extension for the database:
-       ```sql
-       CREATE EXTENSION postgis;
-       ```
-
-8. Create secrets for JWT keys:
-   ```bash
-   openssl genrsa -out src/main/resources/certs/private.pem 2048
-   openssl rsa -in src/main/resources/certs/private.pem -pubout -out src/main/resources/certs/public.pem
-   ```
+This guide details the complete setup, infrastructure provisioning, environment configuration, and verification steps required to run the QuickBite backend locally or in production.
 
 ---
 
-### Details about secret files
+## 1. Prerequisites
 
-[`src/main/resources/certs/private.pem`](../src/main/resources/certs/private.pem): This file contains the private key used for signing JWT tokens. It should be kept secure and not shared publicly.
-
-[`src/main/resources/certs/public.pem`](../src/main/resources/certs/public.pem): This file contains the public key used for verifying JWT tokens. It can be shared publicly and is used by clients to verify the authenticity of the JWT tokens issued by the QuickBite application.
-
-[`.env`](../.env): This file contains environment variables for the QuickBite application. It includes settings for PostgreSQL, Redis, Kafka, and other application-specific configurations. Make sure to set the required variables.
-
-[` .env.local`](../.env.local): This file contains environment variables for `docker-compose.yml`. It includes settings for PostgreSQL, Redis and Kafka. Make sure to set the required variables.
+Before starting, ensure the following software is installed on your host system:
+* **Java Development Kit (JDK) 25** (e.g., Eclipse Temurin or GraalVM). Verify with `java -version`.
+* **Docker & Docker Compose** (v2.20+ recommended).
+* **OpenSSL** (for RSA JWT key pair generation).
+* *(Optional, recommended for macOS/Linux)* **Homebrew & OSRM** (`brew install osrm-backend`) for native routing performance.
 
 ---
 
-### More details are as follows:
+## 2. Infrastructure Setup with Docker Compose
 
-[`redis-setup/redis-entrypoint.sh`](../redis-setup/redis-entrypoint.sh):
+QuickBite relies on three primary infrastructure containers: **PostgreSQL 18 (with PostGIS)**, **Redis 8 (with ACL enabled)**, and **Apache Kafka 4.3 (KRaft mode)**.
 
-This script is responsible for setting up the Redis ACL user and ensuring that the ACL configuration is saved. It checks
-if the ACL user already exists, and if not, it creates the user with the specified username and password. The script
-also ensures that the ACL file exists before starting Redis, as Redis requires the ACL file to be present for proper
-configuration.
+### Step 1: Clone Repository
+```bash
+git clone https://github.com/eshant52/quickbite-backend.git
+cd quickbite-backend
+```
 
-[`redis-setup/redis.conf`](../redis-setup/redis.conf):
+### Step 2: Configure Local Infrastructure Environment
+Create the `.env.local` file used by `docker-compose.yml`:
+```bash
+cp .env.local.example .env.local
+```
 
-This configuration file contains the Redis server settings, including the ACL file path. It is important to ensure that
-the ACL file exists before starting Redis, as Redis will not create it automatically.
+Ensure the ports and credentials match your preferences:
+```env
+POSTGRES_USER=eshant
+POSTGRES_PASSWORD=mypg2510
+POSTGRES_DB=quickbite
 
-[`postgres-setup/initdb-postgis.sh`](../postgres-setup/initdb-postgis.sh):
-This script is responsible for creating the PostGIS extension in the PostgreSQL database. It is executed when the
-PostgreSQL container is initialized, and it ensures that the PostGIS extension is available for use in the QuickBite
-application.
+REDIS_USERNAME=quickbite
+REDIS_PASSWORD=redistest
 
-[`postgres-setup/update-postgis.sh`](../postgres-setup/update-postgis.sh):
-This script is responsible for updating the PostGIS extension in the PostgreSQL database. It can be executed manually if
-you need to update the PostGIS extension to a newer version.
+KAFKA_SERVERS=localhost:9092
+```
 
-[`postgres-setup/Dockerfile`](../postgres-setup/Dockerfile):
-This Dockerfile is used to build a custom PostgreSQL image with the PostGIS extension. It installs the necessary
-dependencies and sets up the PostGIS extension during the image build process.
+### Step 3: Launch Containers
+Start the infrastructure services in detached mode:
+```bash
+docker compose --env-file .env.local --profile full up -d
+```
 
-[`docker-compose.yml`](../docker-compose.yml):
+Verify all containers report `healthy`:
+```bash
+docker ps
+```
 
-This file defines the services for the QuickBite application, including PostgreSQL, Redis, and Kafka. It specifies the
-environment variables, volumes, and health checks for each service. The Redis service uses the `redis-entrypoint.sh`
-script to set up the ACL user and ensure that the ACL configuration is saved.
+| Service | Container Name | Host Port | Internal Port | Healthcheck |
+| :--- | :--- | :--- | :--- | :--- |
+| **PostgreSQL + PostGIS** | `my-postgres` | `5430` | `5432` | `pg_isready` |
+| **Redis (ACL Protected)** | `my-redis` | `6377` | `6379` | `redis-cli ping` |
+| **Apache Kafka (KRaft)** | `my-kafka` | `9092` | `9092` | `kafka-topics.sh --list` |
 
-Redis is exposed locally on `localhost:6377`, Kafka is exposed on `localhost:9092`, and application cache keys use the
-`quickbite:` prefix to match the Redis ACL key pattern.
+---
+
+## 3. Database & Cryptographic Key Initialization
+
+### Step 4: Verify PostGIS Extension
+The `postgres-setup/initdb-postgis.sh` script automatically installs PostGIS when the container is first created. To verify manually:
+```bash
+docker exec -it my-postgres psql -U eshant -d quickbite -c "SELECT PostGIS_Version();"
+```
+If not installed, enable it with:
+```sql
+CREATE EXTENSION IF NOT EXISTS postgis;
+```
+
+### Step 5: Generate RSA Key Pair for JWT Issuance
+QuickBite self-issues asymmetric RSA256 tokens using a private/public key pair:
+```bash
+mkdir -p src/main/resources/certs
+openssl genrsa -out src/main/resources/certs/private.pem 2048
+openssl rsa -in src/main/resources/certs/private.pem -pubout -out src/main/resources/certs/public.pem
+```
+
+> [!CAUTION]
+> Never commit `private.pem` to source control. In production environments, load the private key via the `JWT_SECRET` environment variable or AWS Secrets Manager.
+
+---
+
+## 4. Kafka Topic Management
+
+When the Spring Boot application boots, `KafkaConfig.java` **automatically creates** all 7 domain topics and their corresponding Dead Letter Topics (`.DLT`) via `NewTopic` beans.
+
+If you prefer to initialize the topics manually prior to application startup, run:
+```bash
+# Order Events
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.order.events --partitions 3 --replication-factor 1
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.order.events.DLT --partitions 1 --replication-factor 1
+
+# Payment Events
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.payment.events --partitions 3 --replication-factor 1
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.payment.events.DLT --partitions 1 --replication-factor 1
+
+# Delivery Events
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.delivery.events --partitions 3 --replication-factor 1
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.delivery.events.DLT --partitions 1 --replication-factor 1
+
+# Restaurant Application Events
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.restaurant.application.events --partitions 3 --replication-factor 1
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.restaurant.application.events.DLT --partitions 1 --replication-factor 1
+
+# Delivery Agent Application Events
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.deliveryagent.application.events --partitions 3 --replication-factor 1
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.deliveryagent.application.events.DLT --partitions 1 --replication-factor 1
+
+# Vehicle Application Events
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.vehicle.application.events --partitions 3 --replication-factor 1
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.vehicle.application.events.DLT --partitions 1 --replication-factor 1
+
+# Cuisine Events
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.cuisine.events --partitions 3 --replication-factor 1
+docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic quickbite.cuisine.events.DLT --partitions 1 --replication-factor 1
+```
+
+---
+
+## 5. Local OSRM Routing Engine (Optional)
+
+QuickBite connects to a local OSRM instance for sub-millisecond street-level bicycle routing.
+
+1. **Install OSRM**:
+   ```bash
+   brew install osrm-backend
+   ```
+2. **Download OSM Data** (e.g., regional or India map):
+   ```bash
+   mkdir -p ~/osrm-data && cd ~/osrm-data
+   curl -O http://download.geofabrik.de/asia/india-latest.osm.pbf
+   ```
+3. **Extract, Partition & Customize**:
+   ```bash
+   osrm-extract -p /opt/homebrew/share/osrm/profiles/bicycle.lua india-latest.osm.pbf
+   osrm-partition india-latest.osrm
+   osrm-customize india-latest.osrm
+   ```
+4. **Run OSRM Server** on port **5001** (avoids conflict with macOS AirPlay on 5000):
+   ```bash
+   osrm-routed --algorithm mld -p 5001 india-latest.osrm
+   ```
+
+*(Note: If OSRM is not running, the application will automatically fall back to Haversine calculation without interrupting execution).*
+
+---
+
+## 6. Application Configuration & Startup
+
+### Step 6: Create Application Environment File
+Create the `.env` file for the Spring Boot application:
+```bash
+cp .env.example .env
+```
+
+Key environment properties to configure:
+```env
+# Database Credentials
+DB_USERNAME=eshant
+DB_PASSWORD=mypg2510
+
+# Redis Credentials
+REDIS_HOST=localhost
+REDIS_PORT=6377
+REDIS_USERNAME=quickbite
+REDIS_PASSWORD=redistest
+
+# Kafka Bootstrap Server
+KAFKA_SERVERS=localhost:9092
+
+# Razorpay Credentials (Leave dummy values if using test profile)
+RAZORPAY_KEY_ID=rzp_test_YourKeyIdHere
+RAZORPAY_KEY_SECRET=YourRazorpaySecretHere
+RAZORPAY_WEBHOOK_SECRET=YourWebhookSecretHere
+
+# AWS S3 (for image/document uploads)
+AWS_S3_BUCKET=quickbite-dev-uploads
+AWS_REGION=ap-south-1
+```
+
+### Step 7: Profiles & Running the Application
+QuickBite enables the `dev` and `razorpay` profiles by default (`spring.profiles.default=dev,razorpay`).
+
+To start the application locally:
+```bash
+./mvnw spring-boot:run
+```
+
+To run with a custom profile:
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+### Step 8: Verify Application Health
+Once started, verify the service is running and all health checks pass:
+```bash
+curl http://localhost:8080/actuator/health
+```
+Expected response:
+```json
+{
+  "status": "UP"
+}
+```
+
+---
+
+## 7. Default Super Admin Bootstrap Account
+
+QuickBite includes an automated admin bootstrapper (`AdminBootstrapRunner`) that seeds an administrative account on startup if none exists:
+
+* **Email**: `super.admin@quickbite.com`
+* **Password**: `Admin@123`
+* **Role**: `ROLE_ADMIN`
+
+You can use these credentials immediately to log in via `POST /api/v1/auth/login` and access `/api/v1/admin/**` endpoints.
