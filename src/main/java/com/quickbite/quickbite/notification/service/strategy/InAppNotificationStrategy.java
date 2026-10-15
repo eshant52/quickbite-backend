@@ -2,6 +2,7 @@ package com.quickbite.quickbite.notification.service.strategy;
 
 import com.quickbite.quickbite.notification.dto.NotificationPayload;
 import com.quickbite.quickbite.notification.repository.NotificationRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Component;
 
 /**
@@ -22,6 +23,7 @@ public class InAppNotificationStrategy implements NotificationDeliveryStrategy {
     }
 
     @Override
+    @CacheEvict(value = "notification_unread_count", key = "#payload.recipient().id")
     public void deliver(NotificationPayload payload) {
         // TODO: Some ws realtime notification to notify web app of specific user in the future.
         notificationRepository.save(payload.toNotification());

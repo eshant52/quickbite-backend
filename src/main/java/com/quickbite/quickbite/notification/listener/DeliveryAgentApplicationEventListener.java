@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -28,15 +27,12 @@ public class DeliveryAgentApplicationEventListener {
 
     private final NotificationService notificationService;
     private final UserRepository userRepository;
-    private final ObjectMapper objectMapper;
 
     public DeliveryAgentApplicationEventListener(
             NotificationService notificationService,
-            UserRepository userRepository,
-            ObjectMapper objectMapper) {
+            UserRepository userRepository) {
         this.notificationService = notificationService;
         this.userRepository = userRepository;
-        this.objectMapper = objectMapper;
     }
 
     @KafkaListener(
@@ -44,8 +40,7 @@ public class DeliveryAgentApplicationEventListener {
             groupId = "quickbite-notification-group",
             containerFactory = "stringKafkaListenerContainerFactory"
     )
-    public void onDeliveryAgentApplicationEvent(String rawEvent) {
-        DeliveryAgentApplicationEvent event = deserialize(rawEvent, DeliveryAgentApplicationEvent.class);
+    public void onDeliveryAgentApplicationEvent(DeliveryAgentApplicationEvent event) {
         if (event == null) return;
 
         switch (event) {
@@ -110,14 +105,5 @@ public class DeliveryAgentApplicationEventListener {
                 },
                 () -> log.warn("[NOTIFICATION] Agent user not found for rejected event, agentUserId={}", event.agentUserId())
         );
-    }
-
-    private <T> T deserialize(String rawEvent, Class<T> type) {
-        try {
-            return objectMapper.readValue(rawEvent, type);
-        } catch (Exception ex) {
-            log.error("[NOTIFICATION] Failed to deserialize Kafka event as {}: {}", type.getSimpleName(), ex.getMessage(), ex);
-            throw new RuntimeException("Failed to deserialize event", ex);
-        }
     }
 }

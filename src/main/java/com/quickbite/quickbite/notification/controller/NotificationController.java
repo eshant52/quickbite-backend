@@ -3,13 +3,13 @@ package com.quickbite.quickbite.notification.controller;
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.notification.dto.NotificationResponse;
+import com.quickbite.quickbite.notification.dto.UnreadCountResponse;
 import com.quickbite.quickbite.notification.service.NotificationQueryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -71,9 +71,9 @@ public class NotificationController {
      * Response: {@code { "count": 3 }}
      */
     @GetMapping("/unread-count")
-    public ResponseEntity<Map<String, Long>> getUnreadCount(@AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<UnreadCountResponse> getUnreadCount(@AuthenticationPrincipal Jwt jwt) {
         UUID userId = sessionResolver.userIdFromJwt(jwt);
-        return ResponseEntity.ok(Map.of("count", notificationQueryService.getUnreadCount(userId)));
+        return ResponseEntity.ok(notificationQueryService.getUnreadCount(userId));
     }
 
     /**

@@ -16,15 +16,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.databind.ObjectMapper;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,9 +32,6 @@ class DeliveryAgentApplicationEventListenerTest {
 
     @Mock
     private UserRepository userRepository;
-
-    @Mock
-    private ObjectMapper objectMapper;
 
     @InjectMocks
     private DeliveryAgentApplicationEventListener listener;
@@ -65,16 +59,14 @@ class DeliveryAgentApplicationEventListenerTest {
 
     @Test
     @DisplayName("onDeliveryAgentApplicationEvent - handles submitted event and notifies allotted admins")
-    void handlesSubmittedEvent() throws Exception {
+    void handlesSubmittedEvent() {
         var event = new DeliveryAgentApplicationSubmittedEvent(
                 appId, agentUserId, List.of(adminId), Instant.now());
-        String raw = "{\"eventType\":\"SUBMITTED\"}";
 
-        when(objectMapper.readValue(eq(raw), any(Class.class))).thenReturn(event);
         when(userRepository.findAllById(List.of(adminId))).thenReturn(List.of(admin));
         when(userRepository.findById(agentUserId)).thenReturn(Optional.of(agent));
 
-        listener.onDeliveryAgentApplicationEvent(raw);
+        listener.onDeliveryAgentApplicationEvent(event);
 
         ArgumentCaptor<DeliveryAgentApplicationNotificationPayload> captor =
                 ArgumentCaptor.forClass(DeliveryAgentApplicationNotificationPayload.class);
@@ -89,15 +81,13 @@ class DeliveryAgentApplicationEventListenerTest {
 
     @Test
     @DisplayName("onDeliveryAgentApplicationEvent - handles approved event and notifies driver")
-    void handlesApprovedEvent() throws Exception {
+    void handlesApprovedEvent() {
         var event = new DeliveryAgentApplicationApprovedEvent(
                 appId, UUID.randomUUID(), agentUserId, adminId, Instant.now());
-        String raw = "{\"eventType\":\"APPROVED\"}";
 
-        when(objectMapper.readValue(eq(raw), any(Class.class))).thenReturn(event);
         when(userRepository.findById(agentUserId)).thenReturn(Optional.of(agent));
 
-        listener.onDeliveryAgentApplicationEvent(raw);
+        listener.onDeliveryAgentApplicationEvent(event);
 
         ArgumentCaptor<DeliveryAgentApplicationNotificationPayload> captor =
                 ArgumentCaptor.forClass(DeliveryAgentApplicationNotificationPayload.class);
@@ -111,15 +101,13 @@ class DeliveryAgentApplicationEventListenerTest {
 
     @Test
     @DisplayName("onDeliveryAgentApplicationEvent - handles rejected event and notifies driver with remarks")
-    void handlesRejectedEvent() throws Exception {
+    void handlesRejectedEvent() {
         var event = new DeliveryAgentApplicationRejectedEvent(
                 appId, agentUserId, adminId, "Driving license expired", Instant.now());
-        String raw = "{\"eventType\":\"REJECTED\"}";
 
-        when(objectMapper.readValue(eq(raw), any(Class.class))).thenReturn(event);
         when(userRepository.findById(agentUserId)).thenReturn(Optional.of(agent));
 
-        listener.onDeliveryAgentApplicationEvent(raw);
+        listener.onDeliveryAgentApplicationEvent(event);
 
         ArgumentCaptor<DeliveryAgentApplicationNotificationPayload> captor =
                 ArgumentCaptor.forClass(DeliveryAgentApplicationNotificationPayload.class);

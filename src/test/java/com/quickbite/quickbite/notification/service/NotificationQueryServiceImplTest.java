@@ -3,6 +3,7 @@ package com.quickbite.quickbite.notification.service;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
 import com.quickbite.quickbite.notification.dto.NotificationResponse;
+import com.quickbite.quickbite.notification.dto.UnreadCountResponse;
 import com.quickbite.quickbite.notification.model.Notification;
 import com.quickbite.quickbite.notification.model.OrderNotification;
 import com.quickbite.quickbite.notification.model.OrderNotificationType;
@@ -129,9 +130,9 @@ class NotificationQueryServiceImplTest {
     void getUnreadCount_delegatesToRepository() {
         when(notificationRepository.countByRecipientIdAndIsReadFalse(userId)).thenReturn(5L);
 
-        long count = notificationQueryService.getUnreadCount(userId);
+        UnreadCountResponse res = notificationQueryService.getUnreadCount(userId);
 
-        assertThat(count).isEqualTo(5L);
+        assertThat(res.count()).isEqualTo(5L);
         verify(notificationRepository).countByRecipientIdAndIsReadFalse(userId);
     }
 

@@ -1,6 +1,5 @@
 package com.quickbite.quickbite.notification.listener;
 
-import tools.jackson.databind.ObjectMapper;
 import com.quickbite.quickbite.common.event.QuickBiteTopics;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationApprovedEvent;
 import com.quickbite.quickbite.common.event.restaurantapplication.RestaurantApplicationEvent;
@@ -29,14 +28,11 @@ public class RestaurantApplicationEventListener {
 
     private final NotificationService notificationService;
     private final UserRepository userRepository;
-    private final ObjectMapper objectMapper;
 
     public RestaurantApplicationEventListener(NotificationService notificationService,
-                                              UserRepository userRepository,
-                                              ObjectMapper objectMapper) {
+                                              UserRepository userRepository) {
         this.notificationService = notificationService;
         this.userRepository = userRepository;
-        this.objectMapper = objectMapper;
     }
 
     @KafkaListener(
@@ -44,8 +40,7 @@ public class RestaurantApplicationEventListener {
             groupId = "quickbite-notification-group",
             containerFactory = "stringKafkaListenerContainerFactory"
     )
-    public void onApplicationEvent(String rawEvent) {
-        RestaurantApplicationEvent event = deserialize(rawEvent, RestaurantApplicationEvent.class);
+    public void onApplicationEvent(RestaurantApplicationEvent event) {
         if (event == null) return;
 
         switch (event) {
@@ -108,14 +103,5 @@ public class RestaurantApplicationEventListener {
                 },
                 () -> log.warn("[NOTIFICATION] Owner not found for rejected event, ownerId={}", event.ownerId())
         );
-    }
-
-    private <T> T deserialize(String rawEvent, Class<T> type) {
-        try {
-            return objectMapper.readValue(rawEvent, type);
-        } catch (Exception ex) {
-            log.error("[NOTIFICATION] Failed to deserialize Kafka event as {}: {}", type.getSimpleName(), ex.getMessage(), ex);
-            throw new RuntimeException("Failed to deserialize event", ex);
-        }
     }
 }

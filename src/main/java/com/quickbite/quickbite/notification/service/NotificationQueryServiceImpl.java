@@ -3,8 +3,11 @@ package com.quickbite.quickbite.notification.service;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
 import com.quickbite.quickbite.notification.dto.NotificationResponse;
+import com.quickbite.quickbite.notification.dto.UnreadCountResponse;
 import com.quickbite.quickbite.notification.model.Notification;
 import com.quickbite.quickbite.notification.repository.NotificationRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,12 +46,14 @@ public class NotificationQueryServiceImpl implements NotificationQueryService {
 
     @Override
     @Transactional(readOnly = true)
-    public long getUnreadCount(UUID userId) {
-        return notificationRepository.countByRecipientIdAndIsReadFalse(userId);
+    @Cacheable(value = "notification_unread_count", key = "#userId", sync = true)
+    public UnreadCountResponse getUnreadCount(UUID userId) {
+        return new UnreadCountResponse(notificationRepository.countByRecipientIdAndIsReadFalse(userId));
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "notification_unread_count", key = "#userId")
     public void markAsRead(UUID notificationId, UUID userId) {
         int updated = notificationRepository.markAsRead(notificationId, userId);
         if (updated == 0) {
@@ -59,6 +64,7 @@ public class NotificationQueryServiceImpl implements NotificationQueryService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "notification_unread_count", key = "#userId")
     public void markAllAsRead(UUID userId) {
         notificationRepository.markAllAsRead(userId);
     }

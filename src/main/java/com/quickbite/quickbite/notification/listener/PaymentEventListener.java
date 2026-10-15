@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
@@ -25,16 +24,13 @@ public class PaymentEventListener {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
-    private final ObjectMapper objectMapper;
 
     public PaymentEventListener(NotificationService notificationService,
                                 UserRepository userRepository,
-                                PaymentRepository paymentRepository,
-                                ObjectMapper objectMapper) {
+                                PaymentRepository paymentRepository) {
         this.notificationService = notificationService;
         this.userRepository = userRepository;
         this.paymentRepository = paymentRepository;
-        this.objectMapper = objectMapper;
     }
 
     // --------------------------------------------------------------------------
@@ -46,8 +42,7 @@ public class PaymentEventListener {
             groupId = "quickbite-notification-group",
             containerFactory = "stringKafkaListenerContainerFactory"
     )
-    public void onPaymentStatusChanged(String rawEvent) {
-        PaymentStatusChangedEvent event = deserialize(rawEvent, PaymentStatusChangedEvent.class);
+    public void onPaymentStatusChanged(PaymentStatusChangedEvent event) {
         if (event == null) return;
 
         User customer = userRepository.findById(event.customerId()).orElse(null);
@@ -74,15 +69,6 @@ public class PaymentEventListener {
         ));
 
         log.info("[NOTIFICATION] Payment sent for payment id: {}", event.paymentId());
-    }
-
-    private <T> T deserialize(String rawEvent, Class<T> type) {
-        try {
-            return objectMapper.readValue(rawEvent, type);
-        } catch (Exception e) {
-            log.error("[NOTIFICATION] Failed to deserialize event: {}", rawEvent, e);
-            throw new RuntimeException("Failed to deserialize event", e);
-        }
     }
 
     private Map<String, String> getTitleAndMessage(PaymentStatus newStatus) {

@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -25,15 +24,12 @@ public class CuisineEventListener {
 
     private final NotificationService notificationService;
     private final UserRepository userRepository;
-    private final ObjectMapper objectMapper;
 
     public CuisineEventListener(
             NotificationService notificationService,
-            UserRepository userRepository,
-            ObjectMapper objectMapper) {
+            UserRepository userRepository) {
         this.notificationService = notificationService;
         this.userRepository = userRepository;
-        this.objectMapper = objectMapper;
     }
 
     @KafkaListener(
@@ -41,8 +37,7 @@ public class CuisineEventListener {
             groupId = "quickbite-notification-group",
             containerFactory = "stringKafkaListenerContainerFactory"
     )
-    public void onCuisineEvent(String rawEvent) {
-        CuisineEvent event = deserialize(rawEvent, CuisineEvent.class);
+    public void onCuisineEvent(CuisineEvent event) {
         if (event == null) return;
 
         switch (event) {
@@ -116,14 +111,5 @@ public class CuisineEventListener {
                 },
                 () -> log.warn("[NOTIFICATION] Requester not found for rejected cuisine event, requesterId={}", event.requesterId())
         );
-    }
-
-    private <T> T deserialize(String rawEvent, Class<T> type) {
-        try {
-            return objectMapper.readValue(rawEvent, type);
-        } catch (Exception e) {
-            log.error("[NOTIFICATION] Failed to deserialize Kafka event: {}", rawEvent, e);
-            throw new RuntimeException("Failed to deserialize event", e);
-        }
     }
 }

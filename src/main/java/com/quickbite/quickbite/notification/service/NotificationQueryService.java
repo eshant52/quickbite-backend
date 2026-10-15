@@ -2,6 +2,7 @@ package com.quickbite.quickbite.notification.service;
 
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.notification.dto.NotificationResponse;
+import com.quickbite.quickbite.notification.dto.UnreadCountResponse;
 
 import java.util.UUID;
 
@@ -27,7 +28,7 @@ public interface NotificationQueryService {
     CursorPage<NotificationResponse> getNotifications(UUID userId, boolean unreadOnly, UUID cursor, int size);
 
     /** Returns the number of unread notifications — used for badge counters in the UI. */
-    long getUnreadCount(UUID userId);
+    UnreadCountResponse getUnreadCount(UUID userId);
 
     /**
      * Marks a single notification as read.

@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -28,15 +27,12 @@ public class VehicleApplicationEventListener {
 
     private final NotificationService notificationService;
     private final UserRepository userRepository;
-    private final ObjectMapper objectMapper;
 
     public VehicleApplicationEventListener(
             NotificationService notificationService,
-            UserRepository userRepository,
-            ObjectMapper objectMapper) {
+            UserRepository userRepository) {
         this.notificationService = notificationService;
         this.userRepository = userRepository;
-        this.objectMapper = objectMapper;
     }
 
     @KafkaListener(
@@ -44,8 +40,7 @@ public class VehicleApplicationEventListener {
             topics = QuickBiteTopics.VEHICLE_APPLICATION_EVENTS,
             containerFactory = "stringKafkaListenerContainerFactory"
     )
-    public void onVehicleApplicationEvent(String rawEvent) {
-        VehicleApplicationEvent event = deserialize(rawEvent, VehicleApplicationEvent.class);
+    public void onVehicleApplicationEvent(VehicleApplicationEvent event) {
         if (event == null) return;
 
         switch (event) {
@@ -108,14 +103,5 @@ public class VehicleApplicationEventListener {
                 },
                 () -> log.warn("[NOTIFICATION] Driver not found for rejected event, agentUserId={}", event.agentUserId())
         );
-    }
-
-    private <T> T deserialize(String rawEvent, Class<T> type) {
-        try {
-            return objectMapper.readValue(rawEvent, type);
-        } catch (Exception ex) {
-            log.error("[NOTIFICATION] Failed to deserialize Kafka event as {}: {}", type.getSimpleName(), ex.getMessage(), ex);
-            throw new RuntimeException("Failed to deserialize event", ex);
-        }
     }
 }

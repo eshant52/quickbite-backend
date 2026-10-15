@@ -16,15 +16,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.databind.ObjectMapper;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,9 +32,6 @@ class VehicleApplicationEventListenerTest {
 
     @Mock
     private UserRepository userRepository;
-
-    @Mock
-    private ObjectMapper objectMapper;
 
     @InjectMocks
     private VehicleApplicationEventListener listener;
@@ -65,15 +59,13 @@ class VehicleApplicationEventListenerTest {
 
     @Test
     @DisplayName("onVehicleApplicationEvent - handles submitted event and notifies allotted admins")
-    void handlesSubmittedEvent() throws Exception {
+    void handlesSubmittedEvent() {
         var event = new VehicleApplicationSubmittedEvent(
                 appId, driverUserId, UUID.randomUUID(), "Yamaha FZ", List.of(adminId), Instant.now());
-        String raw = "{\"eventType\":\"SUBMITTED\"}";
 
-        when(objectMapper.readValue(eq(raw), any(Class.class))).thenReturn(event);
         when(userRepository.findAllById(List.of(adminId))).thenReturn(List.of(admin));
 
-        listener.onVehicleApplicationEvent(raw);
+        listener.onVehicleApplicationEvent(event);
 
         ArgumentCaptor<VehicleApplicationNotificationPayload> captor =
                 ArgumentCaptor.forClass(VehicleApplicationNotificationPayload.class);
@@ -88,15 +80,13 @@ class VehicleApplicationEventListenerTest {
 
     @Test
     @DisplayName("onVehicleApplicationEvent - handles approved event and notifies driver")
-    void handlesApprovedEvent() throws Exception {
+    void handlesApprovedEvent() {
         var event = new VehicleApplicationApprovedEvent(
                 appId, driverUserId, UUID.randomUUID(), "Yamaha FZ", adminId, Instant.now());
-        String raw = "{\"eventType\":\"APPROVED\"}";
 
-        when(objectMapper.readValue(eq(raw), any(Class.class))).thenReturn(event);
         when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driver));
 
-        listener.onVehicleApplicationEvent(raw);
+        listener.onVehicleApplicationEvent(event);
 
         ArgumentCaptor<VehicleApplicationNotificationPayload> captor =
                 ArgumentCaptor.forClass(VehicleApplicationNotificationPayload.class);
@@ -110,15 +100,13 @@ class VehicleApplicationEventListenerTest {
 
     @Test
     @DisplayName("onVehicleApplicationEvent - handles rejected event and notifies driver with remarks")
-    void handlesRejectedEvent() throws Exception {
+    void handlesRejectedEvent() {
         var event = new VehicleApplicationRejectedEvent(
                 appId, driverUserId, UUID.randomUUID(), "Yamaha FZ", "RC document is blurry", adminId, Instant.now());
-        String raw = "{\"eventType\":\"REJECTED\"}";
 
-        when(objectMapper.readValue(eq(raw), any(Class.class))).thenReturn(event);
         when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driver));
 
-        listener.onVehicleApplicationEvent(raw);
+        listener.onVehicleApplicationEvent(event);
 
         ArgumentCaptor<VehicleApplicationNotificationPayload> captor =
                 ArgumentCaptor.forClass(VehicleApplicationNotificationPayload.class);

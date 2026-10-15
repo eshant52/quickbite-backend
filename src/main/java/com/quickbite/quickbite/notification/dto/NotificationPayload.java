@@ -1,7 +1,11 @@
 package com.quickbite.quickbite.notification.dto;
 
 import com.quickbite.quickbite.notification.model.Notification;
+import com.quickbite.quickbite.notification.service.strategy.NotificationChannel;
 import com.quickbite.quickbite.user.model.User;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * Sealed interface representing everything a notification delivery strategy needs.
@@ -34,4 +38,12 @@ public sealed interface NotificationPayload permits
      * with all domain-specific fields.
      */
     Notification toNotification();
+
+    /**
+     * Set of delivery channels this payload targets by default.
+     * Defaults to all channels. Implementations may override this.
+     */
+    default Set<NotificationChannel> targetChannels() {
+        return EnumSet.allOf(NotificationChannel.class);
+    }
 }

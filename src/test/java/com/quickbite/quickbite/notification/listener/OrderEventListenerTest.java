@@ -19,8 +19,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.databind.ObjectMapper;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
@@ -28,7 +26,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,7 +34,6 @@ class OrderEventListenerTest {
     @Mock private NotificationService notificationService;
     @Mock private UserRepository userRepository;
     @Mock private OrderRepository orderRepository;
-    @Mock private ObjectMapper objectMapper;
 
     @InjectMocks
     private OrderEventListener orderEventListener;
@@ -66,19 +62,16 @@ class OrderEventListenerTest {
 
     @Test
     @DisplayName("onOrderEvent processes OrderPlacedEvent and sends notification")
-    void onOrderEvent_orderPlaced() throws Exception {
+    void onOrderEvent_orderPlaced() {
         OrderPlacedEvent event = new OrderPlacedEvent(
                 orderId, customerId, "Alice", "alice@example.com",
                 UUID.randomUUID(), "Pizza Co", BigDecimal.valueOf(350.00), Instant.now()
         );
-        String rawEvent = "{\"orderId\":\"" + orderId + "\"}";
 
-        when(objectMapper.readValue(rawEvent, com.quickbite.quickbite.common.event.order.OrderEvent.class))
-                .thenReturn(event);
         when(userRepository.findById(customerId)).thenReturn(Optional.of(customer));
         when(orderRepository.findByIdAndCustomerId(orderId, customerId)).thenReturn(Optional.of(order));
 
-        orderEventListener.onOrderEvent(rawEvent);
+        orderEventListener.onOrderEvent(event);
 
         ArgumentCaptor<OrderNotificationPayload> captor = ArgumentCaptor.forClass(OrderNotificationPayload.class);
         verify(notificationService).send(captor.capture());
@@ -87,18 +80,15 @@ class OrderEventListenerTest {
 
     @Test
     @DisplayName("onOrderEvent processes OrderStatusChangedEvent for ABANDONED status")
-    void onOrderEvent_orderAbandoned() throws Exception {
+    void onOrderEvent_orderAbandoned() {
         OrderStatusChangedEvent event = new OrderStatusChangedEvent(
                 orderId, customerId, UUID.randomUUID(), OrderStatus.AWAITING_PAYMENT, OrderStatus.ABANDONED, Instant.now()
         );
-        String rawEvent = "{\"orderId\":\"" + orderId + "\"}";
 
-        when(objectMapper.readValue(rawEvent, com.quickbite.quickbite.common.event.order.OrderEvent.class))
-                .thenReturn(event);
         when(userRepository.findById(customerId)).thenReturn(Optional.of(customer));
         when(orderRepository.findByIdAndCustomerId(orderId, customerId)).thenReturn(Optional.of(order));
 
-        orderEventListener.onOrderEvent(rawEvent);
+        orderEventListener.onOrderEvent(event);
 
         ArgumentCaptor<OrderNotificationPayload> captor = ArgumentCaptor.forClass(OrderNotificationPayload.class);
         verify(notificationService).send(captor.capture());
@@ -108,18 +98,15 @@ class OrderEventListenerTest {
 
     @Test
     @DisplayName("onOrderEvent processes OrderCancelledEvent and sends notification")
-    void onOrderEvent_orderCancelled() throws Exception {
+    void onOrderEvent_orderCancelled() {
         OrderCancelledEvent event = new OrderCancelledEvent(
                 orderId, customerId, UUID.randomUUID(), Instant.now()
         );
-        String rawEvent = "{\"orderId\":\"" + orderId + "\"}";
 
-        when(objectMapper.readValue(rawEvent, com.quickbite.quickbite.common.event.order.OrderEvent.class))
-                .thenReturn(event);
         when(userRepository.findById(customerId)).thenReturn(Optional.of(customer));
         when(orderRepository.findByIdAndCustomerId(orderId, customerId)).thenReturn(Optional.of(order));
 
-        orderEventListener.onOrderEvent(rawEvent);
+        orderEventListener.onOrderEvent(event);
 
         ArgumentCaptor<OrderNotificationPayload> captor = ArgumentCaptor.forClass(OrderNotificationPayload.class);
         verify(notificationService).send(captor.capture());

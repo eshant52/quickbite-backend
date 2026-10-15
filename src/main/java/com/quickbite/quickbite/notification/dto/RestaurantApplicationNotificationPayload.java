@@ -3,8 +3,11 @@ package com.quickbite.quickbite.notification.dto;
 import com.quickbite.quickbite.notification.model.Notification;
 import com.quickbite.quickbite.notification.model.RestaurantApplicationNotification;
 import com.quickbite.quickbite.notification.model.RestaurantApplicationNotificationType;
+import com.quickbite.quickbite.notification.service.strategy.NotificationChannel;
 import com.quickbite.quickbite.user.model.User;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -26,6 +29,7 @@ import java.util.UUID;
  * @param type           Specific event type within restaurant application lifecycle.
  * @param applicationId  ID of the source RestaurantApplication (no FK — historical record).
  * @param restaurantName Snapshot of the restaurant name at event time.
+ * @param targetChannels Set of target delivery channels.
  */
 public record RestaurantApplicationNotificationPayload(
         User recipient,
@@ -33,8 +37,22 @@ public record RestaurantApplicationNotificationPayload(
         String message,
         RestaurantApplicationNotificationType type,
         UUID applicationId,
-        String restaurantName
+        String restaurantName,
+        Set<NotificationChannel> targetChannels
 ) implements NotificationPayload {
+
+    public RestaurantApplicationNotificationPayload(
+            User recipient,
+            String title,
+            String message,
+            RestaurantApplicationNotificationType type,
+            UUID applicationId,
+            String restaurantName) {
+        this(recipient, title, message, type, applicationId, restaurantName,
+                type == RestaurantApplicationNotificationType.APPLICATION_SUBMITTED
+                        ? Set.of(NotificationChannel.IN_APP)
+                        : EnumSet.allOf(NotificationChannel.class));
+    }
 
     @Override
     public Notification toNotification() {

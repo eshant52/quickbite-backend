@@ -15,9 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
-
-import java.util.UUID;
 
 @Component
 public class DeliveryEventListener {
@@ -27,17 +24,14 @@ public class DeliveryEventListener {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
-    private final ObjectMapper objectMapper;
 
     public DeliveryEventListener(
             NotificationService notificationService,
             UserRepository userRepository,
-            OrderRepository orderRepository,
-            ObjectMapper objectMapper) {
+            OrderRepository orderRepository) {
         this.notificationService = notificationService;
         this.userRepository = userRepository;
         this.orderRepository = orderRepository;
-        this.objectMapper = objectMapper;
     }
 
     @KafkaListener(
@@ -45,8 +39,7 @@ public class DeliveryEventListener {
             groupId = "quickbite-delivery-notification-group",
             containerFactory = "stringKafkaListenerContainerFactory"
     )
-    public void onDeliveryEvent(String rawEvent) {
-        DeliveryEvent event = deserialize(rawEvent, DeliveryEvent.class);
+    public void onDeliveryEvent(DeliveryEvent event) {
         if (event == null) return;
 
         switch (event) {
@@ -76,14 +69,5 @@ public class DeliveryEventListener {
     private void handleOfferCreated(DeliveryOfferCreatedEvent event) {
         // TODO(issue #N): Implement FCM push notification to agent when offer is created
         log.info("[NOTIFICATION] Push notification: New delivery offer {} for agent {}", event.offerId(), event.agentId());
-    }
-
-    private <T> T deserialize(String rawEvent, Class<T> type) {
-        try {
-            return objectMapper.readValue(rawEvent, type);
-        } catch (Exception e) {
-            log.error("[NOTIFICATION] Failed to deserialize DeliveryEvent: {}", rawEvent, e);
-            return null;
-        }
     }
 }

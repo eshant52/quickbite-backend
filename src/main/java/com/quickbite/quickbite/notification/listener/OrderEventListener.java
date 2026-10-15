@@ -17,9 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
-import java.util.Map;
 import java.util.UUID;
 
 @Component
@@ -30,16 +28,13 @@ public class OrderEventListener {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
-    private final ObjectMapper objectMapper;
 
     public OrderEventListener(NotificationService notificationService,
                               UserRepository userRepository,
-                              OrderRepository orderRepository,
-                              ObjectMapper objectMapper) {
+                              OrderRepository orderRepository) {
         this.notificationService = notificationService;
         this.userRepository = userRepository;
         this.orderRepository = orderRepository;
-        this.objectMapper = objectMapper;
     }
 
     @KafkaListener(
@@ -47,8 +42,7 @@ public class OrderEventListener {
             groupId = "quickbite-notification-group",
             containerFactory = "stringKafkaListenerContainerFactory"
     )
-    public void onOrderEvent(String rawEvent) {
-        OrderEvent event = deserialize(rawEvent, OrderEvent.class);
+    public void onOrderEvent(OrderEvent event) {
         if (event == null) return;
 
         switch (event) {
@@ -59,148 +53,118 @@ public class OrderEventListener {
     }
 
     private void handleOrderPlaced(OrderPlacedEvent event) {
-        User customer = loadCustomer(event.customerId());
-        if (customer == null) {
-            log.error("[NOTIFICATION] Customer not found for order: {}", event.orderId());
-            return;
-        }
-
-        Order order = loadOrderOfCustomer(event.orderId(), customer);
-        if (order == null) {
-            log.error("[NOTIFICATION] Order not found for order: {}", event.orderId());
-            return;
-        }
-
-        notificationService.send(new OrderNotificationPayload(
-                customer,
+        notifyOrderCustomer(
+                event.orderId(),
+                event.customerId(),
                 "Order Confirmed!",
                 "Your order of amount ₹" + event.totalAmount() + " has been placed successfully.",
                 OrderNotificationType.PLACED,
-                order
-        ));
-
-        log.info("[NOTIFICATION] Order placed event sent to order: {}", event.orderId());
+                "Order placed event sent"
+        );
     }
 
     private void handleOrderStatusChanged(OrderStatusChangedEvent event) {
-        User customer = loadCustomer(event.customerId());
-        if (customer == null) {
-            log.error("[NOTIFICATION] Customer not found for order: {}", event.orderId());
+        StatusNotificationConfig config = resolveStatusConfig(event.newStatus());
+        if (config == null) {
             return;
         }
 
-        Order order = loadOrderOfCustomer(event.orderId(), customer);
-        if (order == null) {
-            log.error("[NOTIFICATION] Order not found for order: {}", event.orderId());
-            return;
-        }
-
-        Map<String, String> titleAndMessage = getTitleAndMessage(event.newStatus());
-
-        OrderNotificationType notificationType = switch (event.newStatus()) {
-            case ACCEPTED -> OrderNotificationType.ACCEPTED;
-            case PREPARING -> OrderNotificationType.PREPARING;
-            case READY_FOR_PICKUP -> OrderNotificationType.READY_FOR_PICKUP;
-            case OUT_FOR_DELIVERY -> OrderNotificationType.OUT_FOR_DELIVERY;
-            case DELIVERED -> OrderNotificationType.DELIVERED;
-            case DECLINED -> OrderNotificationType.DECLINED;
-            case PAYMENT_FAILED -> OrderNotificationType.PAYMENT_FAILED;
-            case ABANDONED -> OrderNotificationType.ABANDONED;
-            default -> null;
-        };
-
-        if (notificationType == null) return;
-
-        notificationService.send(new OrderNotificationPayload(
-                customer,
-                titleAndMessage.get("title"),
-                titleAndMessage.get("message"),
-                notificationType,
-                order
-        ));
-
-        log.info("[NOTIFICATION] Order {} updated for order: {}", event.newStatus().name(), event.orderId());
+        notifyOrderCustomer(
+                event.orderId(),
+                event.customerId(),
+                config.title(),
+                config.message(),
+                config.type(),
+                "Order " + event.newStatus().name() + " updated"
+        );
     }
 
     private void handleOrderCancelled(OrderCancelledEvent event) {
-        User customer = loadCustomer(event.customerId());
+        notifyOrderCustomer(
+                event.orderId(),
+                event.customerId(),
+                "Order Cancelled!",
+                "Your order has been cancelled. If you have any questions, please contact support.",
+                OrderNotificationType.CANCELLED,
+                "Order cancelled"
+        );
+    }
+
+    private void notifyOrderCustomer(
+            UUID orderId,
+            UUID customerId,
+            String title,
+            String message,
+            OrderNotificationType type,
+            String actionLog) {
+        User customer = userRepository.findById(customerId).orElse(null);
         if (customer == null) {
-            log.error("[NOTIFICATION] Customer not found for order: {}", event.orderId());
+            log.error("[NOTIFICATION] Customer not found for order: {}", orderId);
             return;
         }
 
-        Order order = loadOrderOfCustomer(event.orderId(), customer);
+        Order order = orderRepository.findByIdAndCustomerId(orderId, customer.getId()).orElse(null);
         if (order == null) {
-            log.error("[NOTIFICATION] Order not found for order: {}", event.orderId());
+            log.error("[NOTIFICATION] Order not found for order: {}", orderId);
             return;
         }
 
         notificationService.send(new OrderNotificationPayload(
                 customer,
-                "Order Cancelled!",
-                "Your order has been cancelled. If you have any questions, please contact support.",
-                OrderNotificationType.CANCELLED,
+                title,
+                message,
+                type,
                 order
         ));
 
-        log.info("[NOTIFICATION] Order cancelled for order: {}", event.orderId());
+        log.info("[NOTIFICATION] {} for order: {}", actionLog, orderId);
     }
 
-    private <T> T deserialize(String rawEvent, Class<T> type) {
-        try {
-            return objectMapper.readValue(rawEvent, type);
-        } catch (Exception e) {
-            log.error("[NOTIFICATION] Failed to deserialize Kafka event: {}", rawEvent, e);
-            throw new RuntimeException("Failed to deserialize event", e);
-        }
-    }
+    private record StatusNotificationConfig(OrderNotificationType type, String title, String message) {}
 
-    private User loadCustomer(UUID customerId) {
-        return userRepository.findById(customerId).orElse(null);
-    }
-
-    private Order loadOrderOfCustomer(UUID orderId, User customer) {
-        return orderRepository.findByIdAndCustomerId(orderId, customer.getId()).orElse(null);
-    }
-
-    private Map<String, String> getTitleAndMessage(OrderStatus newStatus) {
+    private StatusNotificationConfig resolveStatusConfig(OrderStatus newStatus) {
         return switch (newStatus) {
-            case ACCEPTED -> Map.of(
-                    "title", "Restaurant Accepted Your Order!",
-                    "message", "Your order has been accepted by the restaurant."
+            case ACCEPTED -> new StatusNotificationConfig(
+                    OrderNotificationType.ACCEPTED,
+                    "Restaurant Accepted Your Order!",
+                    "Your order has been accepted by the restaurant."
             );
-            case PREPARING -> Map.of(
-                    "title", "Food is Being Prepared!",
-                    "message", "Your order is currently being prepared."
+            case PREPARING -> new StatusNotificationConfig(
+                    OrderNotificationType.PREPARING,
+                    "Food is Being Prepared!",
+                    "Your order is currently being prepared."
             );
-            case READY_FOR_PICKUP -> Map.of(
-                    "title", "Order Ready - Assigning Delivery Partner",
-                    "message", "Your order is ready for pickup."
+            case READY_FOR_PICKUP -> new StatusNotificationConfig(
+                    OrderNotificationType.READY_FOR_PICKUP,
+                    "Order Ready - Assigning Delivery Partner",
+                    "Your order is ready for pickup."
             );
-            case OUT_FOR_DELIVERY -> Map.of(
-                    "title", "Order is On the Way!",
-                    "message", "Your order is out for delivery."
+            case OUT_FOR_DELIVERY -> new StatusNotificationConfig(
+                    OrderNotificationType.OUT_FOR_DELIVERY,
+                    "Order is On the Way!",
+                    "Your order is out for delivery."
             );
-            case DELIVERED -> Map.of(
-                    "title", "Order Delivered!",
-                    "message", "Your order has been delivered. Enjoy your meal!"
+            case DELIVERED -> new StatusNotificationConfig(
+                    OrderNotificationType.DELIVERED,
+                    "Order Delivered!",
+                    "Your order has been delivered. Enjoy your meal!"
             );
-            case DECLINED -> Map.of(
-                    "title", "Order Declined",
-                    "message", "Your order has been declined."
+            case DECLINED -> new StatusNotificationConfig(
+                    OrderNotificationType.DECLINED,
+                    "Order Declined",
+                    "Your order has been declined."
             );
-            case PAYMENT_FAILED -> Map.of(
-                    "title", "Payment Failed",
-                    "message", "Payment for your order has failed."
+            case PAYMENT_FAILED -> new StatusNotificationConfig(
+                    OrderNotificationType.PAYMENT_FAILED,
+                    "Payment Failed",
+                    "Payment for your order has failed."
             );
-            case ABANDONED -> Map.of(
-                    "title", "Order Cancelled due to Inactivity",
-                    "message", "Your order was cancelled because payment was not completed within the allowed time."
+            case ABANDONED -> new StatusNotificationConfig(
+                    OrderNotificationType.ABANDONED,
+                    "Order Cancelled due to Inactivity",
+                    "Your order was cancelled because payment was not completed within the allowed time."
             );
-            default -> Map.of(
-                    "title", "Order Updated",
-                    "message", "Your order status has been updated."
-            );
+            default -> null;
         };
     }
 }
