@@ -8,12 +8,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.converter.RecordMessageConverter;
+import org.springframework.kafka.support.converter.StringJacksonJsonMessageConverter;
+import org.springframework.kafka.support.mapping.DefaultJacksonJavaTypeMapper;
+import org.springframework.kafka.support.mapping.JacksonJavaTypeMapper;
 import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.Map;
@@ -53,12 +58,26 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(properties);
     }
 
+    /**
+     * Default container factory for Kafka consumers with automatic Dead Letter Topic (DLT) recovery
+     * and native Jackson polymorphic JSON message conversion.
+     * Used by any @KafkaListener that does not explicitly specify a containerFactory.
+     */
     @Bean
+    @Primary
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
-            ConsumerFactory<String, Object> consumerFactory) {
+            ConsumerFactory<String, Object> consumerFactory,
+            KafkaTemplate<String, Object> kafkaTemplate,
+            RecordMessageConverter recordMessageConverter) {
         ConcurrentKafkaListenerContainerFactory<String, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
+        factory.setRecordMessageConverter(recordMessageConverter);
+
+        var recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
+        var errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(1_000L, 3));
+        factory.setCommonErrorHandler(errorHandler);
+
         return factory;
     }
 
@@ -74,17 +93,34 @@ public class KafkaConfig {
     }
 
     /**
-     * Container factory for string consumers with automatic Dead Letter Topic (DLT) recovery.
+     * JSON message converter backed by Jackson.
+     * Uses INFERRED type precedence to automatically deserialize into the listener method's parameter type.
+     */
+    @Bean
+    public RecordMessageConverter recordMessageConverter() {
+        StringJacksonJsonMessageConverter converter = new StringJacksonJsonMessageConverter();
+        DefaultJacksonJavaTypeMapper typeMapper = new DefaultJacksonJavaTypeMapper();
+        typeMapper.setTypePrecedence(JacksonJavaTypeMapper.TypePrecedence.INFERRED);
+        typeMapper.addTrustedPackages("*");
+        converter.setTypeMapper(typeMapper);
+        return converter;
+    }
+
+    /**
+     * Container factory for string consumers with automatic Dead Letter Topic (DLT) recovery
+     * and native Jackson polymorphic JSON message conversion.
      * Retries up to 3 times with a 1-second fixed delay before publishing the unrecoverable
      * poisoned record to &lt;topic&gt;.DLT.
      */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> stringKafkaListenerContainerFactory(
             ConsumerFactory<String, String> stringConsumerFactory,
-            KafkaTemplate<String, Object> kafkaTemplate) {
+            KafkaTemplate<String, Object> kafkaTemplate,
+            RecordMessageConverter recordMessageConverter) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(stringConsumerFactory);
+        factory.setRecordMessageConverter(recordMessageConverter);
 
         var recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
         var errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(1_000L, 3));

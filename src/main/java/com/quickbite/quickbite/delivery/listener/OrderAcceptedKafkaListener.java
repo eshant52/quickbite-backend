@@ -9,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class OrderAcceptedKafkaListener {
@@ -17,13 +16,9 @@ public class OrderAcceptedKafkaListener {
     private static final Logger log = LoggerFactory.getLogger(OrderAcceptedKafkaListener.class);
 
     private final DeliveryDispatchService deliveryDispatchService;
-    private final ObjectMapper objectMapper;
 
-    public OrderAcceptedKafkaListener(
-            DeliveryDispatchService deliveryDispatchService,
-            ObjectMapper objectMapper) {
+    public OrderAcceptedKafkaListener(DeliveryDispatchService deliveryDispatchService) {
         this.deliveryDispatchService = deliveryDispatchService;
-        this.objectMapper = objectMapper;
     }
 
     @KafkaListener(
@@ -31,8 +26,7 @@ public class OrderAcceptedKafkaListener {
             groupId = "quickbite-delivery-dispatch-group",
             containerFactory = "stringKafkaListenerContainerFactory"
     )
-    public void onOrderEvent(String rawEvent) {
-        OrderEvent event = deserialize(rawEvent, OrderEvent.class);
+    public void onOrderEvent(OrderEvent event) {
         if (event instanceof OrderStatusChangedEvent statusChanged
                 && statusChanged.newStatus() == OrderStatus.ACCEPTED) {
             log.info("[Kafka] OrderStatusChangedEvent (ACCEPTED) received for order={}. Initiating delivery dispatch.",
@@ -43,15 +37,6 @@ public class OrderAcceptedKafkaListener {
                 log.error("[Kafka] Failed to initiate dispatch for order={}: {}",
                         statusChanged.orderId(), e.getMessage(), e);
             }
-        }
-    }
-
-    private <T> T deserialize(String rawEvent, Class<T> type) {
-        try {
-            return objectMapper.readValue(rawEvent, type);
-        } catch (Exception e) {
-            log.error("[Kafka] Failed to deserialize OrderEvent: {}", rawEvent, e);
-            return null;
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.quickbite.quickbite.delivery.service;
 
+import com.quickbite.quickbite.common.config.property.DeliveryGeoProperties;
 import com.quickbite.quickbite.common.event.order.OrderStatusChangedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentStatusChangedEvent;
 import com.quickbite.quickbite.common.exception.BadRequestException;
@@ -74,7 +75,10 @@ class DeliveryServiceImplTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
+    @Mock
+    private DeliveryTrackingService deliveryTrackingService;
+
+    private DeliveryGeoProperties deliveryGeoProperties;
     private DeliveryServiceImpl deliveryService;
 
     private User user;
@@ -86,6 +90,19 @@ class DeliveryServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        deliveryGeoProperties = new DeliveryGeoProperties(true, java.time.Duration.ofSeconds(60), java.time.Duration.ofSeconds(30));
+        deliveryService = new DeliveryServiceImpl(
+                deliveryAgentRepository,
+                userRepository,
+                orderRepository,
+                orderStatusHistoryRepository,
+                paymentRepository,
+                paymentStatusHistoryRepository,
+                deliveryAssignmentStrategy,
+                eventPublisher,
+                deliveryTrackingService,
+                deliveryGeoProperties
+        );
         userId = UUID.randomUUID();
         agentId = UUID.randomUUID();
         orderId = UUID.randomUUID();
@@ -155,14 +172,13 @@ class DeliveryServiceImplTest {
     class UpdateLocationTests {
 
         @Test
-        @DisplayName("Updates GPS point and preserves existing availability and assigned status")
-        void updateLocation_approvedAgent() {
+        @DisplayName("Updates GPS point via Redis tracking when geo is enabled")
+        void updateLocation_withGeoEnabled() {
             agent.setCurrentStatus(DeliveryAgentVerificationStatus.APPROVED);
             agent.setAvailable(true);
-            agent.setAssigned(true); // Agent is on an active delivery
+            agent.setAssigned(true);
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(deliveryAgentRepository.findByUser(user)).thenReturn(Optional.of(agent));
-            when(deliveryAgentRepository.save(any(DeliveryAgent.class))).thenAnswer(i -> i.getArgument(0));
 
             UpdateLocationRequest req = new UpdateLocationRequest(12.9716, 77.5946);
             DeliveryAgentResponse res = deliveryService.updateLocation(userId, req);
@@ -171,6 +187,43 @@ class DeliveryServiceImplTest {
             assertThat(res.isAssigned()).isTrue();
             assertThat(res.latitude()).isEqualTo(12.9716);
             assertThat(res.longitude()).isEqualTo(77.5946);
+            verify(deliveryTrackingService).recordLocation(agentId, 12.9716, 77.5946);
+            verify(deliveryAgentRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Updates GPS point directly to DB when geo is disabled")
+        void updateLocation_withGeoDisabled() {
+            DeliveryGeoProperties disabledProps = new DeliveryGeoProperties(false, java.time.Duration.ofSeconds(60), java.time.Duration.ofSeconds(30));
+            DeliveryServiceImpl disabledService = new DeliveryServiceImpl(
+                    deliveryAgentRepository,
+                    userRepository,
+                    orderRepository,
+                    orderStatusHistoryRepository,
+                    paymentRepository,
+                    paymentStatusHistoryRepository,
+                    deliveryAssignmentStrategy,
+                    eventPublisher,
+                    deliveryTrackingService,
+                    disabledProps
+            );
+
+            agent.setCurrentStatus(DeliveryAgentVerificationStatus.APPROVED);
+            agent.setAvailable(true);
+            agent.setAssigned(true);
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(deliveryAgentRepository.findByUser(user)).thenReturn(Optional.of(agent));
+            when(deliveryAgentRepository.save(any(DeliveryAgent.class))).thenAnswer(i -> i.getArgument(0));
+
+            UpdateLocationRequest req = new UpdateLocationRequest(12.9716, 77.5946);
+            DeliveryAgentResponse res = disabledService.updateLocation(userId, req);
+
+            assertThat(res.isAvailable()).isTrue();
+            assertThat(res.isAssigned()).isTrue();
+            assertThat(res.latitude()).isEqualTo(12.9716);
+            assertThat(res.longitude()).isEqualTo(77.5946);
+            verify(deliveryAgentRepository).save(any(DeliveryAgent.class));
+            verify(deliveryTrackingService, never()).recordLocation(any(), anyDouble(), anyDouble());
         }
     }
 

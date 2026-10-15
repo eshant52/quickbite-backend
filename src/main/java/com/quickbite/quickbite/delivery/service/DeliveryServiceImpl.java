@@ -1,5 +1,6 @@
 package com.quickbite.quickbite.delivery.service;
 
+import com.quickbite.quickbite.common.config.property.DeliveryGeoProperties;
 import com.quickbite.quickbite.common.event.order.OrderStatusChangedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentStatusChangedEvent;
 import com.quickbite.quickbite.common.exception.BadRequestException;
@@ -53,6 +54,8 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
     private final PaymentStatusHistoryRepository paymentStatusHistoryRepository;
     private final DeliveryAssignmentStrategy deliveryAssignmentStrategy;
     private final ApplicationEventPublisher eventPublisher;
+    private final DeliveryTrackingService deliveryTrackingService;
+    private final DeliveryGeoProperties deliveryGeoProperties;
 
     public DeliveryServiceImpl(
             DeliveryAgentRepository deliveryAgentRepository,
@@ -62,7 +65,9 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
             PaymentRepository paymentRepository,
             PaymentStatusHistoryRepository paymentStatusHistoryRepository,
             DeliveryAssignmentStrategy deliveryAssignmentStrategy,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            DeliveryTrackingService deliveryTrackingService,
+            DeliveryGeoProperties deliveryGeoProperties
     ) {
         this.deliveryAgentRepository = deliveryAgentRepository;
         this.userRepository = userRepository;
@@ -72,6 +77,8 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
         this.paymentStatusHistoryRepository = paymentStatusHistoryRepository;
         this.deliveryAssignmentStrategy = deliveryAssignmentStrategy;
         this.eventPublisher = eventPublisher;
+        this.deliveryTrackingService = deliveryTrackingService;
+        this.deliveryGeoProperties = deliveryGeoProperties;
     }
 
     // -----------------------------------------------------------------
@@ -113,8 +120,13 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
         Point location = GEOMETRY_FACTORY.createPoint(new Coordinate(req.longitude(), req.latitude()));
         agent.setLastLocation(location);
 
-        DeliveryAgent saved = deliveryAgentRepository.save(agent);
-        return DeliveryAgentResponse.from(saved);
+        if (deliveryGeoProperties.enabled()) {
+            deliveryTrackingService.recordLocation(agent.getId(), req.latitude(), req.longitude());
+        } else {
+            agent = deliveryAgentRepository.save(agent);
+        }
+
+        return DeliveryAgentResponse.from(agent);
     }
 
     @Override
@@ -135,6 +147,19 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
 
         agent.setAvailable(available);
         DeliveryAgent saved = deliveryAgentRepository.save(agent);
+
+        if (deliveryGeoProperties.enabled()) {
+            if (!available) {
+                deliveryTrackingService.removeAgent(saved.getId());
+            } else if (saved.getLastLocation() != null) {
+                deliveryTrackingService.recordLocation(
+                        saved.getId(),
+                        saved.getLastLocation().getY(),
+                        saved.getLastLocation().getX()
+                );
+            }
+        }
+
         return DeliveryAgentResponse.from(saved);
     }
 
