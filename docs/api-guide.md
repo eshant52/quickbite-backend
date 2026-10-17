@@ -12,10 +12,10 @@ All API endpoints (except explicitly public routes) are protected by Spring Secu
 
 | Credential Type | Protocol / Format | Transport Mechanism | Scope / Role Mapping | Lifetime |
 | :--- | :--- | :--- | :--- | :--- |
-| **API Access Token** | RSA256 Signed JWT | `Authorization: Bearer <token>` | `SCOPE_API` + `ROLE_<ROLE>` | 15 Minutes (`PT15M`) |
-| **Session Challenge Token** | RSA256 Signed JWT | `Authorization: Bearer <token>` | `SCOPE_AUTH` only | 5 Minutes (`PT5M`) |
-| **Refresh Token** | Cryptographic Opaque String | Cookie: `qb_refresh_token` (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1/auth`) | Internal validation against PostgreSQL & Redis | 7 Days (`P7D`) |
-| **Client Context** | Optional Header | `X-Client-Type: WEB \| MOBILE_APP \| TABLET \| DESKTOP` | Parsed by `UserAgentParser` | Per-request |
+| **API Access Token** | RS256 Signed JWT | `Authorization: Bearer <token>` | `SCOPE_API` + `ROLE_<ROLE>` | 15 Minutes (`PT15M`) |
+| **Session Challenge Token** | RS256 Signed JWT | `Authorization: Bearer <token>` | `SCOPE_AUTH` only | 5 Minutes (`PT5M`) |
+| **Refresh Token** | 64-Byte Opaque String | **Web**: Cookie `qb_refresh_token` (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1/auth`)<br/>**Mobile**: JSON Body (`AuthResponse.refreshToken` / `RefreshRequest.refreshToken`) | Internal validation against PostgreSQL & Redis | 7 Days (`P7D`) |
+| **Client Context** | Mandatory Auth Header | `X-Client-Type: web_browser \| mobile_app` | Resolved by `YauaaDeviceInfoResolver` | Per-request on `/login`, `/refresh-token`, `/claim-session` |
 
 ---
 
@@ -23,15 +23,16 @@ All API endpoints (except explicitly public routes) are protected by Spring Secu
 
 | URL Pattern | Required Authority / Role | Permitted HTTP Methods | Description |
 | :--- | :--- | :--- | :--- |
-| `/api/v1/auth/register/**` | **PermitAll** (Public) | `POST` | Customer & partner registration |
+| `/api/v1/auth/register/**` | **PermitAll** (Public) | `POST` | Customer, driver & restaurant owner registration |
 | `/api/v1/auth/login` | **PermitAll** (Public) | `POST` | User authentication |
-| `/api/v1/auth/refresh-token` | **PermitAll** (Cookie required) | `POST` | Token rotation |
+| `/api/v1/auth/refresh-token` | **PermitAll** (Cookie or Body) | `POST` | Refresh token rotation |
 | `/api/v1/webhooks/**` | **PermitAll** (Signature check) | `POST` | Gateway webhooks (Razorpay) |
 | `/api/v1/cuisines` | **PermitAll** (Public) | `GET` | Browse approved cuisines |
 | `/api/v1/restaurants/**` | **PermitAll** (Public) | `GET` | Browse restaurants, menus, reviews |
 | `/actuator/health`, `/info` | **PermitAll** (Public) | `GET` | Liveness & Readiness probes |
 | `/api/v1/auth/sessions/**` | `SCOPE_AUTH` | `GET`, `DELETE` | Session challenge resolution |
 | `/api/v1/auth/claim-session` | `SCOPE_AUTH` | `POST` | Claim session on eviction |
+| `/api/v1/auth/logout`, `/logout-all` | `SCOPE_API` | `POST` | Single-session or global logout |
 | `/api/v1/files/upload-url` | `SCOPE_API` | `POST` | Direct S3 presigned upload URL |
 | `/api/v1/customer/**` | `SCOPE_API` + `ROLE_CUSTOMER` | `GET`, `POST`, `PUT`, `DELETE` | Customer operations |
 | `/api/v1/restaurant-owner/**` | `SCOPE_API` + `ROLE_RESTAURANT_OWNER` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | Restaurant management |
@@ -43,15 +44,20 @@ All API endpoints (except explicitly public routes) are protected by Spring Secu
 
 ## 3. Public Endpoints
 
-### 3.1 Authentication & Registration (`AuthenticationController`, `UserRegistrationController`)
-* `POST /api/v1/auth/register/customer` — Register a new customer account.
-  - Body: `{ "fullName": "Jane Doe", "email": "jane@example.com", "phoneNumber": "+919876543210", "password": "Password@123" }`
+### 3.1 Authentication & Registration (`AuthenticationController`, `UserRegistrationController`, `LogoutController`)
+* `POST /api/v1/auth/register/customer` — Register a new customer account (`ROLE_CUSTOMER`).
+  - Body: `{ "name": "Jane Doe", "email": "jane@example.com", "phoneNumber": "+919876543210", "password": "Password@123" }`
+* `POST /api/v1/auth/register/delivery-agent` — Register a new delivery partner account (`ROLE_DELIVERY_AGENT`).
+* `POST /api/v1/auth/register/restaurant-owner` — Register a new restaurant owner account (`ROLE_RESTAURANT_OWNER`).
 * `POST /api/v1/auth/login` — Authenticate with email and password.
+  - Header: `X-Client-Type: web_browser` or `mobile_app` (Required)
   - Body: `{ "email": "jane@example.com", "password": "Password@123" }`
-  - Response: `AuthResponse` containing `accessToken`. Also sets `qb_refresh_token` in `HttpOnly` cookie.
-  - *Note*: If the user has 3 active sessions, returns `409 Conflict` with `SessionLimitErrorResponse` containing a challenge token.
-* `POST /api/v1/auth/refresh-token` — Rotate tokens using the `qb_refresh_token` cookie.
-* `POST /api/v1/auth/logout` — Terminate current session and invalidate refresh token family.
+  - Response: `AuthResponse` (`accessToken`, `refreshToken` [for mobile], `expiresIn`, `sessionId`, `tokenType`). Sets `qb_refresh_token` `HttpOnly` cookie for `web_browser`.
+  - *Note*: If the user already has 3 active sessions, returns `409 Conflict` with `SessionLimitErrorResponse { "error": "session_limit_exceeded", "challengeToken": "...", "maxSessions": 3 }`.
+* `POST /api/v1/auth/refresh-token` — Rotate tokens.
+  - Header: `X-Client-Type: web_browser` (reads `qb_refresh_token` cookie) or `mobile_app` (reads `{ "refreshToken": "..." }` JSON body).
+* `POST /api/v1/auth/logout` — Terminate current session and expire refresh cookie (Requires `SCOPE_API`).
+* `POST /api/v1/auth/logout-all` — Terminate all active sessions across all devices for the current user (Requires `SCOPE_API`).
 
 ### 3.2 Public Catalog & Discovery (`RestaurantCatalogController`, `CuisineCatalogController`, `MenuItemCatalogController`, `RestaurantReviewController`)
 * `GET /api/v1/cuisines` — List all approved cuisines.
@@ -86,25 +92,29 @@ All API endpoints (except explicitly public routes) are protected by Spring Secu
 * `PUT /api/v1/customer/me/addresses/{id}/default` — Set an address as default.
 
 ### 4.2 Shopping Cart (`CartController`)
-* `GET /api/v1/customer/cart` — Get active shopping cart.
-* `POST /api/v1/customer/cart/items` — Add item to cart (enforces single-restaurant rule).
-  - Body: `{ "menuItemId": "<uuid>", "quantity": 2, "specialInstructions": "Extra spicy" }`
-* `PUT /api/v1/customer/cart/items/{id}` — Update item quantity or instructions.
-* `DELETE /api/v1/customer/cart/items/{id}` — Remove item from cart.
+* `GET /api/v1/customer/cart` — Get active shopping cart (24h rolling TTL).
+* `POST /api/v1/customer/cart/items` — Add item to cart (enforces single-restaurant rule; throws `409 Conflict` if cart contains items from another restaurant).
+  - Body: `{ "menuItemId": "<uuid>", "quantity": 2 }`
+* `PUT /api/v1/customer/cart/items/{cartItemId}` — Update item quantity.
+  - Body: `{ "quantity": 3 }`
+* `DELETE /api/v1/customer/cart/items/{cartItemId}` — Remove item from cart.
 * `DELETE /api/v1/customer/cart` — Clear entire cart.
-* `GET /api/v1/customer/cart/checkout-preview` — Real-time price, delivery fee, platform fee, and GST preview.
+* `GET /api/v1/customer/cart/checkout-preview` — Real-time route distance, delivery fee (base + distance + surge), platform fee, GST, and total preview.
+  - Params: `addressId` (UUID, required), `tipAmount` (BigDecimal, optional).
 
 ### 4.3 Orders & Payments (`CustomerOrderController`, `PaymentController`)
-* `POST /api/v1/customer/orders` — Place order from active cart (Redisson locked).
-  - Body: `{ "addressId": "<uuid>", "paymentMethod": "ONLINE \| COD", "customerNotes": "Leave at front door" }`
-* `GET /api/v1/customer/orders` — Paginated order history.
-* `GET /api/v1/customer/orders/{orderId}` — Order details with item breakdown and status history.
-* `POST /api/v1/customer/orders/{orderId}/retry-payment` — Re-initiate payment for failed orders.
-* `DELETE /api/v1/customer/orders/{orderId}/cancel` — Cancel order (if not yet accepted/preparing).
-* `GET /api/v1/customer/orders/{orderId}/delivery-agent` — Track assigned delivery agent location.
-* `GET /api/v1/customer/payments/order/{orderId}` — Get payment details and gateway order ID.
-* `POST /api/v1/customer/payments/verify` — Verify online payment client signature.
-  - Body: `{ "orderId": "<uuid>", "razorpayPaymentId": "pay_...", "razorpayOrderId": "order_...", "razorpaySignature": "..." }`
+* `POST /api/v1/customer/orders` — Place order from active cart (5s Redisson cooldown + price-drift check).
+  - Body: `{ "addressId": "<uuid>", "paymentMethod": "UPI | CARD | NET_BANKING | WALLET | COD", "tipAmount": 20.00, "expectedTotal": 345.50 }`
+  - Returns: `201 Created` with `PaymentResult` (`CodPaymentResult`, `OnlinePaymentResult`, or `StubOnlinePaymentResult`). Throws `409 Conflict` (`PriceChangedException`) if `expectedTotal` differs from freshly computed price.
+* `GET /api/v1/customer/orders` — Cursor-paginated order history (`cursor`, `size`).
+* `GET /api/v1/customer/orders/{orderId}` — Order details with item breakdown, pricing, and status history.
+* `POST /api/v1/customer/orders/{orderId}/retry-payment` — Reconcile prior attempts and re-initiate payment within the 15-minute window.
+  - Params: `paymentMethod` (optional override, defaults to `UPI`).
+* `DELETE /api/v1/customer/orders/{orderId}/cancel` — Cancel order (allowed while in `AWAITING_PAYMENT`, `PAYMENT_FAILED`, or `PLACED` prior to restaurant acceptance).
+* `GET /api/v1/customer/orders/{orderId}/delivery-agent` — Track assigned delivery agent details and coordinates.
+* `GET /api/v1/customer/payments/order/{orderId}` — Get payment details, all attempt summaries, and trigger live reconciliation if `PENDING`.
+* `POST /api/v1/customer/payments/verify` — Verify online payment HMAC-SHA256 signature and transition order to `PLACED`.
+  - Body: `{ "gatewayOrderId": "order_...", "gatewayPaymentId": "pay_...", "gatewaySignature": "..." }`
 
 ### 4.4 Reviews (`CustomerReviewController`)
 * `POST /api/v1/customer/reviews` — Submit review for a delivered order.
@@ -145,12 +155,14 @@ All API endpoints (except explicitly public routes) are protected by Spring Secu
 * `POST /api/v1/restaurant-owner/cuisines/requests` — Request a new cuisine category.
 
 ### 5.3 Order Fulfillment (`RestaurantOrderController`)
-* `GET /api/v1/restaurant-owner/orders` — Incoming and active orders queue.
-* `GET /api/v1/restaurant-owner/orders/{orderId}` — Order details.
-* `POST /api/v1/restaurant-owner/orders/{orderId}/accept` — Accept order (must accept within 2-min deadline).
-* `POST /api/v1/restaurant-owner/orders/{orderId}/decline` — Decline order (triggers refund).
-* `POST /api/v1/restaurant-owner/orders/{orderId}/mark-preparing` — Transition status to `PREPARING`.
-* `POST /api/v1/restaurant-owner/orders/{orderId}/mark-ready` — Mark kitchen preparation completed (`READY_FOR_PICKUP`).
+All endpoints require query parameter `?restaurantId=<uuid>`:
+* `GET /api/v1/restaurant-owner/orders` — Cursor-paginated restaurant orders (`restaurantId`, optional `status`, `cursor`, `size`).
+* `GET /api/v1/restaurant-owner/orders/{orderId}` — Detailed order view (`restaurantId`).
+* `POST /api/v1/restaurant-owner/orders/{orderId}/accept` — Accept order within 2-minute deadline (`PLACED` &rarr; `ACCEPTED`, initiates parallel driver dispatch).
+* `POST /api/v1/restaurant-owner/orders/{orderId}/decline` — Decline order (`PLACED` &rarr; `DECLINED`, triggers automatic customer refund).
+* `POST /api/v1/restaurant-owner/orders/{orderId}/mark-preparing` — Transition status (`ACCEPTED` &rarr; `PREPARING`).
+* `POST /api/v1/restaurant-owner/orders/{orderId}/mark-ready` — Mark kitchen preparation complete (`PREPARING` &rarr; `READY_FOR_PICKUP`).
+* `GET /api/v1/restaurant-owner/orders/{orderId}/delivery-agent` — View delivery agent assigned to the order.
 
 ---
 

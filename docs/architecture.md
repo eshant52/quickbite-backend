@@ -42,19 +42,19 @@ flowchart TB
     end
 
     subgraph StorageLayer["Persistence & Caching"]
-        PostgresDB[(PostgreSQL 18 + PostGIS<br/>Audited by Hibernate Envers)]
-        RedisCache[(Redis 8<br/>Cache, Sessions, Redis GEO)]
-        RedissonLock[Redisson Distributed Locks]
+        PostgresDB[("PostgreSQL 18 + PostGIS<br/>Audited by Hibernate Envers")]
+        RedisCache[("Redis 8<br/>Cache, Sessions, Redis GEO")]
+        RedissonLock[("Redisson Distributed Locks")]
     end
 
     subgraph EventStreaming["Event Streaming"]
-        KafkaBroker{{Apache Kafka 4.3<br/>7 Domain Streams + DLTs}}
+        KafkaBroker["Apache Kafka 4.3<br/>7 Domain Streams + DLTs"]
     end
 
     subgraph ExternalServices["External Providers"]
-        OSRMServer[OSRM Routing Engine :5001]
-        AWSS3[AWS S3 Object Storage]
-        RazorpayGateway[Razorpay Payment API]
+        OSRMServer["OSRM Routing Engine :5001"]
+        AWSS3["AWS S3 Object Storage"]
+        RazorpayGateway["Razorpay Payment API"]
     end
 
     Clients --> SecurityPerimeter
@@ -123,13 +123,13 @@ The system declares **7 primary aggregate streams** alongside automated Dead Let
 ```mermaid
 flowchart LR
     subgraph Publishers["Domain Publishers"]
-        OrderPub[OrderKafkaEventPublisher]
-        PaymentPub[PaymentKafkaEventPublisher]
-        DeliveryPub[DeliveryKafkaEventPublisher]
-        RestAppPub[RestaurantAppKafkaPublisher]
-        AgentAppPub[DeliveryAgentAppKafkaPublisher]
-        VehicleAppPub[VehicleAppKafkaPublisher]
-        CuisinePub[CuisineKafkaEventPublisher]
+        OrderPub["OrderKafkaEventPublisher"]
+        PaymentPub["PaymentKafkaEventPublisher"]
+        DeliveryPub["DeliveryKafkaEventPublisher"]
+        RestAppPub["RestaurantAppKafkaPublisher"]
+        AgentAppPub["DeliveryAgentAppKafkaPublisher"]
+        VehicleAppPub["VehicleAppKafkaPublisher"]
+        CuisinePub["CuisineKafkaEventPublisher"]
     end
 
     subgraph Topics["Kafka Topics (3 Partitions, 1-3 Replicas)"]
@@ -143,12 +143,12 @@ flowchart LR
     end
 
     subgraph Consumers["Domain Listeners"]
-        OrderListener[order.PaymentEventListener]
-        DeliveryListener[delivery.OrderAcceptedKafkaListener]
-        CartListener[cart.CartEventListener]
-        ReviewListener[review.RestaurantRatingEventListener]
-        PaymentRefundListener[payment.PaymentRefundListener]
-        NotificationListeners[notification.*EventListener<br/>(Consumes all 7 streams)]
+        OrderListener["order.PaymentEventListener"]
+        DeliveryListener["delivery.OrderAcceptedKafkaListener"]
+        CartListener["cart.CartEventListener"]
+        ReviewListener["review.RestaurantRatingEventListener"]
+        PaymentRefundListener["payment.PaymentRefundListener"]
+        NotificationListeners["notification.*EventListener<br/>(Consumes all 7 streams)"]
     end
 
     OrderPub --> T1
@@ -182,48 +182,51 @@ flowchart LR
 
 ### 4.1 Order State Machine (`OrderStatus`)
 
-The complete order lifecycle encompasses customer placement, payment verification, restaurant acceptance, food preparation, multi-round delivery dispatch, and delivery confirmation.
+The complete order lifecycle encompasses price-drift-protected checkout (`AWAITING_PAYMENT`), payment verification (`PLACED`), 2-minute restaurant acceptance (`ACCEPTED`), food preparation (`PREPARING`, `READY_FOR_PICKUP`), multi-round delivery dispatch, and delivery confirmation (`DELIVERED`).
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PLACED: Customer places order (Redisson locked)
-    PLACED --> PAYMENT_PENDING: Online payment initiated
-    PLACED --> CONFIRMED: Cash on Delivery (COD) selected
+    [*] --> AWAITING_PAYMENT: TX 1 Order created from Cart
+    AWAITING_PAYMENT --> PLACED: COD immediate success or Online PaymentSucceededEvent
+    AWAITING_PAYMENT --> PAYMENT_FAILED: PaymentFailedEvent or PaymentCancelledEvent
+    AWAITING_PAYMENT --> ABANDONED: 15m payment timeout via Redisson Queue or Reaper
+    AWAITING_PAYMENT --> CANCELLED: Customer cancels before payment - CUSTOMER_CANCELLED
     
-    PAYMENT_PENDING --> PAID: Payment verified / Webhook success
-    PAYMENT_PENDING --> PAYMENT_FAILED: Payment fails / Webhook failure
-    PAYMENT_PENDING --> ABANDONED: OrderAbandonmentScheduler (15 min TTL)
+    PAYMENT_FAILED --> AWAITING_PAYMENT: Customer retries payment within 15m TTL
+    PAYMENT_FAILED --> ABANDONED: 15m payment timeout expires
+    PAYMENT_FAILED --> CANCELLED: Customer cancels order - CUSTOMER_CANCELLED
     
-    PAYMENT_FAILED --> PAYMENT_PENDING: Customer retries payment
-    PAYMENT_FAILED --> CANCELLED: Payment expired / aborted
+    PLACED --> ACCEPTED: Restaurant accepts within 2m deadline
+    PLACED --> DECLINED: Restaurant declines order with Auto-Refund
+    PLACED --> CANCELLED: 2m acceptance timeout - RESTAURANT_UNRESPONSIVE
     
-    PAID --> CONFIRMED: Transition to confirmed state
-    
-    CONFIRMED --> PREPARING: Restaurant accepts order (Within 2m deadline)
-    CONFIRMED --> CANCELLED: Restaurant declines OR 2m acceptance deadline expires (Auto-refund triggered)
+    ACCEPTED --> PREPARING: Kitchen marks food preparing
+    ACCEPTED --> CANCELLED: Dispatch exhausted after Round 3 - NO_AGENT_FOUND
     
     PREPARING --> READY_FOR_PICKUP: Kitchen marks food ready
-    READY_FOR_PICKUP --> OUT_FOR_DELIVERY: Delivery agent picks up order
+    PREPARING --> CANCELLED: Dispatch exhausted after Round 3 - NO_AGENT_FOUND
+    
+    READY_FOR_PICKUP --> OUT_FOR_DELIVERY: Assigned delivery agent picks up order
+    READY_FOR_PICKUP --> CANCELLED: Dispatch exhausted after Round 3 - NO_AGENT_FOUND
     
     OUT_FOR_DELIVERY --> DELIVERED: Agent completes delivery with customer
     
-    CANCELLED --> REFUNDED: Refund processed via Kafka
-    CANCELLED --> REFUND_FAILED: Gateway refund failure
     DELIVERED --> [*]
-    REFUNDED --> [*]
+    CANCELLED --> [*]
+    DECLINED --> [*]
     ABANDONED --> [*]
 ```
 
 ### 4.2 Delivery Dispatch & Offer State Machine (`DeliveryDispatchStatus`, `DeliveryOfferStatus`)
 
-Orders requiring delivery trigger the automated multi-round dispatch engine upon restaurant acceptance.
+Orders requiring delivery trigger the automated multi-round dispatch engine upon restaurant acceptance (`OrderStatus.ACCEPTED`).
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING: Order confirmed / preparing
-    PENDING --> ROUND_1: Radius: 3km, Duration: 2min
+    [*] --> PENDING: Order accepted by restaurant
+    PENDING --> ROUND_1: Round 1 search radius 3km
     
-    ROUND_1 --> OFFERED: Offer sent to candidate drivers (45s timeout)
+    ROUND_1 --> OFFERED: Offer sent to candidate drivers with 45s timer
     OFFERED --> ACCEPTED: Driver accepts offer
     OFFERED --> REJECTED: Driver declines offer
     OFFERED --> EXPIRED: 45s timer expires without action
@@ -231,8 +234,8 @@ stateDiagram-v2
     REJECTED --> ROUND_1: Check next driver in current round pool
     EXPIRED --> ROUND_1: Check next driver in current round pool
     
-    ROUND_1 --> ROUND_2: Round 1 pool exhausted (Radius: 6km, Duration: 3min)
-    ROUND_2 --> ROUND_3: Round 2 pool exhausted (Radius: 10km, Duration: 5min)
+    ROUND_1 --> ROUND_2: Round 1 pool exhausted to 6km
+    ROUND_2 --> ROUND_3: Round 2 pool exhausted to 10km
     
     ROUND_3 --> EXHAUSTED: No drivers found in 10km after 10 minutes
     
@@ -249,13 +252,13 @@ Applies to Restaurant Applications, Delivery Agent Applications, and Vehicle App
 ```mermaid
 stateDiagram-v2
     [*] --> DRAFT: Partner creates application
-    DRAFT --> SUBMITTED: Required documents & details provided
+    DRAFT --> SUBMITTED: Required documents and details provided
     
     SUBMITTED --> UNDER_REVIEW: AdminAllotment assigns application to Admin
-    UNDER_REVIEW --> APPROVED: Admin approves (Entities created in core tables)
+    UNDER_REVIEW --> APPROVED: Admin approves and entities created
     UNDER_REVIEW --> REJECTED: Admin rejects with reason
     
-    REJECTED --> REOPENED: Partner updates documents & resubmits
+    REJECTED --> REOPENED: Partner updates documents and resubmits
     REOPENED --> UNDER_REVIEW: Resubmitted for admin review
     
     APPROVED --> [*]
@@ -266,13 +269,12 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING: Payment record created
-    PENDING --> SUCCESS: Razorpay signature verified / Webhook success
-    PENDING --> FAILED: Payment failure received
-    PENDING --> CANCELLED: Order cancelled before payment
+    PENDING --> SUCCESS: COD confirmed or Razorpay signature and Webhook captured
+    PENDING --> FAILED: Gateway payment failure received
+    PENDING --> CANCELLED: Order abandoned or cancelled before payment
     
-    SUCCESS --> REFUND_PENDING: Order cancellation or rejection
-    REFUND_PENDING --> REFUNDED: Gateway acknowledges refund
-    REFUND_PENDING --> REFUND_FAILED: Gateway refund rejection
+    SUCCESS --> REFUNDED: Kafka PaymentRefundListener processes gateway refund
+    SUCCESS --> REFUND_FAILED: Gateway refund error flagged for admin audit
     
     FAILED --> [*]
     CANCELLED --> [*]
@@ -284,12 +286,13 @@ stateDiagram-v2
 
 ## 5. Distributed Concurrency, Locking & Data Consistency
 
-### 5.1 Redisson Distributed Locking (`RLock`)
-Distributed locks are applied across nodes using Redisson to prevent race conditions during high-concurrency operations:
-- **Order Placement**: Locked per user (`order:user:{userId}`) to prevent double-clicks and concurrent cart checkout attempts within a 5-second cooldown window.
-- **Payment Capture & Webhooks**: Locked per order (`payment:order:{orderId}`) to ensure client-side verification and background webhook processing do not execute parallel state transitions.
-- **Delivery Offer Acceptance**: Locked per dispatch (`dispatch:order:{orderId}`) to ensure only the first accepting driver wins the offer; subsequent race attempts fail gracefully.
-- **Session Concurrency Management**: Locked per user during authentication and session challenge eviction.
+### 5.1 Redisson Distributed Locks (`RLock`) & Delayed Queues (`RDelayedQueue`)
+Distributed coordination across nodes is powered by Redisson:
+- **Order Placement Cooldown**: Bucket `quickbite:cooldown:place-order:{customerId}` (`SET NX EX 5s`) prevents rapid duplicate checkout submissions; automatically released if validation fails.
+- **Payment Retry Lock**: Lock `quickbite:lock:retry-payment:{orderId}` (30s lease) prevents parallel payment retry and reconciliation races.
+- **Order Lifecycle Delayed Queues**: `OrderTimeoutQueueService` schedules 15-minute payment abandonment (`quickbite:order:queue:abandonment-timeout`) and 2-minute kitchen acceptance (`quickbite:order:queue:acceptance-timeout`) timeouts into Redisson `RDelayedQueue`, consumed via atomic `BLPOP` by `OrderTimeoutConsumer` alongside safety-net cron reapers.
+- **Delivery Offer Acceptance**: Locked per dispatch to ensure only the first accepting driver wins the offer; subsequent race attempts fail gracefully.
+- **Session Concurrency & Token Rotation**: Per-user lock (`quickbite:session-lock:{userId}`) during login/claim and per-token-hash lock (`quickbite:refresh-lock:{hash}`) during refresh rotation.
 
 ### 5.2 PostgreSQL Optimistic Locking (`@Version`)
 Aggregates subject to concurrent modifications (e.g., `Order`, `Payment`, `DeliveryAgent`, `DeliveryOffer`, `Cart`) feature integer `@Version` columns. If an outdated process attempts a write, Hibernate throws an `OptimisticLockException`, protecting authoritative data from lost updates.

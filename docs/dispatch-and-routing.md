@@ -30,8 +30,8 @@ flowchart TB
 
     subgraph DriverAction["Driver Interaction"]
         DriverNotification --> DriverApp["Driver App UI"]
-        DriverApp -->|Accept| RedissonLock["Redisson Distributed Lock<br/>(dispatch:order:{orderId})"]
-        DriverApp -->|Decline / 45s Expire| NextCandidate["Advance to Next Candidate"]
+        DriverApp -->|Accept| RedissonLock["Redisson Distributed Lock<br/>(dispatch:order:orderId)"]
+        DriverApp -->|Decline or Expired| NextCandidate["Advance to Next Candidate"]
         NextCandidate --> AssignStrategy
         RedissonLock --> Assigned["Order Assigned & Route Generated"]
     end
@@ -107,11 +107,11 @@ Street-level road network distances and travel durations are resolved via `Compo
 flowchart TD
     RouteReq["Route Request (Origin, Destination)"] --> OSRMAdapter{"Tier 1: OSRM Routing Adapter<br/>(Local Native :5001)"}
     
-    OSRMAdapter -->|Success (Sub-10ms)| RouteFound["Return RouteResult (Distance, Duration)"]
-    OSRMAdapter -->|Timeout / Offline| MapboxAdapter{"Tier 2: Mapbox Routing Adapter<br/>(Cloud REST API)"}
+    OSRMAdapter -->|Success| RouteFound["Return RouteResult (Sub-10ms)"]
+    OSRMAdapter -->|Timeout or Offline| MapboxAdapter{"Tier 2: Mapbox Routing Adapter<br/>(Cloud REST API)"}
     
     MapboxAdapter -->|Success| RouteFound
-    MapboxAdapter -->|Error / Disabled| HaversineAdapter["Tier 3: Haversine Fallback Adapter<br/>(Mathematical Great-Circle)"]
+    MapboxAdapter -->|Error or Disabled| HaversineAdapter["Tier 3: Haversine Fallback Adapter<br/>(Mathematical Great-Circle)"]
     
     HaversineAdapter --> RouteFound
 ```

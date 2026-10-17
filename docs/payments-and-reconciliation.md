@@ -12,41 +12,41 @@ Payment processing is built around the **Strategy Pattern** to support multiple 
 classDiagram
     class PaymentStrategy {
         <<interface>>
-        +process(Order, PaymentMethod, Money) PaymentResult
+        +initiate(Order, PaymentMethod) PaymentResult
         +supports(PaymentMethod) boolean
-        +verify(OnlinePaymentVerifyRequest) PaymentResult
     }
 
-    class RazorpayPaymentStrategy {
-        -RazorpayGateway razorpayGateway
-        -PaymentRepository paymentRepository
-        +process(Order, PaymentMethod, Money) PaymentResult
-        +verify(OnlinePaymentVerifyRequest) PaymentResult
+    class OnlinePaymentStrategy {
+        -PaymentGateway paymentGateway
+        -PaymentLifecycleService paymentLifecycle
+        +initiate(Order, PaymentMethod) PaymentResult
+        +supports(PaymentMethod) boolean
     }
 
     class CodPaymentStrategy {
-        -PaymentRepository paymentRepository
-        +process(Order, PaymentMethod, Money) PaymentResult
-        +verify(OnlinePaymentVerifyRequest) PaymentResult
+        -PaymentLifecycleService paymentLifecycle
+        +initiate(Order, PaymentMethod) PaymentResult
+        +supports(PaymentMethod) boolean
     }
 
     class StubOnlinePaymentStrategy {
-        +process(Order, PaymentMethod, Money) PaymentResult
-        +verify(OnlinePaymentVerifyRequest) PaymentResult
+        -PaymentLifecycleService paymentLifecycle
+        +initiate(Order, PaymentMethod) PaymentResult
+        +supports(PaymentMethod) boolean
     }
 
-    PaymentStrategy <|.. RazorpayPaymentStrategy
+    PaymentStrategy <|.. OnlinePaymentStrategy
     PaymentStrategy <|.. CodPaymentStrategy
     PaymentStrategy <|.. StubOnlinePaymentStrategy
 ```
 
-### Supported Payment Strategies
+### Supported Payment Strategies & Methods (`PaymentMethod`)
 
-| Strategy | Supported Method | Flow Description |
-| :--- | :--- | :--- |
-| **`RazorpayPaymentStrategy`** | `ONLINE` | Generates a remote Razorpay Order ID; verifies cryptographic client signatures and processes asynchronous webhooks. |
-| **`CodPaymentStrategy`** | `COD` | Immediately marks the order as confirmed with payment status `PENDING`; transitions to `SUCCESS` upon delivery confirmation. |
-| **`StubOnlinePaymentStrategy`** | `ONLINE` (Stub Profile) | Development stub that simulates payment successes or failures without hitting external Razorpay servers. |
+| Strategy | Active Profiles | Supported `PaymentMethod` Values | Flow Description |
+| :--- | :--- | :--- | :--- |
+| **`OnlinePaymentStrategy`** | `!dev` or `razorpay` | `UPI`, `CARD`, `NET_BANKING`, `WALLET` (`method.isOnline()`) | Creates a `PENDING` payment in TX, calls `PaymentGateway.createOrder` **outside** TX, and updates `gatewayOrderId`. Order stays `AWAITING_PAYMENT` until verified or captured via webhook. |
+| **`CodPaymentStrategy`** | All | `COD` | Creates a `PENDING` payment and immediately marks it `SUCCESS`, firing `PaymentSucceededEvent` (`BEFORE_COMMIT`) so the order transitions to `PLACED` and clears the cart. |
+| **`StubOnlinePaymentStrategy`** | `dev & !razorpay` | `UPI`, `CARD`, `NET_BANKING`, `WALLET` | Development stub that returns a local `paymentUrl` without external Razorpay network calls. |
 
 ---
 
@@ -62,31 +62,31 @@ sequenceDiagram
     participant RzGateway as RazorpayGateway
     participant Razorpay as Razorpay API Server
     participant WebhookCtrl as PaymentWebhookController
-    participant Kafka as Apache Kafka
+    participant OrderListener as order.PaymentEventListener
 
-    Customer->>App: Tap "Place Order" (Online Payment)
+    Customer->>App: Tap "Place Order" (UPI / CARD / NET_BANKING / WALLET)
     App->>OrderCtrl: POST /api/v1/customer/orders
-    OrderCtrl->>PayService: initiatePayment(order, ONLINE)
-    PayService->>RzGateway: createGatewayOrder(amount, receiptId)
+    Note over OrderCtrl: TX 1: Order created in AWAITING_PAYMENT
+    OrderCtrl->>PayService: initiatePayment(order, method)
+    PayService->>RzGateway: createOrder(amount, paymentId) [Outside DB TX]
     RzGateway->>Razorpay: POST /v1/orders
     Razorpay-->>RzGateway: { id: "order_xyz123", status: "created" }
-    RzGateway-->>PayService: GatewayOrderDetails
-    PayService-->>OrderCtrl: Payment (PENDING, gatewayOrderId: "order_xyz123")
-    OrderCtrl-->>App: OrderResponse (includes gatewayOrderId, amount, keyId)
+    RzGateway-->>PayService: GatewayOrder
+    PayService-->>OrderCtrl: OnlinePaymentResult (PENDING, gatewayOrderId, providerKeyId)
+    OrderCtrl-->>App: 201 Created (OnlinePaymentResult)
 
     Customer->>App: Completes payment in Razorpay Checkout modal
-    App->>PayService: POST /api/v1/customer/payments/verify
     
     par Path A: Synchronous Client Verification
-        PayService->>RzGateway: verifyPaymentSignature(orderId, payId, sig)
-        RzGateway->>RzGateway: HMAC-SHA256 Verification
-        PayService->>PayService: Update Payment -> SUCCESS
-        PayService->>Kafka: Publish PaymentSucceededEvent
+        App->>PayService: POST /api/v1/customer/payments/verify (gatewayOrderId, gatewayPaymentId, gatewaySignature)
+        PayService->>RzGateway: verifyPaymentSignature(gatewayOrderId, gatewayPaymentId, gatewaySignature)
+        PayService->>OrderListener: Mark Payment SUCCESS & publish PaymentSucceededEvent (BEFORE_COMMIT)
+        OrderListener->>OrderListener: Transition Order AWAITING_PAYMENT -> PLACED & publish OrderPlacedEvent
     and Path B: Asynchronous Server Webhook
-        Razorpay->>WebhookCtrl: POST /api/v1/webhooks/payments/razorpay
-        WebhookCtrl->>RzGateway: verifyWebhookSignature(payload, signature)
-        WebhookCtrl->>PayService: processWebhookEvent(payment.captured)
-        PayService->>PayService: Idempotent state transition to SUCCESS
+        Razorpay->>WebhookCtrl: POST /api/v1/webhooks/payments/razorpay (payment.captured)
+        WebhookCtrl->>RzGateway: verifyWebhookSignature(rawBody, signature)
+        WebhookCtrl->>PayService: processOnlinePaymentSuccess(gatewayOrderId, gatewayPaymentId)
+        PayService->>OrderListener: Idempotent transition to SUCCESS & Order -> PLACED
     end
 ```
 
@@ -96,63 +96,62 @@ sequenceDiagram
 
 To guard against MITM tampering, both client-side verification and background webhook processing enforce strict **HMAC-SHA256 signature verification**.
 
-### 3.1 Client Checkout Verification
-When a customer completes a checkout in the frontend Razorpay modal, the client receives:
-* `razorpay_order_id`
-* `razorpay_payment_id`
-* `razorpay_signature`
+### 3.1 Client Checkout Verification (`POST /api/v1/customer/payments/verify`)
+When a customer completes checkout in the frontend Razorpay modal, the client submits `OnlinePaymentVerifyRequest`:
+* `gatewayOrderId`
+* `gatewayPaymentId`
+* `gatewaySignature`
 
-The server verifies the signature using:
+`RazorpayGateway.verifyPaymentSignature` validates the signature using:
 
-$$\text{Expected Signature} = \text{HMAC-SHA256}\Big(\text{razorpay\_order\_id} + \text{"|"} + \text{razorpay\_payment\_id}, \; \text{key\_secret}\Big)$$
+$$\text{Expected Signature} = \text{HMAC-SHA256}\Big(\text{gatewayOrderId} + \text{"|"} + \text{gatewayPaymentId}, \; \text{keySecret}\Big)$$
 
-If the generated hash matches `razorpay_signature`, the payment is transitioned to `SUCCESS`.
+If valid, `PaymentLifecycleServiceImpl.processOnlinePaymentSuccess` locks the payment row (`SELECT ... FOR UPDATE`), marks it `SUCCESS`, cancels any sibling pending attempts for the same order, and publishes `PaymentSucceededEvent` (`BEFORE_COMMIT`).
 
-### 3.2 Webhook Signature & Idempotency Defense
-Incoming webhooks sent to `POST /api/v1/webhooks/payments/razorpay` contain the header `X-Razorpay-Signature`.
-
-* **Signature Check**: Verified using `HMAC-SHA256(rawPayloadBytes, webhookSecret)`. Requests failing verification return `400 Bad Request` immediately.
-* **Redisson Distributed Lock**: Each webhook event acquires a distributed lock on the order (`payment:order:{orderId}`). If both the client verify endpoint and the webhook fire simultaneously, only the first lock-holder mutates the state machine. The second execution observes `PaymentStatus == SUCCESS` and exits idempotently without firing duplicate Kafka events.
+### 3.2 Webhook Signature & Idempotency Defense (`POST /api/v1/webhooks/payments/razorpay`)
+Incoming webhooks include the header `X-Razorpay-Signature`:
+* **Signature Check**: Verified via `HMAC-SHA256(rawBody, webhookSecret)`. Invalid signatures fail with `400 Bad Request`.
+* **Handled Events**:
+  - `payment.captured` &rarr; `processOnlinePaymentSuccess(gatewayOrderId, gatewayPaymentId)`
+  - `payment.failed` &rarr; `processOnlinePaymentFailed(gatewayOrderId, failureReason)` (transitions Order to `PAYMENT_FAILED`)
+* **Pessimistic Row Lock & Idempotency**: If both `/verify` and the `payment.captured` webhook arrive concurrently, `findByGatewayOrderIdForUpdate` serializes execution at the database row level; the second caller observes `PaymentStatus == SUCCESS` and exits as a no-op.
 
 ---
 
-## 4. Background Automated Schedulers
+## 4. Timeout Queues, Abandonment & Active Reconciliation
 
-### 4.1 Order Abandonment Scheduler (`OrderAbandonmentScheduler`)
-* **Problem**: Customers initiate checkout, creating orders with `OrderStatus = PAYMENT_PENDING`, but abandon the transaction before completion.
-* **Mechanism**: Runs on a background cron (`quickbite.order.abandon-cron = 0 0 * * * *`) every hour.
-* **Logic**: Queries all orders remaining in `PAYMENT_PENDING` older than **15 minutes** (`quickbite.order.abandon-ttl-minutes = 15`), marks their status as `ABANDONED`, cancels the corresponding payment attempt, and frees held resources.
+### 4.1 Dual-Layer Order Abandonment (`OrderTimeoutConsumer` + `OrderAbandonmentScheduler`)
+* **Problem**: Customers initiate online checkout (`OrderStatus = AWAITING_PAYMENT`), creating a pending payment, but close the app before paying.
+* **Layer 1 (Real-Time Redisson Delayed Queue)**: `OrderCreationServiceImpl` schedules the order ID into `quickbite:order:queue:abandonment-timeout` with a **15-minute delay** (`quickbite.order.abandon-ttl-minutes = 15`). `OrderTimeoutConsumer` pops expired order IDs via atomic `BLPOP` and invokes `OrderLifecycleService.abandonOrderById`.
+* **Layer 2 (Hourly Safety-Net Reaper)**: `OrderAbandonmentScheduler` runs on cron `0 0 * * * *` under a Redisson distributed lock to sweep any stale `AWAITING_PAYMENT` or `PAYMENT_FAILED` orders older than 15 minutes.
+* **Effect**: Transitions the order to `ABANDONED` and cancels all `PENDING` payment records (`PaymentStatus.CANCELLED`).
 
-### 4.2 Payment Reconciliation Service (`PaymentReconciliationServiceImpl`)
-* **Problem**: Network partitions or gateway drops may cause a payment to succeed on Razorpay without the server receiving the client callback or webhook.
-* **Mechanism**: Schedulers scan pending payments older than a configured grace threshold and invoke `RazorpayGateway.fetchGatewayOrderStatus(gatewayOrderId)`.
-* **State Correction**: If the gateway indicates `captured`, the internal record is reconciled to `SUCCESS` and an order status update event is published. If the gateway indicates `failed`, the payment is marked `FAILED`.
+### 4.2 Multi-Attempt Payment Reconciliation (`PaymentReconciliationServiceImpl`)
+* **On-Demand Polling & Pre-Retry Reconciliation**: Whenever a client polls `GET /api/v1/customer/payments/order/{orderId}` (while the latest attempt is `PENDING`) or calls `POST /api/v1/customer/orders/{orderId}/retry-payment`, `reconcileAllPaymentAttempts(orderId)` queries Razorpay for every online attempt on that order.
+* **First-Success-Wins & Duplicate Capture Protection**:
+  - The earliest captured payment is marked `SUCCESS` and fulfills the order (`PLACED`).
+  - If a customer accidentally paid twice across multiple attempts, any subsequent captured payments are automatically marked for refund via `PaymentRefundRequestedEvent`.
+  - If a payment succeeded at the gateway *after* the order was already `ABANDONED`, `CANCELLED`, or `DECLINED`, `PaymentEventListener` automatically triggers a full gateway refund.
 
 ---
 
 ## 5. Kafka-Driven Refund Orchestration
 
-When an order is cancelled or declined by a restaurant kitchen, an automated refund is executed asynchronously:
+When an order is cancelled (by the customer, 2-minute kitchen timeout, or dispatch exhaustion), declined by the restaurant, or refunded post-delivery by an admin:
 
 ```mermaid
 flowchart TD
-    CancelEvent["OrderCancelledEvent<br/>(Restaurant Declined / Acceptance Timeout)"] --> PaymentRefundListener
-    PaymentRefundListener --> RefundCheck{"Was PaymentMethod ONLINE<br/>and Status SUCCESS?"}
+    Trigger["Refund Trigger:<br/>1. Customer Cancel / Kitchen Decline<br/>2. 2m Acceptance Timeout / No Driver Found<br/>3. Late Payment on Abandoned Order<br/>4. Admin Post-Delivery Refund"] --> EmitReq["Publish PaymentRefundRequestedEvent<br/>(AFTER_COMMIT -> Kafka: quickbite.payment.events)"]
     
-    RefundCheck -->|No (COD / Unpaid)| Skip["No Gateway Refund Required"]
-    RefundCheck -->|Yes| RazorpayRefund["RazorpayGateway.refund(paymentId, amount)"]
+    EmitReq --> Listener["payment.listener.PaymentRefundListener"]
+    Listener --> GatewayCall["PaymentGateway.refund(gatewayPaymentId, amount)"]
     
-    RazorpayRefund -->|Success| SuccessUpdate["PaymentStatus: REFUNDED<br/>OrderStatus: REFUNDED"]
-    SuccessUpdate --> PubSuccess["Kafka: PaymentStatusChangedEvent(REFUNDED)"]
+    GatewayCall -->|Success| MarkRefunded["PaymentLifecycleService.markRefunded<br/>PaymentStatus: REFUNDED"]
+    MarkRefunded --> PubSuccess["Publish PaymentStatusChangedEvent(REFUNDED)"]
     
-    RazorpayRefund -->|Gateway Error| FailUpdate["PaymentStatus: REFUND_FAILED<br/>(Flagged for Manual Admin Audit)"]
-    FailUpdate --> PubFail["Kafka: PaymentStatusChangedEvent(REFUND_FAILED)"]
+    GatewayCall -->|Gateway Exception| MarkFailed["PaymentLifecycleService.markRefundFailed<br/>PaymentStatus: REFUND_FAILED"]
+    MarkFailed --> PubFail["Recorded in PaymentStatusHistory for Support Audit"]
 ```
-
-1. **Trigger**: An `OrderCancelledEvent` or `PaymentRefundRequestedEvent` is emitted on topic `quickbite.order.events` or `quickbite.payment.events`.
-2. **Listener**: `payment.listener.PaymentRefundListener` receives the event.
-3. **Execution**: If the order was paid online, `RazorpayGateway.refund(...)` executes a full refund via the Razorpay REST API.
-4. **State Transition**: The payment status transitions to `REFUND_PENDING` and then `REFUNDED`. If an unrecoverable gateway error occurs, the status transitions to `REFUND_FAILED` for administrative review via `/api/v1/admin/orders/{orderId}/refund`.
 
 ---
 
@@ -164,9 +163,11 @@ razorpay.key-id=${RAZORPAY_KEY_ID}
 razorpay.key-secret=${RAZORPAY_KEY_SECRET}
 razorpay.webhook-secret=${RAZORPAY_WEBHOOK_SECRET}
 
-# Order Abandonment & Reconciliation
+# Order Abandonment & Timeouts
 quickbite.order.abandon-ttl-minutes=15
 quickbite.order.abandon-cron=0 0 * * * *
 quickbite.order.abandon-batch-size=100
 quickbite.order.place-cooldown-seconds=5
+quickbite.order.restaurant-acceptance-window=PT2M
+quickbite.order.delayed-queue-enabled=true
 ```

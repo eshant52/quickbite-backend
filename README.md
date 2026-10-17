@@ -48,13 +48,13 @@ flowchart TB
     end
 
     subgraph Datastores["Persistence & Caching"]
-        PG[(PostgreSQL 18 + PostGIS<br/>Hibernate Envers Auditing)]
-        Redis[(Redis 8<br/>Cache, Sessions, Redis GEO)]
-        Redisson[(Redisson Distributed Locks)]
+        PG[("PostgreSQL 18 + PostGIS<br/>Hibernate Envers Auditing")]
+        Redis[("Redis 8<br/>Cache, Sessions, Redis GEO")]
+        Redisson[("Redisson Distributed Locks")]
     end
 
     subgraph Messaging["Event Broker"]
-        Kafka{{Apache Kafka 4.3<br/>7 Domain Streams + DLT Queues}}
+        Kafka["Apache Kafka 4.3<br/>7 Domain Streams + DLT Queues"]
     end
 
     subgraph External["External Integrations"]
@@ -79,11 +79,13 @@ flowchart TB
 ## Key Features & Domain Capabilities
 
 ### 1. Security, Identity & Stateful Sessions (`auth`)
-* **Dual-JWT Token Architecture**: Asymmetric RSA256 tokens separating business API access (`aud: quickbite-api`, 15m) from session administrative tasks (`aud: quickbite-auth`, 5m).
-* **Token Rotation with Breach Detection**: Refresh tokens are family-tracked (`RefreshTokenFamily`) and stored in PostgreSQL with SHA-256 hashes. Rotating an already-used token triggers an immediate protocol breach invalidation.
-* **HttpOnly Cookie Transport**: Refresh tokens are strictly transported via `HttpOnly`, `Secure`, `SameSite=Strict` cookies (`qb_refresh_token`).
-* **Session Concurrency Challenge**: Enforces a strict limit of 3 concurrent active sessions per user. Exceeding limits returns `409 Conflict` allowing users to remotely evict older sessions via a challenge token.
-* **Redisson Rotation Grace Window**: A 2-second Redis grace cache ensures that concurrent tab refreshes do not accidentally trigger family breach detection.
+* **Dual-JWT Token Architecture**: Asymmetric RSA256 tokens separating business API access (`aud: quickbite-api`, `type: access`, 15m) from session challenge tasks (`aud: quickbite-auth`, `type: session-limit`, 5m).
+* **Client-Aware Hybrid Refresh Token Transport (`X-Client-Type`)**:
+  - **`WEB_BROWSER` (`web_browser`)**: Refresh tokens are delivered exclusively via `HttpOnly`, `Secure`, `SameSite=Strict` cookies (`qb_refresh_token`) and stripped (`null`) from JSON bodies.
+  - **`MOBILE_APP` (`mobile_app`)**: Refresh tokens are returned directly in the `AuthResponse` JSON payload and accepted via `RefreshRequest` JSON bodies for native Keychain/Keystore storage.
+* **Generation-Tracked Token Families & Breach Detection**: Refresh tokens belong to a `RefreshTokenFamily` with monotonically increasing `generation` counters and SHA-256 hashes in PostgreSQL. Replaying an already-used token (`used_at != null`) outside the 2-second Redis grace window triggers an immediate `REQUIRES_NEW` breach revocation.
+* **3-Step Session Concurrency Challenge**: Enforces 3 concurrent active sessions per user. Exceeding the limit returns `409 Conflict` with a 5-minute `challengeToken` to list (`GET /sessions`), evict (`DELETE /sessions/{id}`), and claim (`POST /claim-session`) a session slot.
+* **Automated Stale Token Retention Cleanup**: Daily cron (`RefreshTokenCleanupScheduler`) purges used, expired, or revoked tokens older than 30 days while retaining recent history for breach detection.
 
 ### 2. Multi-Round Dispatch & Geospatial Tracking (`delivery`)
 * **3-Round Concentric Dispatch**: Orders automatically expand across candidate pools:
@@ -96,16 +98,16 @@ flowchart TB
 * **Fair Driver Assignment**: `FairNearestDeliveryAssignmentStrategy` optimizes for distance while preventing driver starvation.
 
 ### 3. Order Engine & Pricing Subsystem (`order`, `cart`)
-* **Distributed Placement Locks**: Redisson locks prevent duplicate cart submissions and double-order race conditions within a 5-second cooldown.
-* **Dynamic Fee Calculation Chain**: Calculates Base Fee (₹15), Distance Fee (₹8/km), Surge Fee, Platform Fee (₹5), and 5% GST with min (₹20) and max (₹80) bounds.
-* **2-Minute Restaurant Acceptance Deadline**: Kitchens have 2 minutes (`PT2M`) to accept orders. If the timer expires, the order is automatically cancelled and refunded.
-* **Automated Abandonment Scheduler**: An hourly cron scans for unpaid orders in `PAYMENT_PENDING` older than 15 minutes and cancels them.
+* **2-Phase Non-Holding Checkout & Cooldown**: 5-second Redisson cooldown prevents duplicate submissions; isolated transactions ensure external routing and payment gateway HTTP calls never hold open DB connections.
+* **Price-Drift Protection (`expectedTotal`)**: Validates checkout totals against real-time pricing and aborts with `409 Conflict` (`PriceChangedException`) if item prices or surge fees changed.
+* **Chain-of-Responsibility Fee Calculation**: Calculates Base Fee (₹15), Distance Fee (₹8/km), Surge Fee, Platform Fee (₹5), and 5% GST with min (₹20) and max (₹80) bounds and a 5-minute Redis route cache.
+* **Dual-Layer Distributed Timeouts (Redisson Delayed Queues + Reapers)**: Event-driven `RDelayedQueue` + atomic `BLPOP` workers (`OrderTimeoutConsumer`) enforce the **2-minute restaurant acceptance deadline (`PT2M`)** and **15-minute payment abandonment window**, backed by safety-net cron schedulers.
 
 ### 4. Payments, Webhooks & Automated Reconciliation (`payment`)
-* **Strategy Pattern**: Pluggable strategies for `ONLINE` (Razorpay), `COD` (Cash on Delivery), and `STUB` (Test environment).
+* **Strategy Pattern**: Pluggable strategies for online methods (`UPI`, `CARD`, `NET_BANKING`, `WALLET` via `OnlinePaymentStrategy`), `COD` (`CodPaymentStrategy`), and `StubOnlinePaymentStrategy`.
 * **HMAC-SHA256 Signature Verification**: Cryptographic validation for both frontend checkout signatures and backend webhooks.
-* **Automated Reconciliation**: Schedulers reconcile orphan or out-of-sync gateway payments against internal database records.
-* **Kafka-Driven Automated Refunds**: Event listeners automatically issue Razorpay refunds when orders are cancelled or declined.
+* **Multi-Attempt Reconciliation (`First-Success-Wins`)**: Reconciles all payment attempts on poll or retry, auto-refunding duplicate captures or late captures on abandoned/cancelled orders.
+* **Kafka-Driven Automated Refunds**: Event listeners automatically issue Razorpay refunds when orders are cancelled, declined, or refunded post-delivery by an admin.
 
 ### 5. Multi-Tier Composite Routing Gateway (`common/routing`)
 * **Tier 1 (OSRM)**: Local native high-performance OpenStreetMap routing machine on port `5001`.
@@ -140,7 +142,7 @@ flowchart TB
 | **Language & Runtime** | Java 25 (Temurin / GraalVM) |
 | **Relational Database** | PostgreSQL 18.1 with PostGIS 3.4 & Hibernate Spatial |
 | **Auditing & Lineage** | Hibernate Envers (`@Audited`) on core aggregates (`User`, `Restaurant`, `Order`, `Payment`, `DeliveryAgent`) |
-| **In-Memory & Cache** | Redis 8.4-alpine, Redisson 4.7.0 (Distributed Locks), Redis GEO |
+| **In-Memory & Cache** | Redis 8.4-alpine, Redisson 4.7.0 (Distributed Locks & Delayed Queues), Redis GEO |
 | **Event Streaming** | Apache Kafka 4.3.0 (KRaft mode) + Spring Kafka Dead Letter Topics (`.DLT`) |
 | **Cloud Storage** | AWS SDK for Java v2 (S3 Presigned URLs) |
 | **Routing Engines** | OSRM (Open Source Routing Machine), Mapbox Directions API, Haversine Math Fallback |
@@ -153,11 +155,11 @@ flowchart TB
 
 | URL Prefix | Primary Role | Required Authority | Description |
 | :--- | :--- | :--- | :--- |
-| `/api/v1/auth/register/**`, `/login` | Public | None | Authentication & customer registration |
+| `/api/v1/auth/register/**`, `/login` | Public | None | Authentication & multi-role registration |
 | `/api/v1/cuisines`, `/restaurants/**` | Public | None | Restaurant catalog, menus, and reviews |
 | `/api/v1/webhooks/**` | Public (Signature) | None | Razorpay webhook notifications |
 | `/actuator/health`, `/actuator/info` | Public | None | Service liveness and readiness probes |
-| `/api/v1/auth/sessions/**` | Challenged User | `SCOPE_AUTH` | Session challenge resolution & eviction |
+| `/api/v1/auth/sessions/**`, `/claim-session` | Challenged User | `SCOPE_AUTH` | Session challenge resolution & eviction |
 | `/api/v1/files/upload-url` | Authenticated | `SCOPE_API` | Direct S3 presigned PUT URL generation |
 | `/api/v1/customer/**` | Customer | `SCOPE_API` + `ROLE_CUSTOMER` | Cart, orders, delivery addresses, reviews |
 | `/api/v1/restaurant-owner/**` | Partner | `SCOPE_API` + `ROLE_RESTAURANT_OWNER` | Restaurant info, menus, order kitchen queue |
@@ -216,9 +218,10 @@ For in-depth architectural guides and developer specifications, consult the [`do
 
 * [**Documentation Hub (`docs/README.md`)**](docs/README.md) — Complete documentation index.
 * [**System Architecture & Domain Design (`docs/architecture.md`)**](docs/architecture.md) — Event choreography, state machines, and concurrency patterns.
+* [**Order & Cart Lifecycle Guide (`docs/order-process.md`)**](docs/order-process.md) — End-to-end cart, pricing chain, price-drift check, Redisson delayed queues, and fulfillment flow.
 * [**REST API Reference & Security Matrix (`docs/api-guide.md`)**](docs/api-guide.md) — Comprehensive guide to all 35+ REST controllers.
 * [**Dispatch Engine & Geospatial Routing (`docs/dispatch-and-routing.md`)**](docs/dispatch-and-routing.md) — Concentric dispatch, Redis GEO, and OSRM routing.
-* [**Payments & Automated Reconciliation (`docs/payments-and-reconciliation.md`)**](docs/payments-and-reconciliation.md) — Razorpay integration, webhooks, and schedulers.
+* [**Payments & Automated Reconciliation (`docs/payments-and-reconciliation.md`)**](docs/payments-and-reconciliation.md) — Razorpay integration, webhooks, and multi-attempt reconciliation.
 * [**Installation & Environment Setup (`docs/installation.md`)**](docs/installation.md) — Detailed deployment and setup instructions.
 * [**Client JWT & Session Integration Guide (`docs/jwt.md`)**](docs/jwt.md) — Guide for frontend and mobile client authentication.
 * [**Authentication & Session Architecture (`docs/authentication.md`)**](docs/authentication.md) — Deep dive into dual tokens and family rotation.
