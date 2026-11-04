@@ -83,12 +83,17 @@ public interface OrderLifecycleService {
     void abandonOrderById(UUID orderId, String reason);
 
     /**
-     * Cancels an order, updates status to {@code CANCELLED}, records status history,
-     * cancels pending payments, and publishes an {@code OrderCancelledEvent}.
-     *
      * @param order the order to cancel
      */
     void cancelOrder(Order order);
+
+    /**
+     * Cancels an order with explicit actor attribution.
+     *
+     * @param order the order to cancel
+     * @param changedBy the user who initiated the cancellation
+     */
+    void cancelOrder(Order order, User changedBy);
 
     /**
      * Transitions an order from an expected status to a next status, records history,
@@ -100,6 +105,18 @@ public interface OrderLifecycleService {
      * @return the saved order
      */
     Order transitionStatus(Order order, OrderStatus expected, OrderStatus next);
+
+    /**
+     * Transitions an order from an expected status to a next status with actor attribution,
+     * records history, and publishes an {@code OrderStatusChangedEvent}.
+     *
+     * @param order     the order entity
+     * @param expected  expected current status
+     * @param next      next status
+     * @param changedBy the user who initiated the transition
+     * @return the saved order
+     */
+    Order transitionStatus(Order order, OrderStatus expected, OrderStatus next, User changedBy);
 
     /**
      * Persists a new order to the database.

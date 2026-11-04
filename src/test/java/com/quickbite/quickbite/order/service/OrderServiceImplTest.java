@@ -280,7 +280,7 @@ class OrderServiceImplTest {
 
             orderService.cancelOrder(customerId, orderId);
 
-            verify(orderLifecycleService).cancelOrder(order);
+            verify(orderLifecycleService).cancelOrder(order, customer);
         }
     }
 
@@ -308,13 +308,13 @@ class OrderServiceImplTest {
         @DisplayName("acceptOrder delegates status transition to lifecycle service")
         void acceptOrder_success() {
             order.setCurrentStatus(OrderStatus.ACCEPTED);
-            when(orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.ACCEPTED))
+            when(orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.ACCEPTED, owner))
                     .thenReturn(order);
 
             OrderResponse response = orderService.acceptOrder(orderId, restaurantId, ownerId);
 
             assertThat(response.currentStatus()).isEqualTo(OrderStatus.ACCEPTED);
-            verify(orderLifecycleService).transitionStatus(order, OrderStatus.PLACED, OrderStatus.ACCEPTED);
+            verify(orderLifecycleService).transitionStatus(order, OrderStatus.PLACED, OrderStatus.ACCEPTED, owner);
         }
 
         @Test
@@ -331,13 +331,13 @@ class OrderServiceImplTest {
         @DisplayName("declineOrder delegates status transition to lifecycle service and triggers payment refund/cancellation")
         void declineOrder_success() {
             order.setCurrentStatus(OrderStatus.DECLINED);
-            when(orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.DECLINED))
+            when(orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.DECLINED, owner))
                     .thenReturn(order);
 
             OrderResponse response = orderService.declineOrder(orderId, restaurantId, ownerId);
 
             assertThat(response.currentStatus()).isEqualTo(OrderStatus.DECLINED);
-            verify(orderLifecycleService).transitionStatus(order, OrderStatus.PLACED, OrderStatus.DECLINED);
+            verify(orderLifecycleService).transitionStatus(order, OrderStatus.PLACED, OrderStatus.DECLINED, owner);
             verify(paymentService).refundSuccessfulPayment(orderId, "Order declined by restaurant");
             verify(paymentService).cancelPendingPayments(orderId, "Order declined by restaurant");
         }
@@ -346,26 +346,26 @@ class OrderServiceImplTest {
         @DisplayName("markPreparing delegates status transition to lifecycle service")
         void markPreparing_success() {
             order.setCurrentStatus(OrderStatus.PREPARING);
-            when(orderLifecycleService.transitionStatus(order, OrderStatus.ACCEPTED, OrderStatus.PREPARING))
+            when(orderLifecycleService.transitionStatus(order, OrderStatus.ACCEPTED, OrderStatus.PREPARING, owner))
                     .thenReturn(order);
 
             OrderResponse response = orderService.markPreparing(orderId, restaurantId, ownerId);
 
             assertThat(response.currentStatus()).isEqualTo(OrderStatus.PREPARING);
-            verify(orderLifecycleService).transitionStatus(order, OrderStatus.ACCEPTED, OrderStatus.PREPARING);
+            verify(orderLifecycleService).transitionStatus(order, OrderStatus.ACCEPTED, OrderStatus.PREPARING, owner);
         }
 
         @Test
         @DisplayName("markReadyForPickup transitions status without inline delivery assignment")
         void markReadyForPickup_success() {
             order.setCurrentStatus(OrderStatus.READY_FOR_PICKUP);
-            when(orderLifecycleService.transitionStatus(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP))
+            when(orderLifecycleService.transitionStatus(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP, owner))
                     .thenReturn(order);
 
             OrderResponse response = orderService.markReadyForPickup(orderId, restaurantId, ownerId);
 
             assertThat(response.currentStatus()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
-            verify(orderLifecycleService).transitionStatus(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP);
+            verify(orderLifecycleService).transitionStatus(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP, owner);
         }
     }
 

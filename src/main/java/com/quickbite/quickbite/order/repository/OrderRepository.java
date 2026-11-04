@@ -160,4 +160,16 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     );
 
     Optional<Order> findByIdAndCurrentStatusNotIn(UUID id, List<OrderStatus> statuses);
+
+    @Query("""
+            SELECT COUNT(o),
+                   COALESCE(SUM(o.totalAmount), 0),
+                   COALESCE(SUM(o.subtotal), 0),
+                   COALESCE(SUM(o.platformFee), 0),
+                   COALESCE(SUM(o.taxAmount), 0)
+            FROM Order o
+            WHERE o.restaurant.id = :restaurantId
+              AND o.currentStatus = com.quickbite.quickbite.order.model.OrderStatus.DELIVERED
+            """)
+    List<Object[]> aggregateDeliveredEarningsByRestaurant(@Param("restaurantId") UUID restaurantId);
 }

@@ -26,6 +26,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -193,7 +194,7 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
         Order order = orderRepository.findByIdAndCustomerId(orderId, customer.getId())
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
 
-        orderLifecycleService.cancelOrder(order);
+        orderLifecycleService.cancelOrder(order, customer);
     }
 
     @Override
@@ -244,7 +245,7 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     @Override
     @Transactional(readOnly = true)
     public AssignedDeliveryAgentResponse getAssignedDeliveryAgent(UUID orderId, UUID restaurantId, UUID ownerId) {
-        Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
+        Order order = loadRestaurantOrder(orderId, restaurantId, ownerId).order();
         if (order.getDeliveryAgent() == null) {
             throw new ResourceNotFoundException("No delivery agent assigned to this order yet");
         }
@@ -252,21 +253,55 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public com.quickbite.quickbite.order.dto.RestaurantEarningsResponse getEarnings(UUID restaurantId, UUID ownerId) {
+        User owner = loadUser(ownerId);
+        Restaurant restaurant = loadOwnedRestaurant(restaurantId, owner);
+
+        List<Object[]> rows = orderRepository.aggregateDeliveredEarningsByRestaurant(restaurant.getId());
+        long count = 0L;
+        BigDecimal gross = BigDecimal.ZERO;
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal platformFees = BigDecimal.ZERO;
+        BigDecimal taxes = BigDecimal.ZERO;
+
+        if (rows != null && !rows.isEmpty() && rows.getFirst() != null) {
+            Object[] row = rows.getFirst();
+            count = row[0] != null ? ((Number) row[0]).longValue() : 0L;
+            gross = row[1] != null ? (BigDecimal) row[1] : BigDecimal.ZERO;
+            subtotal = row[2] != null ? (BigDecimal) row[2] : BigDecimal.ZERO;
+            platformFees = row[3] != null ? (BigDecimal) row[3] : BigDecimal.ZERO;
+            taxes = row[4] != null ? (BigDecimal) row[4] : BigDecimal.ZERO;
+        }
+
+        return new com.quickbite.quickbite.order.dto.RestaurantEarningsResponse(
+                restaurant.getId(),
+                count,
+                gross,
+                subtotal,
+                platformFees,
+                taxes,
+                Instant.now()
+        );
+    }
+
+    @Override
     @Transactional
     public OrderResponse acceptOrder(UUID orderId, UUID restaurantId, UUID ownerId) {
-        Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
+        LoadedRestaurantOrder loaded = loadRestaurantOrder(orderId, restaurantId, ownerId);
+        Order order = loaded.order();
         if (order.getRestaurantAcceptanceDeadline() != null
                 && order.getRestaurantAcceptanceDeadline().isBefore(Instant.now())) {
             throw new BadRequestException("Order acceptance window has expired");
         }
-        return OrderResponse.from(orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.ACCEPTED));
+        return OrderResponse.from(orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.ACCEPTED, loaded.owner()));
     }
 
     @Override
     @Transactional
     public OrderResponse declineOrder(UUID orderId, UUID restaurantId, UUID ownerId) {
-        Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
-        Order updated = orderLifecycleService.transitionStatus(order, OrderStatus.PLACED, OrderStatus.DECLINED);
+        LoadedRestaurantOrder loaded = loadRestaurantOrder(orderId, restaurantId, ownerId);
+        Order updated = orderLifecycleService.transitionStatus(loaded.order(), OrderStatus.PLACED, OrderStatus.DECLINED, loaded.owner());
         paymentService.refundSuccessfulPayment(updated.getId(), "Order declined by restaurant");
         paymentService.cancelPendingPayments(updated.getId(), "Order declined by restaurant");
         return OrderResponse.from(updated);
@@ -275,15 +310,15 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
     @Override
     @Transactional
     public OrderResponse markPreparing(UUID orderId, UUID restaurantId, UUID ownerId) {
-        Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
-        return OrderResponse.from(orderLifecycleService.transitionStatus(order, OrderStatus.ACCEPTED, OrderStatus.PREPARING));
+        LoadedRestaurantOrder loaded = loadRestaurantOrder(orderId, restaurantId, ownerId);
+        return OrderResponse.from(orderLifecycleService.transitionStatus(loaded.order(), OrderStatus.ACCEPTED, OrderStatus.PREPARING, loaded.owner()));
     }
 
     @Override
     @Transactional
     public OrderResponse markReadyForPickup(UUID orderId, UUID restaurantId, UUID ownerId) {
-        Order order = loadRestaurantOrder(orderId, restaurantId, ownerId);
-        Order updated = orderLifecycleService.transitionStatus(order, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP);
+        LoadedRestaurantOrder loaded = loadRestaurantOrder(orderId, restaurantId, ownerId);
+        Order updated = orderLifecycleService.transitionStatus(loaded.order(), OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP, loaded.owner());
         return OrderResponse.from(updated);
     }
 
@@ -301,10 +336,13 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurant not found"));
     }
 
-    private Order loadRestaurantOrder(UUID orderId, UUID restaurantId, UUID ownerId) {
+    private record LoadedRestaurantOrder(Order order, User owner) {}
+
+    private LoadedRestaurantOrder loadRestaurantOrder(UUID orderId, UUID restaurantId, UUID ownerId) {
         User owner = loadUser(ownerId);
         Restaurant restaurant = loadOwnedRestaurant(restaurantId, owner);
-        return orderRepository.findByIdAndRestaurantId(orderId, restaurant.getId())
+        Order order = orderRepository.findByIdAndRestaurantId(orderId, restaurant.getId())
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+        return new LoadedRestaurantOrder(order, owner);
     }
 }

@@ -95,4 +95,12 @@ public class RestaurantOrderController {
         UUID ownerId = authenticatedSessionResolver.userIdFromJwt(jwt);
         return ResponseEntity.ok(restaurantOrderService.getAssignedDeliveryAgent(orderId, restaurantId, ownerId));
     }
+
+    @GetMapping("/earnings")
+    public ResponseEntity<com.quickbite.quickbite.order.dto.RestaurantEarningsResponse> getEarnings(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam("restaurantId") UUID restaurantId) {
+        UUID ownerId = authenticatedSessionResolver.userIdFromJwt(jwt);
+        return ResponseEntity.ok(restaurantOrderService.getEarnings(restaurantId, ownerId));
+    }
 }

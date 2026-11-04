@@ -120,6 +120,7 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
             OrderStatusHistory history = new OrderStatusHistory();
             history.setOrder(order);
             history.setOrderStatus(OrderStatus.AWAITING_PAYMENT);
+            history.setChangedBy(order.getCustomer());
             orderStatusHistoryRepository.save(history);
         }
     }
@@ -194,6 +195,12 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     @Override
     @Transactional
     public void cancelOrder(Order order) {
+        cancelOrder(order, order.getCustomer());
+    }
+
+    @Override
+    @Transactional
+    public void cancelOrder(Order order, User changedBy) {
         Order lockedOrder = order.getId() != null
                 ? orderRepository.findByIdForUpdate(order.getId()).orElse(order)
                 : order;
@@ -222,6 +229,7 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
         OrderStatusHistory history = new OrderStatusHistory();
         history.setOrder(lockedOrder);
         history.setOrderStatus(OrderStatus.CANCELLED);
+        history.setChangedBy(changedBy != null ? changedBy : lockedOrder.getCustomer());
         orderStatusHistoryRepository.save(history);
 
         paymentService.refundSuccessfulPayment(lockedOrder.getId(), "Order cancelled by customer");
@@ -322,6 +330,12 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     @Override
     @Transactional
     public Order transitionStatus(Order order, OrderStatus expected, OrderStatus next) {
+        return transitionStatus(order, expected, next, null);
+    }
+
+    @Override
+    @Transactional
+    public Order transitionStatus(Order order, OrderStatus expected, OrderStatus next, User changedBy) {
         Order lockedOrder = order.getId() != null
                 ? orderRepository.findByIdForUpdate(order.getId()).orElse(order)
                 : order;
@@ -347,6 +361,7 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
         OrderStatusHistory history = new OrderStatusHistory();
         history.setOrder(saved);
         history.setOrderStatus(next);
+        history.setChangedBy(changedBy);
         orderStatusHistoryRepository.save(history);
         if (saved.getStatusHistory() != null) {
             saved.getStatusHistory().add(history);
@@ -424,6 +439,7 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
         OrderStatusHistory history = new OrderStatusHistory();
         history.setOrder(savedOrder);
         history.setOrderStatus(initialStatus);
+        history.setChangedBy(savedOrder.getCustomer());
         orderStatusHistoryRepository.save(history);
         if (savedOrder.getStatusHistory() != null) {
             savedOrder.getStatusHistory().add(history);

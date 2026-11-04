@@ -2,6 +2,7 @@ package com.quickbite.quickbite.order.model;
 
 import com.quickbite.quickbite.common.model.Base;
 import com.quickbite.quickbite.order.model.Order;
+import com.quickbite.quickbite.user.model.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,7 +17,8 @@ import org.hibernate.type.SqlTypes;
 @Table(
         name = "order_status_history",
         indexes = {
-                @Index(name = "idx_order_status_history_order_created", columnList = "order_id, created_at ASC")
+                @Index(name = "idx_order_status_history_order_created", columnList = "order_id, created_at ASC"),
+                @Index(name = "idx_order_status_history_changed_by", columnList = "changed_by_id")
         }
 )
 public class OrderStatusHistory extends Base {
@@ -29,4 +31,8 @@ public class OrderStatusHistory extends Base {
     @JdbcTypeCode(SqlTypes.ENUM)
     @Column(columnDefinition = "order_status", nullable = false)
     private OrderStatus orderStatus;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "changed_by_id")
+    private User changedBy;
 }

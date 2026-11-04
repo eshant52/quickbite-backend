@@ -160,6 +160,7 @@ public class PaymentEventListener {
         OrderStatusHistory history = new OrderStatusHistory();
         history.setOrder(order);
         history.setOrderStatus(status);
+        history.setChangedBy(order.getCustomer());
         orderStatusHistoryRepository.save(history);
     }
 
