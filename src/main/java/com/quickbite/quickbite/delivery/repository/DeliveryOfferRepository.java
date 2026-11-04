@@ -38,4 +38,23 @@ public interface DeliveryOfferRepository extends JpaRepository<DeliveryOffer, UU
             @Param("status") DeliveryOfferStatus status,
             @Param("now") Instant now
     );
+
+    @Query("""
+            SELECT DISTINCT o FROM DeliveryOffer o
+            JOIN FETCH o.order ord
+            LEFT JOIN FETCH ord.restaurant rest
+            LEFT JOIN FETCH rest.address
+            LEFT JOIN FETCH ord.customer
+            LEFT JOIN FETCH ord.items item
+            LEFT JOIN FETCH item.menuItem
+            WHERE o.agent.id = :agentId
+              AND o.status = :status
+              AND o.expiresAt > :now
+            ORDER BY o.offeredAt ASC
+            """)
+    List<DeliveryOffer> findActiveOffersForAgent(
+            @Param("agentId") UUID agentId,
+            @Param("status") DeliveryOfferStatus status,
+            @Param("now") Instant now
+    );
 }

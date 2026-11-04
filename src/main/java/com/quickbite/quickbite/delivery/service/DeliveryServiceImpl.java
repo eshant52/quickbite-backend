@@ -187,6 +187,7 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
         OrderStatusHistory history = new OrderStatusHistory();
         history.setOrder(savedOrder);
         history.setOrderStatus(OrderStatus.OUT_FOR_DELIVERY);
+        history.setChangedBy(agent.getUser());
         orderStatusHistoryRepository.save(history);
 
         eventPublisher.publishEvent(new OrderStatusChangedEvent(
@@ -225,6 +226,7 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
         OrderStatusHistory history = new OrderStatusHistory();
         history.setOrder(savedOrder);
         history.setOrderStatus(OrderStatus.DELIVERED);
+        history.setChangedBy(agent.getUser());
         orderStatusHistoryRepository.save(history);
 
         // Free agent from active assignment so they are ready for the next order

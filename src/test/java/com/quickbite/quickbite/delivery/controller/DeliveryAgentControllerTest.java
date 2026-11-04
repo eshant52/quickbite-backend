@@ -2,10 +2,12 @@ package com.quickbite.quickbite.delivery.controller;
 
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.delivery.dto.DeliveryAgentResponse;
+import com.quickbite.quickbite.delivery.dto.OrderOfferSummaryResponse;
 import com.quickbite.quickbite.delivery.dto.UpdateAvailabilityRequest;
 import com.quickbite.quickbite.delivery.dto.UpdateLocationRequest;
 import com.quickbite.quickbite.delivery.model.DeliveryAgentVerificationStatus;
 import com.quickbite.quickbite.delivery.service.DeliveryAgentService;
+import com.quickbite.quickbite.delivery.service.DeliveryDispatchService;
 import com.quickbite.quickbite.order.dto.OrderResponse;
 import com.quickbite.quickbite.order.model.OrderStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +35,9 @@ class DeliveryAgentControllerTest {
 
     @Mock
     private DeliveryAgentService deliveryService;
+
+    @Mock
+    private DeliveryDispatchService deliveryDispatchService;
 
     @Mock
     private AuthenticatedSessionResolver authenticatedSessionResolver;
@@ -148,5 +153,42 @@ class DeliveryAgentControllerTest {
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(res.getBody().currentStatus()).isEqualTo(OrderStatus.DELIVERED);
+    }
+
+    @Test
+    @DisplayName("getActiveOffers returns list of active offers for delivery agent")
+    void getActiveOffers_success() {
+        OrderOfferSummaryResponse offerSummary = new OrderOfferSummaryResponse(
+                UUID.randomUUID(),
+                orderId,
+                0,
+                BigDecimal.valueOf(3.0),
+                "ACCEPTED",
+                BigDecimal.valueOf(200),
+                BigDecimal.valueOf(230),
+                "Alice",
+                "9999988888",
+                List.of(new OrderOfferSummaryResponse.OfferOrderItemDto("Gulab Jamun", 2, BigDecimal.valueOf(100), BigDecimal.valueOf(200))),
+                "Tasty Bites",
+                "Street 42",
+                "Customer Street 1",
+                2.5,
+                420L,
+                BigDecimal.valueOf(45),
+                BigDecimal.valueOf(20),
+                BigDecimal.valueOf(65),
+                Instant.now(),
+                Instant.now().plusSeconds(40),
+                40L
+        );
+
+        when(authenticatedSessionResolver.userIdFromJwt(jwt)).thenReturn(userId);
+        when(deliveryDispatchService.getActiveOffers(userId)).thenReturn(List.of(offerSummary));
+
+        ResponseEntity<List<OrderOfferSummaryResponse>> res = deliveryAgentController.getActiveOffers(jwt);
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody()).containsExactly(offerSummary);
+        verify(deliveryDispatchService).getActiveOffers(userId);
     }
 }

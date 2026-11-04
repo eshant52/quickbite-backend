@@ -2,6 +2,7 @@ package com.quickbite.quickbite.delivery.service;
 
 import com.quickbite.quickbite.delivery.dto.OrderOfferSummaryResponse;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -49,4 +50,12 @@ public interface DeliveryDispatchService {
      * @return summary response
      */
     OrderOfferSummaryResponse getOfferSummary(UUID orderId, UUID agentUserId);
+
+    /**
+     * Returns all active (PENDING and non-expired) delivery offers for the authenticated delivery agent.
+     *
+     * @param agentUserId the user ID of the requesting agent
+     * @return list of active offer summaries ordered by offeredAt ascending
+     */
+    List<OrderOfferSummaryResponse> getActiveOffers(UUID agentUserId);
 }

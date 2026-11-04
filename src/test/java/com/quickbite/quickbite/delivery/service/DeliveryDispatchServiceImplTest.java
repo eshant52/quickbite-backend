@@ -396,11 +396,60 @@ class DeliveryDispatchServiceImplTest {
         OrderOfferSummaryResponse summary = dispatchService.getOfferSummary(orderId, agentUserId);
 
         assertThat(summary).isNotNull();
+        assertThat(summary.offerId()).isEqualTo(offer.getId());
+        assertThat(summary.orderId()).isEqualTo(orderId);
+        assertThat(summary.orderStatus()).isEqualTo("ACCEPTED");
+        assertThat(summary.customerName()).isEqualTo("Customer One");
         assertThat(summary.restaurantName()).isEqualTo("Bite Palace");
         assertThat(summary.guaranteedPayout()).isEqualByComparingTo("45.00");
         assertThat(summary.tipAmount()).isEqualByComparingTo("20.00");
         assertThat(summary.estimatedTotalPayout()).isEqualByComparingTo("65.00");
         assertThat(summary.secondsRemaining()).isGreaterThan(0);
+    }
+
+    @Test
+    @DisplayName("getActiveOffers returns active pending offers for agent with order and item details")
+    void getActiveOffers_success() {
+        DeliveryOffer offer = new DeliveryOffer();
+        offer.setId(UUID.randomUUID());
+        offer.setOrder(order);
+        offer.setAgent(agent);
+        offer.setRoundNumber(0);
+        offer.setRadiusKm(new BigDecimal("3.00"));
+        offer.setStatus(DeliveryOfferStatus.PENDING);
+        offer.setOfferedAt(Instant.now().minusSeconds(5));
+        offer.setExpiresAt(Instant.now().plusSeconds(40));
+
+        when(lifecycleService.findAgentForUser(agentUserId)).thenReturn(agent);
+        when(deliveryOfferRepository.findActiveOffersForAgent(
+                eq(agent.getId()),
+                eq(DeliveryOfferStatus.PENDING),
+                any(Instant.class)
+        )).thenReturn(List.of(offer));
+
+        DeliveryEarningsCalculator.DeliveryEarningsBreakdown breakdown =
+                new DeliveryEarningsCalculator.DeliveryEarningsBreakdown(
+                        new BigDecimal("45.00"),
+                        new BigDecimal("20.00"),
+                        new BigDecimal("65.00"),
+                        3.5,
+                        600L
+                );
+        when(earningsCalculator.calculateEarnings(order, agent)).thenReturn(breakdown);
+
+        List<OrderOfferSummaryResponse> activeOffers = dispatchService.getActiveOffers(agentUserId);
+
+        assertThat(activeOffers).hasSize(1);
+        OrderOfferSummaryResponse first = activeOffers.getFirst();
+        assertThat(first.offerId()).isEqualTo(offer.getId());
+        assertThat(first.orderId()).isEqualTo(orderId);
+        assertThat(first.roundNumber()).isEqualTo(0);
+        assertThat(first.radiusKm()).isEqualByComparingTo("3.00");
+        assertThat(first.orderStatus()).isEqualTo("ACCEPTED");
+        assertThat(first.customerName()).isEqualTo("Customer One");
+        assertThat(first.restaurantName()).isEqualTo("Bite Palace");
+        assertThat(first.estimatedTotalPayout()).isEqualByComparingTo("65.00");
+        assertThat(first.secondsRemaining()).isGreaterThan(0);
     }
 
     @Test

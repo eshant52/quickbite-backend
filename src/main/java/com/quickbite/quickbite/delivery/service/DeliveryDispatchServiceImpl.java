@@ -272,17 +272,73 @@ public class DeliveryDispatchServiceImpl implements DeliveryDispatchService {
                 )
                 .orElseThrow(() -> new ResourceNotFoundException("No active offer found for order " + orderId));
 
+        return toOfferSummaryResponse(offer, order, agent, Instant.now());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderOfferSummaryResponse> getActiveOffers(UUID agentUserId) {
+        DeliveryAgent agent = lifecycleService.findAgentForUser(agentUserId);
+        Instant now = Instant.now();
+
+        List<DeliveryOffer> activeOffers = deliveryOfferRepository.findActiveOffersForAgent(
+                agent.getId(),
+                DeliveryOfferStatus.PENDING,
+                now
+        );
+
+        return activeOffers.stream()
+                .map(offer -> toOfferSummaryResponse(offer, offer.getOrder(), agent, now))
+                .toList();
+    }
+
+    private OrderOfferSummaryResponse toOfferSummaryResponse(
+            DeliveryOffer offer,
+            Order order,
+            DeliveryAgent agent,
+            Instant now
+    ) {
         DeliveryEarningsCalculator.DeliveryEarningsBreakdown earnings =
                 earningsCalculator.calculateEarnings(order, agent);
 
-        long secondsRemaining = Math.max(0, Duration.between(Instant.now(), offer.getExpiresAt()).toSeconds());
+        long secondsRemaining = offer.getExpiresAt() != null
+                ? Math.max(0, Duration.between(now, offer.getExpiresAt()).toSeconds())
+                : 0L;
 
         String restaurantAddress = (order.getRestaurant() != null && order.getRestaurant().getAddress() != null)
                 ? formatAddress(order.getRestaurant().getAddress())
                 : "";
 
+        String customerName = (order.getCustomer() != null && order.getCustomer().getName() != null)
+                ? order.getCustomer().getName()
+                : "";
+
+        String customerPhone = (order.getCustomer() != null && order.getCustomer().getPhoneNumber() != null)
+                ? order.getCustomer().getPhoneNumber()
+                : "";
+
+        List<OrderOfferSummaryResponse.OfferOrderItemDto> itemDtos = order.getItems() == null
+                ? List.of()
+                : order.getItems().stream()
+                        .map(oi -> new OrderOfferSummaryResponse.OfferOrderItemDto(
+                                oi.getMenuItem() != null ? oi.getMenuItem().getName() : "Item",
+                                oi.getQuantity(),
+                                oi.getUnitPrice(),
+                                oi.getSubTotal()
+                        ))
+                        .toList();
+
         return new OrderOfferSummaryResponse(
+                offer.getId(),
                 order.getId(),
+                offer.getRoundNumber(),
+                offer.getRadiusKm(),
+                order.getCurrentStatus() != null ? order.getCurrentStatus().name() : "",
+                order.getSubtotal(),
+                order.getTotalAmount(),
+                customerName,
+                customerPhone,
+                itemDtos,
                 order.getRestaurant() != null ? order.getRestaurant().getName() : "",
                 restaurantAddress,
                 order.getDeliveryAddress(),
@@ -291,6 +347,7 @@ public class DeliveryDispatchServiceImpl implements DeliveryDispatchService {
                 earnings.guaranteedPayout(),
                 earnings.tipAmount(),
                 earnings.estimatedTotalPayout(),
+                offer.getOfferedAt(),
                 offer.getExpiresAt(),
                 secondsRemaining
         );

@@ -15,6 +15,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -78,6 +79,14 @@ public class DeliveryAgentController {
     ) {
         UUID agentUserId = authenticatedSessionResolver.userIdFromJwt(jwt);
         return ResponseEntity.ok(deliveryAgentService.markDelivered(orderId, agentUserId));
+    }
+
+    @GetMapping("/offers/active")
+    public ResponseEntity<List<OrderOfferSummaryResponse>> getActiveOffers(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        UUID agentUserId = authenticatedSessionResolver.userIdFromJwt(jwt);
+        return ResponseEntity.ok(deliveryDispatchService.getActiveOffers(agentUserId));
     }
 
     @GetMapping("/orders/{orderId}/offer-summary")
