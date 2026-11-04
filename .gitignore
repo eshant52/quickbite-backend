@@ -49,5 +49,10 @@ logs/
 # OS
 .DS_Store
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
 # Rough note
 docs/roughbook.md
