@@ -123,9 +123,36 @@ docker exec -it my-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server local
 
 ---
 
-## 5. Local OSRM Routing Engine (Optional)
+## 5. Routing Engine Configuration (OSRM & Mapbox)
 
-QuickBite connects to a local OSRM instance for sub-millisecond street-level bicycle routing.
+QuickBite utilizes a **3-Tier Composite Routing Gateway** (`CompositeRoutingGateway`) to compute road-network driving distances, route durations, and delivery fees:
+1. **Tier 1 (OSRM)**: High-speed, self-hosted local OpenStreetMap routing engine (sub-10ms latency).
+2. **Tier 2 (Mapbox)**: Cloud Directions & Matrix API with live traffic data.
+3. **Tier 3 (Haversine)**: Pure mathematical great-circle fallback (always available, guarantees zero downtime).
+
+```mermaid
+flowchart TD
+    Req["Routing Request (Origin, Destination)"] --> OSRMCheck{"OSRM Enabled?<br/>(quickbite.routing.osrm-enabled)"}
+    
+    OSRMCheck -->|Yes| OSRM["Tier 1: Local OSRM (:5001)"]
+    OSRMCheck -->|No| MapboxCheck{"Mapbox Enabled?<br/>(quickbite.routing.mapbox-enabled)"}
+    
+    OSRM -->|Success| Found["Return RouteResult"]
+    OSRM -->|Unavailable or Timeout| MapboxCheck
+    
+    MapboxCheck -->|Yes| Mapbox["Tier 2: Cloud Mapbox API"]
+    MapboxCheck -->|No| Haversine["Tier 3: Haversine Mathematical Fallback"]
+    
+    Mapbox -->|Success| Found
+    Mapbox -->|Unavailable or Rate Limit| Haversine
+    Haversine --> Found
+```
+
+---
+
+### 5.1 Setting Up Local OSRM (Optional for Dev)
+
+By default in `dev` mode (`application-dev.properties`), OSRM is enabled on port `5001`:
 
 1. **Install OSRM**:
    ```bash
@@ -142,12 +169,58 @@ QuickBite connects to a local OSRM instance for sub-millisecond street-level bic
    osrm-partition india-latest.osrm
    osrm-customize india-latest.osrm
    ```
-4. **Run OSRM Server** on port **5001** (avoids conflict with macOS AirPlay on 5000):
+4. **Run OSRM Server** on port **5001** (avoids conflict with macOS AirPlay on port 5000):
    ```bash
    osrm-routed --algorithm mld -p 5001 india-latest.osrm
    ```
 
-*(Note: If OSRM is not running, the application will automatically fall back to Haversine calculation without interrupting execution).*
+*(Note: If OSRM is not running, the application catches the connection failure and automatically falls back to Mapbox or Haversine without interrupting execution).*
+
+---
+
+### 5.2 Enabling & Disabling Routing Providers
+
+You can switch between local OSRM, cloud Mapbox, or pure mathematical Haversine calculation by toggling properties in `src/main/resources/application-dev.properties` or passing environment variables / JVM arguments.
+
+#### Routing Configuration Modes
+
+| Mode | `quickbite.routing.osrm-enabled` | `quickbite.routing.mapbox-enabled` | `MAPBOX_ACCESS_TOKEN` | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **A. OSRM Only (Default Dev)** | `true` | `false` | Not required | Uses local OSRM (`http://localhost:5001`) with automatic Haversine fallback. |
+| **B. Mapbox in Dev (No Local OSRM)** | `false` | `true` | Required (`pk.eyJ1I...`) | Skips local OSRM and queries Mapbox Directions API directly. |
+| **C. Hybrid (OSRM + Mapbox Fallback)** | `true` | `true` | Required (`pk.eyJ1I...`) | Uses OSRM first; if OSRM is down, falls back to Mapbox before Haversine. |
+| **D. Zero-Setup (Haversine Only)** | `false` | `false` | Not required | Mathematical great-circle distance with 25 km/h urban velocity. Ideal for fast test runs without external services. |
+| **E. Production Profile (`prod`)** | `false` | `true` | Required (`pk.eyJ1I...`) | Mapbox primary with Haversine fallback. OSRM is strictly omitted in production. |
+
+---
+
+### 5.3 Step-by-Step: Enabling Mapbox in Dev Mode
+
+To use Mapbox instead of or alongside OSRM in local development:
+
+1. **Obtain a Mapbox Token**:
+   - Create a free account at [account.mapbox.com](https://account.mapbox.com/).
+   - Copy your Public Default Access Token (`pk.eyJ1I...`).
+
+2. **Add Token to `.env`**:
+   Uncomment `MAPBOX_ACCESS_TOKEN` in your `.env` file:
+   ```env
+   # Mapbox Routing API
+   MAPBOX_ACCESS_TOKEN=pk.eyJ1Ixxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   ```
+
+3. **Toggle Properties in `application-dev.properties`**:
+   To use Mapbox as primary in dev (disabling local OSRM):
+   ```properties
+   quickbite.routing.osrm-enabled=false
+   quickbite.routing.mapbox-enabled=true
+   quickbite.routing.mapbox-access-token=${MAPBOX_ACCESS_TOKEN:}
+   ```
+
+   *Alternatively, pass JVM arguments when running Spring Boot without changing files:*
+   ```bash
+   ./mvnw spring-boot:run -Dspring-boot.run.arguments="--quickbite.routing.osrm-enabled=false --quickbite.routing.mapbox-enabled=true"
+   ```
 
 ---
 
@@ -159,7 +232,7 @@ Create the `.env` file for the Spring Boot application:
 cp .env.example .env
 ```
 
-Key environment properties to configure:
+Key environment properties configured in `.env`:
 ```env
 # Database Credentials
 DB_USERNAME=eshant
@@ -175,13 +248,19 @@ REDIS_PASSWORD=redistest
 KAFKA_SERVERS=localhost:9092
 
 # Razorpay Credentials (Leave dummy values if using test profile)
-RAZORPAY_KEY_ID=rzp_test_YourKeyIdHere
-RAZORPAY_KEY_SECRET=YourRazorpaySecretHere
-RAZORPAY_WEBHOOK_SECRET=YourWebhookSecretHere
+RAZORPAY_KEY_ID=rzp_test_TaEBzaya3Nb4Or
+RAZORPAY_KEY_SECRET=0SMFp9Y8PLmWqWszHuU7KMGi
+RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
 
-# AWS S3 (for image/document uploads)
-AWS_S3_BUCKET=quickbite-dev-uploads
-AWS_REGION=ap-south-1
+# Super Admin Initial Bootstrapper
+ADMIN_BOOTSTRAP_ENABLED=true
+ADMIN_BOOTSTRAP_NAME="Super Admin"
+ADMIN_BOOTSTRAP_EMAIL="super.admin@quickbite.com"
+ADMIN_BOOTSTRAP_PHONE="+911234567890"
+ADMIN_BOOTSTRAP_PASSWORD="Admin@123"
+
+# Mapbox Routing API (Optional for dev, required for prod)
+# MAPBOX_ACCESS_TOKEN=pk.eyJ1I...
 ```
 
 ### Step 7: Profiles & Running the Application

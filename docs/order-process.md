@@ -55,9 +55,10 @@ com.quickbite.quickbite
     │   ├── AssignedDeliveryAgentResponse.java        # Assigned driver details & live coordinates
     │   ├── OrderItemResponse.java                    # Snapshot line item in order response
     │   ├── OrderResponse.java                        # Complete order detail with items & status history
-    │   ├── OrderStatusHistoryDto.java                # Timestamped status audit entry
+    │   ├── OrderStatusHistoryDto.java                # Timestamped status audit entry with actor attribution (changedById, changedByName)
     │   ├── OrderSummaryResponse.java                 # Cursor-paginated list item projection
-    │   └── PlaceOrderRequest.java                    # (addressId, paymentMethod, tipAmount, expectedTotal)
+    │   ├── PlaceOrderRequest.java                    # (addressId, paymentMethod, tipAmount, expectedTotal)
+    │   └── RestaurantEarningsResponse.java           # Delivered orders earnings aggregation DTO
     ├── exception
     │   ├── OrderExpiredException.java                # Payment window expired
     │   ├── OrderNotFoundException.java               # Order lookup failure (HTTP 404)
@@ -182,6 +183,8 @@ com.quickbite.quickbite
 | `RESTAURANT_OWNER` | `POST /api/v1/restaurant-owner/orders/{orderId}/decline` | `RestaurantOrderController.declineRestaurantOrder` | Transitions `PLACED` &rarr; `DECLINED` and triggers auto-refund |
 | `RESTAURANT_OWNER` | `POST /api/v1/restaurant-owner/orders/{orderId}/mark-preparing` | `RestaurantOrderController.markPreparingRestaurantOrder` | Transitions `ACCEPTED` &rarr; `PREPARING` |
 | `RESTAURANT_OWNER` | `POST /api/v1/restaurant-owner/orders/{orderId}/mark-ready` | `RestaurantOrderController.markReadyForPickupRestaurantOrder` | Transitions `PREPARING` &rarr; `READY_FOR_PICKUP` |
+| `RESTAURANT_OWNER` | `GET /api/v1/restaurant-owner/orders/{orderId}/delivery-agent` | `RestaurantOrderController.getAssignedDeliveryAgent` | Returns assigned delivery agent details & live location |
+| `RESTAURANT_OWNER` | `GET /api/v1/restaurant-owner/orders/earnings` | `RestaurantOrderController.getEarnings` | Aggregates delivered order count, gross sales, food subtotal, platform fees, and taxes |
 | `ADMIN` | `POST /api/v1/admin/orders/{orderId}/refund` | `AdminOrderController.refundDeliveredOrder` | Issues post-delivery refund for `DELIVERED` order |
 
 ---
@@ -189,7 +192,7 @@ com.quickbite.quickbite
 ## 4. Shopping Cart & Dynamic Pricing Engine
 
 ### 4.1 Single-Restaurant Rule & Rolling 24-Hour TTL (`CartServiceImpl`)
-1. **Single-Restaurant Invariant**: A customer can have at most one active `Cart` at a time, bound to a single `Restaurant`. Adding a `MenuItem` from a different restaurant throws `CartConflictException` (`409 Conflict`), prompting the user to clear their cart first.
+1. **Single-Restaurant Invariant**: A customer can have at most one active `Cart` at a time, bound to a single `Restaurant`. Adding a `MenuItem` from a different restaurant automatically clears the existing cart and initializes a fresh cart for the new restaurant.
 2. **Rolling 24-Hour Expiration**: Every cart creation or item mutation resets `cart.expiresAt = Instant.now().plus(24, HOURS)`. If an expired cart is accessed during `getCart`, `addItem`, `getCheckoutPreview`, or `placeOrder`, it is automatically deleted.
 3. **Auto-Clear on Order Placement**: The cart is **not** deleted while online payment is still pending (allowing the customer to modify their cart or retry if they abandon checkout). Only when an order reaches `OrderStatus.PLACED` (`OrderPlacedEvent`) does [`CartEventListener`](file:///Users/eshant52/Documents/scaler/project/QuickBite/app/QuickBite/src/main/java/com/quickbite/quickbite/cart/listener/CartEventListener.java) clear the customer's cart.
 
@@ -242,7 +245,7 @@ stateDiagram-v2
 
     PLACED --> ACCEPTED: Restaurant accepts within 2m deadline
     PLACED --> DECLINED: Restaurant declines order with Auto-Refund
-    PLACED --> CANCELLED: 2m Acceptance Timeout (RESTAURANT_UNRESPONSIVE) or Customer cancels
+    PLACED --> CANCELLED: 2m Acceptance Timeout - RESTAURANT_UNRESPONSIVE or Customer cancels
 
     ACCEPTED --> PREPARING: Kitchen starts cooking via mark-preparing
     ACCEPTED --> CANCELLED: Dispatch Exhausted after Round 3 - NO_AGENT_FOUND
@@ -569,7 +572,9 @@ If a customer reports a quality or fulfillment issue after an order has reached 
 
 ## 9. Performance & Metric Optimizations Achieved
 
-### 9.1 Database Indexing (`V33` & `V34` Migrations)
+### 9.1 Database Indexing (`V33`–`V35` Migrations)
+* **Order Status Actor Attribution (`V35`)**:
+  * Added `changed_by_id UUID REFERENCES users(id)` and index `idx_order_status_history_changed_by ON order_status_history (changed_by_id)` to track the user (customer, restaurant owner, or delivery agent) who triggered each order status transition.
 * **Composite Cursor Pagination Indexes (`V33`)**:
   * `idx_orders_customer_id ON orders (customer_id, id DESC)`: Serves customer order history (`WHERE customer_id = ? AND id < ? ORDER BY id DESC LIMIT n`) via a pure B-tree index scan with zero sort step and $O(1)$ page depth.
   * `idx_orders_restaurant_status ON orders (restaurant_id, current_status, id DESC)` and `idx_orders_restaurant_id ON orders (restaurant_id, id DESC)`: Serves live kitchen filtering and restaurant order history.

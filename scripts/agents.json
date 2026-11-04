@@ -1,0 +1,32 @@
+[
+  {
+    "email": "aarav.sharma@example.com",
+    "password": "Password@123",
+    "enabled": true
+  },
+  {
+    "email": "vikram.singh@example.com",
+    "password": "Password@123",
+    "enabled": true
+  },
+  {
+    "email": "pooja.patel@example.com",
+    "password": "Password@123",
+    "enabled": true
+  },
+  {
+    "email": "mohammed.rizwan@example.com",
+    "password": "Password@123",
+    "enabled": true
+  },
+  {
+    "email": "sneha.mukherjee@example.com",
+    "password": "Password@123",
+    "enabled": true
+  },
+  {
+    "email": "rajesh.kumar@example.com",
+    "password": "Password@123",
+    "enabled": true
+  }
+]

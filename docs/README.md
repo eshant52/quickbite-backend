@@ -51,6 +51,9 @@ Welcome to the QuickBite Backend technical documentation directory. This collect
   - Kafka event-driven payment refund orchestration.
 
 ### Operations & Setup
+- [**End-to-End Demo Guide & Offer Tracker (`../README.md#🎬-end-to-end-demo-guide-placing-an-order--delivery-offer-tracking`)**](../README.md#🎬-end-to-end-demo-guide-placing-an-order--delivery-offer-tracking)
+  - Complete copy-paste Postman / cURL walkthrough from order placement to restaurant acceptance.
+  - Multi-agent offer tracker CLI (`scripts/track_delivery_offers.py`) with Redis GEO heartbeats and live offer cards.
 - [**Installation & Environment Setup (`installation.md`)**](installation.md)
   - Step-by-step local setup for Docker Compose (PostgreSQL 18 + PostGIS, Redis 8, Apache Kafka 4.3).
   - Native OSRM routing engine installation on macOS/Linux.

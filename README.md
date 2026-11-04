@@ -210,6 +210,250 @@ curl http://localhost:8080/actuator/health
 * **Email**: `super.admin@quickbite.com`
 * **Password**: `Admin@123`
 
+> [!TIP]
+> For more details, comprehensive environment configuration, Docker setup, and routing engine options, look to the [Installation and Configuration Guide](docs/installation.md).
+
+---
+
+## 🎬 End-to-End Demo Guide: Placing an Order & Delivery Offer Tracking
+
+This step-by-step walkthrough demonstrates QuickBite's complete reactive order-to-delivery lifecycle:
+1. **Interactive Delivery Agent Offer Tracker CLI** (`track_delivery_offers.py`): Logs in and tracks up to 10 delivery agents simultaneously, continuously pushes live Redis GEO heartbeats, polls for incoming offers, and renders real-time offer cards with countdown timers.
+2. **Postman / cURL API Flow**: Customer places an order, Restaurant Owner accepts the order within the 2-minute deadline (triggering 3-round parallel dispatch), and the Delivery Agent accepts the offer with single-key prompt (`1`).
+
+---
+
+### Step 1: Start the Interactive Delivery Agent Tracker CLI
+
+In your terminal, launch the Python offer tracker ([`track_delivery_offers.py`](file:///Users/eshant52/Documents/scaler/project/QuickBite/app/QuickBite/scripts/track_delivery_offers.py)):
+
+```bash
+# Local backend (default: http://localhost:8080)
+python3 scripts/track_delivery_offers.py --auto-available
+
+# Or point to a deployed QuickBite backend URL (no direct DB access needed!)
+python3 scripts/track_delivery_offers.py --base-url https://api.your-domain.com --auto-available
+```
+
+> [!NOTE]
+> * **100% REST API-Driven**: Polls `GET /api/v1/delivery-agent/offers/active` for each logged-in agent — requires zero direct database connection (`psql` is not needed).
+> * Pre-configured with 6 verified delivery agents in [`scripts/agents.json`](file:///Users/eshant52/Documents/scaler/project/QuickBite/app/QuickBite/scripts/agents.json) (`aarav.sharma@example.com`, `vikram.singh@example.com`, `pooja.patel@example.com`, `mohammed.rizwan@example.com`, `sneha.mukherjee@example.com`, `rajesh.kumar@example.com`, password `Password@123`).
+> * Automatically refreshes 15-minute JWTs and resolves `409 Conflict` (session limits) by evicting only the single oldest session.
+> * Sends `PUT /api/v1/delivery-agent/location` heartbeats every 35s to keep active agents alive in Redis GEO.
+> * Queues multiple incoming offers in FIFO order so you can review each offer without missing others.
+
+Leave this terminal running — it will alert you as soon as an offer is dispatched!
+
+---
+
+### Step 2: Authenticate in Postman / cURL
+
+Open Postman (or use cURL in a second terminal) with `Content-Type: application/json` and `X-Client-Type: mobile_app`.
+
+#### 2.1 Customer Login
+* **Method**: `POST`
+* **URL**: `http://localhost:8080/api/v1/auth/login`
+* **Headers**:
+  ```http
+  Content-Type: application/json
+  X-Client-Type: mobile_app
+  ```
+* **Body**:
+  ```json
+  {
+    "email": "eshantsonune52@gmail.com",
+    "password": "Password@123"
+  }
+  ```
+* **Action**: Copy the `accessToken` from the response JSON and save it as your `CUSTOMER_TOKEN`.
+
+#### 2.2 Restaurant Owner Login
+* **Method**: `POST`
+* **URL**: `http://localhost:8080/api/v1/auth/login`
+* **Headers**:
+  ```http
+  Content-Type: application/json
+  X-Client-Type: mobile_app
+  ```
+* **Body**:
+  ```json
+  {
+    "email": "rakesh.agarwal@haldiramsnagpur.com",
+    "password": "Password@123"
+  }
+  ```
+* **Action**: Copy the `accessToken` from the response JSON and save it as your `OWNER_TOKEN`.
+
+---
+
+### Step 3: Add Menu Item to Cart (Customer)
+
+Add *Shahi Gulab Jamun (2 Pcs)* from *Haldiram's Planet Food* to the customer's cart.
+
+* **Method**: `POST`
+* **URL**: `http://localhost:8080/api/v1/customer/cart/items`
+* **Headers**:
+  ```http
+  Content-Type: application/json
+  Authorization: Bearer <CUSTOMER_TOKEN>
+  ```
+* **Body**:
+  ```json
+  {
+    "menuItemId": "01a12644-4cf3-79a9-9908-278c7018020f",
+    "quantity": 2
+  }
+  ```
+* **Expected Response (`200 OK`)**:
+  ```json
+  {
+    "restaurantId": "01a12520-fb45-781c-a3e5-27d7ad889ea3",
+    "restaurantName": "Haldiram's Planet Food - Dharampeth",
+    "items": [
+      {
+        "menuItemId": "01a12644-4cf3-79a9-9908-278c7018020f",
+        "menuItemName": "Shahi Gulab Jamun (2 Pcs)",
+        "quantity": 2,
+        "unitPrice": 75.00,
+        "subTotal": 150.00
+      }
+    ]
+  }
+  ```
+
+---
+
+### Step 4: Place Order via Cash on Delivery (Customer)
+
+Place the order using the customer's saved address and `COD` payment method. For Cash on Delivery, QuickBite immediately confirms payment and transitions the order directly to `PLACED`.
+
+* **Method**: `POST`
+* **URL**: `http://localhost:8080/api/v1/customer/orders`
+* **Headers**:
+  ```http
+  Content-Type: application/json
+  Authorization: Bearer <CUSTOMER_TOKEN>
+  ```
+* **Body**:
+  ```json
+  {
+    "addressId": "01a12aaf-4f26-7df3-a6f2-45ffec06dbfb",
+    "paymentMethod": "COD",
+    "tipAmount": 20.00
+  }
+  ```
+* **Expected Response (`201 Created`)**:
+  ```json
+  {
+    "orderId": "0195f000-xxxx-7000-xxxx-xxxxxxxxxxxx",
+    "status": "PLACED",
+    "type": "COD",
+    "totalAmount": 222.50
+  }
+  ```
+* **Action**: Copy the `orderId` value (e.g., `0195f000-...`). The 2-minute restaurant acceptance deadline countdown is now ticking in Redisson!
+
+---
+
+### Step 5: Restaurant Owner Accepts Order (Triggers Dispatch)
+
+The restaurant owner accepts the order within the 2-minute deadline.
+
+* **Method**: `POST`
+* **URL**: `http://localhost:8080/api/v1/restaurant-owner/orders/<orderId>/accept?restaurantId=01a12520-fb45-781c-a3e5-27d7ad889ea3`
+* **Headers**:
+  ```http
+  Authorization: Bearer <OWNER_TOKEN>
+  ```
+* **Expected Response (`200 OK`)**:
+  ```json
+  {
+    "id": "<orderId>",
+    "currentStatus": "ACCEPTED",
+    "restaurantId": "01a12520-fb45-781c-a3e5-27d7ad889ea3"
+  }
+  ```
+
+> [!IMPORTANT]
+> **Dispatch Event Choreography**: Accepting the order publishes an `OrderAcceptedEvent` to Kafka. QuickBite's dispatch engine immediately calculates nearby candidate drivers in Redis GEO (Round 1: 3 km radius) and generates an offer in PostgreSQL with a 45-second expiration timer.
+
+---
+
+### Step 6: Accept Offer in the Python CLI Tracker
+
+Switch back to the terminal running [`track_delivery_offers.py`](file:///Users/eshant52/Documents/scaler/project/QuickBite/app/QuickBite/scripts/track_delivery_offers.py). Within 1–2 seconds, an audible terminal bell will ring and the offer card will render:
+
+```text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 ACTIVE DELIVERY OFFER  (Round #1, Radius 3.0 km) | Queue Empty (0 waiting)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  👤 Delivery Agent : Aarav Sharma (aarav.sharma@example.com | +919876543210)
+  🛵 Vehicle / ID   : MOTORCYCLE (MH-31-AB-1234)  [agentId: 0195e...]
+  ────────────────────────────────────────────────────────────────────────────────────
+  📦 Order ID       : 0195f000-...  [Status: ACCEPTED]
+  🧑 Customer       : Eshant Sonune (+919876543210)  |  Order Bill: ₹222.50
+  🍽️  Order Items    :
+                      • 2 × Shahi Gulab Jamun (2 Pcs) (₹150.00)
+  ────────────────────────────────────────────────────────────────────────────────────
+  🏪 Restaurant     : Haldiram's Planet Food - Dharampeth
+                      Dharampeth, Nagpur, Maharashtra
+  📍 Drop Address   : Dharampeth Home Address, Nagpur
+  🛣️  Distance / ETA : 1.85 km  |  ~320 sec (5m 20s)
+  💰 Agent Payout   : ₹48.50 (Guaranteed: ₹28.50 + Tip: ₹20.00)
+  ⏳ Expires In     : 43 seconds (at 18:25:10)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👉 Action for Aarav Sharma [1=Accept, 2=Reject, 3=Skip, r=Refresh, s=Agents, q=Quit]: 
+```
+
+#### Choose Your Action:
+* **Press `1` + Enter &rarr; Accept Offer**:
+  Assigns the order to Aarav Sharma (`POST /api/v1/delivery-agent/orders/{orderId}/accept`).
+  Terminal prints: `✅ ACCEPTED! Aarav Sharma is now assigned to Order <orderId>.`
+* **Press `2` + Enter &rarr; Reject Offer**:
+  Declines the offer (`POST /api/v1/delivery-agent/orders/{orderId}/reject`). QuickBite automatically escalates and offers the order to the next closest driver (e.g. Vikram Singh or Pooja Patel)!
+* **Press `3` + Enter &rarr; Skip**:
+  Leaves the offer untouched in `PENDING` state to let its natural 45-second timer expire.
+
+---
+
+### Step 7: Complete Kitchen Prep & Delivery (Optional)
+
+Once the agent has accepted, you can step through the remaining kitchen and delivery states:
+
+```mermaid
+flowchart LR
+    A["PLACED"] -->|Restaurant Accept| B["ACCEPTED"]
+    B -->|Agent Accept| C["ASSIGNED"]
+    C -->|mark-preparing| D["PREPARING"]
+    D -->|mark-ready| E["READY_FOR_PICKUP"]
+    E -->|agent pickup| F["OUT_FOR_DELIVERY"]
+    F -->|agent delivered| G["DELIVERED"]
+```
+
+1. **Kitchen Starts Cooking (`ACCEPTED` &rarr; `PREPARING`)**:
+   ```bash
+   curl -X POST "http://localhost:8080/api/v1/restaurant-owner/orders/<orderId>/mark-preparing?restaurantId=01a12520-fb45-781c-a3e5-27d7ad889ea3" \
+     -H "Authorization: Bearer <OWNER_TOKEN>"
+   ```
+2. **Food Ready for Pickup (`PREPARING` &rarr; `READY_FOR_PICKUP`)**:
+   ```bash
+   curl -X POST "http://localhost:8080/api/v1/restaurant-owner/orders/<orderId>/mark-ready?restaurantId=01a12520-fb45-781c-a3e5-27d7ad889ea3" \
+     -H "Authorization: Bearer <OWNER_TOKEN>"
+   ```
+3. **Driver Picks Up Food (`READY_FOR_PICKUP` &rarr; `OUT_FOR_DELIVERY`)**:
+   *Log in as the assigned driver (e.g. `aarav.sharma@example.com` / `Password@123`) to get `AGENT_TOKEN`:*
+   ```bash
+   curl -X POST "http://localhost:8080/api/v1/delivery-agent/orders/<orderId>/pickup" \
+     -H "Authorization: Bearer <AGENT_TOKEN>"
+   ```
+4. **Driver Confirms Delivery (`OUT_FOR_DELIVERY` &rarr; `DELIVERED`)**:
+   ```bash
+   curl -X POST "http://localhost:8080/api/v1/delivery-agent/orders/<orderId>/delivered" \
+     -H "Authorization: Bearer <AGENT_TOKEN>"
+   ```
+
+The order is now in its terminal state: `DELIVERED`! 🎉
+
 ---
 
 ## Documentation Directory
@@ -230,19 +474,19 @@ For in-depth architectural guides and developer specifications, consult the [`do
 
 ## Project Status & Milestone Checklist
 
-- [x] **Core Architecture & Framework Setup** (Spring Boot 4.1.0 on Java 25, Flyway V1–V34, Envers Auditing)
+- [x] **Core Architecture & Framework Setup** (Spring Boot 4.1.0 on Java 25, Flyway V1–V35, Envers Auditing)
 - [x] **Dual-JWT & Stateful Session Engine** (Self-issued RSA256, Refresh Token Family Rotation, 409 Session Challenge)
-- [x] **PostgreSQL & Spatial Foundation** (PostGIS 18.1, JTS geometries, GIST indexing, spatial `/nearby` search)
+- [x] **PostgreSQL & Spatial Foundation** (PostGIS 18.1, JTS geometries, GIST indexing, spatial `/nearby` search with multi-criteria filtering)
 - [x] **Redis & Distributed Concurrency** (Redisson locks for orders/payments/dispatch, Redis GEO real-time driver tracking)
 - [x] **Kafka Event-Driven Messaging** (7 aggregate event streams, Jackson inferred polymorphic conversion, `.DLT` error handling)
 - [x] **Multi-Step Onboarding & Allotment** (Restaurant, Driver, and Vehicle pipelines with Workload-Balanced Admin Allotment)
-- [x] **Cart & Order Management** (Single-restaurant carts, dynamic fee engine, 2-minute kitchen acceptance deadline)
+- [x] **Cart & Order Management** (Single-restaurant auto-clearing carts, dynamic fee engine, 2-minute kitchen acceptance deadline, delivered earnings analytics, actor-attributed status audit trail)
 - [x] **Multi-Round Dispatch Subsystem** (3km/6km/10km expanding rounds, 45s driver offer timeout, fair assignment)
 - [x] **Payment Processing & Webhooks** (Razorpay gateway, COD/Online strategies, HMAC-SHA256 verification, auto-reconciliation)
 - [x] **Multi-Tier Routing Gateway** (Local native OSRM on port 5001 + Mapbox fallback + Haversine fallback)
 - [x] **AWS S3 File Storage** (Presigned PUT URLs for direct client uploads with 10-minute expiry)
 - [x] **Reviews & Automatic Ratings** (Kafka-driven restaurant rating and review count recalculation)
-- [x] **Comprehensive Test Suite** (100 test classes across all domains covering unit, controller, and integration flows)
+- [x] **Comprehensive Test Suite** (102 test classes / 574 tests across all domains covering unit, controller, and integration flows)
 - [ ] WebSocket / SSE live order tracking updates for customer frontend
 - [ ] Push notification gateway integration (Firebase Cloud Messaging / Apple APNs)
 - [ ] Multi-region MSK Kafka deployment configuration

@@ -61,10 +61,10 @@ All API endpoints (except explicitly public routes) are protected by Spring Secu
 
 ### 3.2 Public Catalog & Discovery (`RestaurantCatalogController`, `CuisineCatalogController`, `MenuItemCatalogController`, `RestaurantReviewController`)
 * `GET /api/v1/cuisines` — List all approved cuisines.
-* `GET /api/v1/restaurants` — Pageable search of active and verified restaurants.
-  - Params: `page`, `size`, `search`, `cuisineId`.
-* `GET /api/v1/restaurants/nearby` — PostGIS geospatial query for nearby restaurants.
-  - Params: `latitude` (double), `longitude` (double), `radiusKm` (double, default: `5.0`).
+* `GET /api/v1/restaurants` — Cursor-paginated search of active and verified restaurants with multi-criteria filtering.
+  - Params: `name` (String, optional), `cuisineId` (UUID, optional), `minRating` (BigDecimal, optional), `cursor` (UUID, optional), `size` (int, default: `20`).
+* `GET /api/v1/restaurants/nearby` — PostGIS geospatial query for nearby restaurants with optional catalog filters.
+  - Params: `lat` (double, required), `lng` (double, required), `radius` (int meters, default: `5000`, range: `100`–`50000`), `name` (String, optional), `cuisineId` (UUID, optional), `minRating` (BigDecimal, optional), `page` (int, default: `0`), `size` (int, default: `20`).
 * `GET /api/v1/restaurants/{id}` — Get restaurant details, hours, and images.
 * `GET /api/v1/restaurants/{id}/menu-items` — Get active menu items for a restaurant.
   - Params: `category`, `dietaryClassification` (`VEG`, `NON_VEG`, `VEGAN`), `search`.
@@ -93,7 +93,7 @@ All API endpoints (except explicitly public routes) are protected by Spring Secu
 
 ### 4.2 Shopping Cart (`CartController`)
 * `GET /api/v1/customer/cart` — Get active shopping cart (24h rolling TTL).
-* `POST /api/v1/customer/cart/items` — Add item to cart (enforces single-restaurant rule; throws `409 Conflict` if cart contains items from another restaurant).
+* `POST /api/v1/customer/cart/items` — Add item to cart (enforces single-restaurant rule; adding an item from a different restaurant automatically clears the existing cart and initializes a new cart for the selected restaurant).
   - Body: `{ "menuItemId": "<uuid>", "quantity": 2 }`
 * `PUT /api/v1/customer/cart/items/{cartItemId}` — Update item quantity.
   - Body: `{ "quantity": 3 }`
@@ -163,23 +163,26 @@ All endpoints require query parameter `?restaurantId=<uuid>`:
 * `POST /api/v1/restaurant-owner/orders/{orderId}/mark-preparing` — Transition status (`ACCEPTED` &rarr; `PREPARING`).
 * `POST /api/v1/restaurant-owner/orders/{orderId}/mark-ready` — Mark kitchen preparation complete (`PREPARING` &rarr; `READY_FOR_PICKUP`).
 * `GET /api/v1/restaurant-owner/orders/{orderId}/delivery-agent` — View delivery agent assigned to the order.
+* `GET /api/v1/restaurant-owner/orders/earnings` — View aggregated earnings from `DELIVERED` orders (`restaurantId`).
+  - Response: `RestaurantEarningsResponse` (`restaurantId`, `deliveredOrdersCount`, `totalGrossSales`, `totalFoodSubtotal`, `totalPlatformFees`, `totalTaxesCollected`).
 
 ---
 
 ## 6. Delivery Agent Endpoints (`ROLE_DELIVERY_AGENT`)
 
 ### 6.1 Agent Status & Location (`DeliveryAgentController`)
-* `GET /api/v1/delivery-agent/me` — Agent profile, status, and assigned vehicle.
-* `PATCH /api/v1/delivery-agent/availability` — Toggle duty status (`isAvailable: true/false`).
-* `POST /api/v1/delivery-agent/location` — Send live GPS heartbeat ping (lat, lng).
+* `GET /api/v1/delivery-agent/profile` — Agent profile, status, and assigned vehicle.
+* `PATCH /api/v1/delivery-agent/availability` — Toggle duty status (`available: true/false`).
+* `PUT /api/v1/delivery-agent/location` — Send live GPS heartbeat ping (`latitude`, `longitude`).
   - Updates Redis GEO spatial index with 60s TTL.
 
 ### 6.2 Dispatch Offers & Execution (`DeliveryAgentController`)
-* `GET /api/v1/delivery-agent/offers` — View active delivery offers (45s acceptance window).
-* `POST /api/v1/delivery-agent/offers/{offerId}/accept` — Accept delivery dispatch offer.
-* `POST /api/v1/delivery-agent/offers/{offerId}/reject` — Decline offer.
+* `GET /api/v1/delivery-agent/offers/active` — List all active (`PENDING` and non-expired) delivery offers for the authenticated agent, including order items, customer details, route, payout breakdown, and countdown timer.
+* `GET /api/v1/delivery-agent/orders/{orderId}/offer-summary` — View offer summary for a specific order (45s acceptance window).
+* `POST /api/v1/delivery-agent/orders/{orderId}/accept` — Accept delivery dispatch offer.
+* `POST /api/v1/delivery-agent/orders/{orderId}/reject` — Decline offer (triggers immediate fallback to next candidate).
 * `POST /api/v1/delivery-agent/orders/{orderId}/pickup` — Confirm order pickup from restaurant (`OUT_FOR_DELIVERY`).
-* `POST /api/v1/delivery-agent/orders/{orderId}/deliver` — Confirm successful delivery to customer (`DELIVERED`).
+* `POST /api/v1/delivery-agent/orders/{orderId}/delivered` — Confirm successful delivery to customer (`DELIVERED`).
 
 ### 6.3 Vehicles & Onboarding (`DeliveryAgentVehicleController`, `DeliveryAgentApplicationController`, `VehicleApplicationController`)
 * `GET /api/v1/delivery-agent/vehicles` — List vehicles registered under the agent.
