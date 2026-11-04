@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Min;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,10 +28,13 @@ public class RestaurantCatalogController {
 
     @GetMapping
     public ResponseEntity<CursorPage<RestaurantSummaryResponse>> listApproved(
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "cuisineId", required = false) UUID cuisineId,
+            @RequestParam(value = "minRating", required = false) BigDecimal minRating,
             @RequestParam(value = "cursor", required = false) UUID cursor,
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(restaurantCatalogService.listApproved(cursor, size));
+        return ResponseEntity.ok(restaurantCatalogService.listApproved(name, cuisineId, minRating, cursor, size));
     }
 
     @GetMapping("/nearby")
@@ -38,10 +42,13 @@ public class RestaurantCatalogController {
             @RequestParam @DecimalMin(value = "-90.0", message = "Latitude must be >= -90") @DecimalMax(value = "90.0", message = "Latitude must be <= 90") double lat,
             @RequestParam @DecimalMin(value = "-180.0", message = "Longitude must be >= -180") @DecimalMax(value = "180.0", message = "Longitude must be <= 180") double lng,
             @RequestParam(defaultValue = "5000") @Min(value = 100, message = "Radius must be at least 100 meters") @Max(value = 50000, message = "Radius cannot exceed 50000 meters") int radius,
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "cuisineId", required = false) UUID cuisineId,
+            @RequestParam(value = "minRating", required = false) BigDecimal minRating,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page must be >= 0") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "Size must be >= 1") @Max(value = 50, message = "Size cannot exceed 50") int size
     ) {
-        return ResponseEntity.ok(restaurantCatalogService.findNearbyRestaurants(lat, lng, radius, page, size));
+        return ResponseEntity.ok(restaurantCatalogService.findNearbyRestaurants(lat, lng, radius, name, cuisineId, minRating, page, size));
     }
 
     @GetMapping("/{id}")

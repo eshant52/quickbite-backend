@@ -67,27 +67,26 @@ public class CartServiceImpl implements CartService {
         if (existingCartOpt.isPresent()) {
             Cart existingCart = existingCartOpt.get();
 
-            // 2. Validate restaurant
+            // 2. Validate restaurant: adding from a different restaurant clears the existing cart
             if (!existingCart.getRestaurant().getId().equals(menuItem.getRestaurant().getId())) {
-                throw new CartConflictException("Your cart has items from \"" +
-                        existingCart.getRestaurant().getName() +
-                        "\". Clear your cart to order from a different restaurant.");
-            }
-
-            // 3. Update existing item or add new item
-            Optional<CartItem> existingItemOpt = cartItemRepository.findByCartAndMenuItem(existingCart, menuItem);
-
-            if (existingItemOpt.isPresent()) {
-                CartItem existingItem = existingItemOpt.get();
-                existingItem.setQuantity(existingItem.getQuantity() + req.quantity());
-                existingItem.setSubTotal(existingItem.getUnitPrice()
-                        .multiply(BigDecimal.valueOf(existingItem.getQuantity())));
-                cartItemRepository.save(existingItem);
+                cartRepository.delete(existingCart);
+                cartRepository.flush();
             } else {
-                createCartItem(req, menuItem, existingCart);
-            }
+                // 3. Update existing item or add new item
+                Optional<CartItem> existingItemOpt = cartItemRepository.findByCartAndMenuItem(existingCart, menuItem);
 
-            return CartResponse.from(recalculate(existingCart));
+                if (existingItemOpt.isPresent()) {
+                    CartItem existingItem = existingItemOpt.get();
+                    existingItem.setQuantity(existingItem.getQuantity() + req.quantity());
+                    existingItem.setSubTotal(existingItem.getUnitPrice()
+                            .multiply(BigDecimal.valueOf(existingItem.getQuantity())));
+                    cartItemRepository.save(existingItem);
+                } else {
+                    createCartItem(req, menuItem, existingCart);
+                }
+
+                return CartResponse.from(recalculate(existingCart));
+            }
         }
 
         // 4. If no active cart exists (or previous expired one was deleted), create new

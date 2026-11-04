@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -142,6 +143,64 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
             @Param("lat") double lat,
             @Param("lng") double lng,
             @Param("radiusMeters") int radiusMeters
+    );
+
+    @Query("""
+            SELECT r FROM Restaurant r
+            WHERE r.currentStatus = :status
+              AND (:cursor IS NULL OR r.id < :cursor)
+              AND (:name IS NULL OR LOWER(r.name) LIKE LOWER(CONCAT('%', :name, '%')))
+              AND (:minRating IS NULL OR (r.avgRating IS NOT NULL AND r.avgRating >= :minRating))
+              AND (:cuisineId IS NULL OR EXISTS (
+                    SELECT 1 FROM MenuItem m
+                    WHERE m.restaurant = r
+                      AND m.cuisine.id = :cuisineId
+                      AND m.isAvailable = true
+              ))
+            ORDER BY r.id DESC
+            """)
+    List<Restaurant> searchApprovedWithCursor(
+            @Param("status") RestaurantVerificationStatus status,
+            @Param("name") String name,
+            @Param("cuisineId") UUID cuisineId,
+            @Param("minRating") BigDecimal minRating,
+            @Param("cursor") UUID cursor,
+            Limit limit
+    );
+
+    @Query(value = """
+            SELECT r.* FROM restaurants r
+            JOIN addresses a ON a.id = r.address_id
+            WHERE r.current_status = 'APPROVED'
+              AND r.is_closed = false
+              AND (:name IS NULL OR LOWER(r.name) LIKE LOWER(CONCAT('%', :name, '%')))
+              AND (:minRating IS NULL OR (r.avg_rating IS NOT NULL AND r.avg_rating >= :minRating))
+              AND (:cuisineId IS NULL OR EXISTS (
+                    SELECT 1 FROM menu_items m
+                    WHERE m.restaurant_id = r.id
+                      AND m.cuisine_id = :cuisineId
+                      AND m.is_available = true
+              ))
+              AND ST_DWithin(
+                    a.location::geography,
+                    ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
+                    :radiusMeters
+                  )
+            ORDER BY ST_Distance(
+                         a.location::geography,
+                         ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
+                     ) ASC
+            LIMIT :limit OFFSET :offset
+            """, nativeQuery = true)
+    List<Restaurant> findNearbyRestaurantsWithFilters(
+            @Param("lat") double lat,
+            @Param("lng") double lng,
+            @Param("radiusMeters") int radiusMeters,
+            @Param("name") String name,
+            @Param("cuisineId") UUID cuisineId,
+            @Param("minRating") BigDecimal minRating,
+            @Param("limit") int limit,
+            @Param("offset") int offset
     );
 
 

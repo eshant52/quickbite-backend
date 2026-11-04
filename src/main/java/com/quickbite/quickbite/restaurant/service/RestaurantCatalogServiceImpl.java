@@ -15,6 +15,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,15 +43,26 @@ public class RestaurantCatalogServiceImpl implements RestaurantCatalogService {
     }
 
     @Override
-    public CursorPage<RestaurantSummaryResponse> listApproved(UUID cursor, int size) {
+    public CursorPage<RestaurantSummaryResponse> listApproved(String name, UUID cuisineId, BigDecimal minRating, UUID cursor, int size) {
         int pageSize = Math.clamp(size, 1, 100);
 
-        List<Restaurant> restaurants = restaurantRepository
-                .findAllWithCursor(
-                        RestaurantVerificationStatus.APPROVED,
-                        cursor,
-                        Limit.of(pageSize + 1)
-                );
+        List<Restaurant> restaurants;
+        if (name == null && cuisineId == null && minRating == null) {
+            restaurants = restaurantRepository.findAllWithCursor(
+                    RestaurantVerificationStatus.APPROVED,
+                    cursor,
+                    Limit.of(pageSize + 1)
+            );
+        } else {
+            restaurants = restaurantRepository.searchApprovedWithCursor(
+                    RestaurantVerificationStatus.APPROVED,
+                    name,
+                    cuisineId,
+                    minRating,
+                    cursor,
+                    Limit.of(pageSize + 1)
+            );
+        }
 
         return CursorPage.of(
                 restaurants.stream()
@@ -63,14 +75,21 @@ public class RestaurantCatalogServiceImpl implements RestaurantCatalogService {
 
     @Override
     public List<NearbyRestaurantResponse> findNearbyRestaurants(double lat, double lng,
-                                                                int radiusMeters, int page, int size) {
+                                                                int radiusMeters, String name, UUID cuisineId, BigDecimal minRating, int page, int size) {
         int pageSize   = Math.clamp(size, 1, 50);
         int offset     = Math.max(0, page) * pageSize;
         GeoPoint query = GeoPoint.of(lat, lng);
 
-        List<Restaurant> restaurants = restaurantRepository.findNearbyRestaurants(
-                lat, lng, radiusMeters, pageSize, offset
-        );
+        List<Restaurant> restaurants;
+        if (name == null && cuisineId == null && minRating == null) {
+            restaurants = restaurantRepository.findNearbyRestaurants(
+                    lat, lng, radiusMeters, pageSize, offset
+            );
+        } else {
+            restaurants = restaurantRepository.findNearbyRestaurantsWithFilters(
+                    lat, lng, radiusMeters, name, cuisineId, minRating, pageSize, offset
+            );
+        }
 
         return restaurants.stream()
                 .map(r -> {

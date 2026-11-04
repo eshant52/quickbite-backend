@@ -71,9 +71,23 @@ class RestaurantCatalogControllerTest {
     @DisplayName("listApproved returns public cursor page")
     void listApproved_success() {
         CursorPage<RestaurantSummaryResponse> page = CursorPage.of(List.of(mockSummary), 20, RestaurantSummaryResponse::id);
-        when(restaurantCatalogService.listApproved(null, 20)).thenReturn(page);
+        when(restaurantCatalogService.listApproved(null, null, null, null, 20)).thenReturn(page);
 
-        ResponseEntity<CursorPage<RestaurantSummaryResponse>> res = restaurantCatalogController.listApproved(null, 20);
+        ResponseEntity<CursorPage<RestaurantSummaryResponse>> res = restaurantCatalogController.listApproved(null, null, null, null, 20);
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody().content()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("listApproved passes search filters to service")
+    void listApproved_withFilters() {
+        UUID cuisineId = UUID.randomUUID();
+        CursorPage<RestaurantSummaryResponse> page = CursorPage.of(List.of(mockSummary), 20, RestaurantSummaryResponse::id);
+        when(restaurantCatalogService.listApproved("Trattoria", cuisineId, BigDecimal.valueOf(4.0), null, 20)).thenReturn(page);
+
+        ResponseEntity<CursorPage<RestaurantSummaryResponse>> res =
+                restaurantCatalogController.listApproved("Trattoria", cuisineId, BigDecimal.valueOf(4.0), null, 20);
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(res.getBody().content()).hasSize(1);
@@ -97,11 +111,30 @@ class RestaurantCatalogControllerTest {
                 restaurantId, "Trattoria Mario", BigDecimal.valueOf(4.8), 100L,
                 false, RestaurantVerificationStatus.APPROVED, Instant.now(), 1250.0
         );
-        when(restaurantCatalogService.findNearbyRestaurants(12.9716, 77.5946, 5000, 0, 20))
+        when(restaurantCatalogService.findNearbyRestaurants(12.9716, 77.5946, 5000, null, null, null, 0, 20))
                 .thenReturn(List.of(nearby));
 
         ResponseEntity<List<NearbyRestaurantResponse>> res =
-                restaurantCatalogController.findNearbyRestaurants(12.9716, 77.5946, 5000, 0, 20);
+                restaurantCatalogController.findNearbyRestaurants(12.9716, 77.5946, 5000, null, null, null, 0, 20);
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody()).hasSize(1);
+        assertThat(res.getBody().getFirst().distanceMeters()).isEqualTo(1250.0);
+    }
+
+    @Test
+    @DisplayName("findNearbyRestaurants passes search filters to service")
+    void findNearbyRestaurants_withFilters() {
+        UUID cuisineId = UUID.randomUUID();
+        NearbyRestaurantResponse nearby = new NearbyRestaurantResponse(
+                restaurantId, "Trattoria Mario", BigDecimal.valueOf(4.8), 100L,
+                false, RestaurantVerificationStatus.APPROVED, Instant.now(), 1250.0
+        );
+        when(restaurantCatalogService.findNearbyRestaurants(12.9716, 77.5946, 5000, "Mario", cuisineId, BigDecimal.valueOf(4.5), 0, 20))
+                .thenReturn(List.of(nearby));
+
+        ResponseEntity<List<NearbyRestaurantResponse>> res =
+                restaurantCatalogController.findNearbyRestaurants(12.9716, 77.5946, 5000, "Mario", cuisineId, BigDecimal.valueOf(4.5), 0, 20);
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(res.getBody()).hasSize(1);
