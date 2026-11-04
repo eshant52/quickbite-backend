@@ -19,6 +19,8 @@ public interface CuisineRequestRepository extends JpaRepository<CuisineRequest, 
 
     boolean existsByNameIgnoreCaseAndStatus(String name, CuisineStatus status);
 
+    List<CuisineRequest> findByStatus(CuisineStatus status);
+
     Page<CuisineRequest> findByRequestedBy(User requestedBy, Pageable pageable);
 
     List<CuisineRequest> findByStatusOrderByIdAsc(CuisineStatus status, Limit limit);

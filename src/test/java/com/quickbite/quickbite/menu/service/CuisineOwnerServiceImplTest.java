@@ -129,4 +129,20 @@ class CuisineOwnerServiceImplTest {
                 .isInstanceOf(ResourceConflictException.class)
                 .hasMessageContaining("already exists");
     }
+
+    @Test
+    @DisplayName("request rejects canonical duplicate (e.g. north-indian vs North Indian) (Requirement #36)")
+    void request_canonicalDuplicateInMaster_throwsResourceConflictException() {
+        CuisineRequest req = new CuisineRequest("north-indian");
+        when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+        when(cuisineRepository.existsByNameIgnoreCase("north-indian")).thenReturn(false);
+
+        com.quickbite.quickbite.menu.model.Cuisine existing = new com.quickbite.quickbite.menu.model.Cuisine();
+        existing.setName("North Indian");
+        when(cuisineRepository.findAll()).thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> cuisineOwnerService.request(req, requesterId))
+                .isInstanceOf(ResourceConflictException.class)
+                .hasMessageContaining("already exists in master catalog");
+    }
 }

@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -68,7 +69,6 @@ class OrderEventListenerTest {
                 UUID.randomUUID(), "Pizza Co", BigDecimal.valueOf(350.00), Instant.now()
         );
 
-        when(userRepository.findById(customerId)).thenReturn(Optional.of(customer));
         when(orderRepository.findByIdAndCustomerId(orderId, customerId)).thenReturn(Optional.of(order));
 
         orderEventListener.onOrderEvent(event);
@@ -85,7 +85,6 @@ class OrderEventListenerTest {
                 orderId, customerId, UUID.randomUUID(), OrderStatus.AWAITING_PAYMENT, OrderStatus.ABANDONED, Instant.now()
         );
 
-        when(userRepository.findById(customerId)).thenReturn(Optional.of(customer));
         when(orderRepository.findByIdAndCustomerId(orderId, customerId)).thenReturn(Optional.of(order));
 
         orderEventListener.onOrderEvent(event);
@@ -103,7 +102,6 @@ class OrderEventListenerTest {
                 orderId, customerId, UUID.randomUUID(), Instant.now()
         );
 
-        when(userRepository.findById(customerId)).thenReturn(Optional.of(customer));
         when(orderRepository.findByIdAndCustomerId(orderId, customerId)).thenReturn(Optional.of(order));
 
         orderEventListener.onOrderEvent(event);
@@ -111,5 +109,44 @@ class OrderEventListenerTest {
         ArgumentCaptor<OrderNotificationPayload> captor = ArgumentCaptor.forClass(OrderNotificationPayload.class);
         verify(notificationService).send(captor.capture());
         assertThat(captor.getValue().type()).isEqualTo(OrderNotificationType.CANCELLED);
+    }
+
+    @Test
+    @DisplayName("onOrderEvent sends multi-party notifications to customer, restaurant owner, and delivery agent on DELIVERED")
+    void onOrderEvent_multiPartyDelivered() {
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
+        owner.setName("Mario");
+
+        com.quickbite.quickbite.restaurant.model.Restaurant restaurant = new com.quickbite.quickbite.restaurant.model.Restaurant();
+        restaurant.setId(UUID.randomUUID());
+        restaurant.setName("Mario Pizza");
+        restaurant.setOwner(owner);
+        order.setRestaurant(restaurant);
+
+        User agentUser = new User();
+        agentUser.setId(UUID.randomUUID());
+        agentUser.setName("Bob Driver");
+
+        com.quickbite.quickbite.delivery.model.DeliveryAgent agent = new com.quickbite.quickbite.delivery.model.DeliveryAgent();
+        agent.setId(UUID.randomUUID());
+        agent.setUser(agentUser);
+        order.setDeliveryAgent(agent);
+
+        OrderStatusChangedEvent event = new OrderStatusChangedEvent(
+                orderId, customerId, UUID.randomUUID(), OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED, Instant.now()
+        );
+
+        when(orderRepository.findByIdAndCustomerId(orderId, customerId)).thenReturn(Optional.of(order));
+
+        orderEventListener.onOrderEvent(event);
+
+        ArgumentCaptor<OrderNotificationPayload> captor = ArgumentCaptor.forClass(OrderNotificationPayload.class);
+        verify(notificationService, times(3)).send(captor.capture());
+
+        List<OrderNotificationPayload> sentPayloads = captor.getAllValues();
+        assertThat(sentPayloads).hasSize(3);
+        assertThat(sentPayloads.stream().map(p -> p.recipient().getId()))
+                .containsExactlyInAnyOrder(customer.getId(), owner.getId(), agentUser.getId());
     }
 }

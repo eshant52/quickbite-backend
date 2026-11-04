@@ -53,71 +53,161 @@ public class OrderEventListener {
     }
 
     private void handleOrderPlaced(OrderPlacedEvent event) {
+        Order order = findOrder(event.orderId(), event.customerId());
+        if (order == null) {
+            log.error("[NOTIFICATION] Order not found for placed event: {}", event.orderId());
+            return;
+        }
+
         notifyOrderCustomer(
-                event.orderId(),
-                event.customerId(),
+                order,
                 "Order Confirmed!",
                 "Your order of amount ₹" + event.totalAmount() + " has been placed successfully.",
                 OrderNotificationType.PLACED,
                 "Order placed event sent"
         );
+
+        notifyRestaurantOwner(
+                order,
+                "New Order Placed!",
+                "New order #" + order.getId() + " received for ₹" + event.totalAmount() + ". Please review and accept.",
+                OrderNotificationType.PLACED
+        );
     }
 
     private void handleOrderStatusChanged(OrderStatusChangedEvent event) {
+        Order order = findOrder(event.orderId(), event.customerId());
+        if (order == null) {
+            log.error("[NOTIFICATION] Order not found for status change event: {}", event.orderId());
+            return;
+        }
+
         StatusNotificationConfig config = resolveStatusConfig(event.newStatus());
-        if (config == null) {
+        if (config != null) {
+            notifyOrderCustomer(
+                    order,
+                    config.title(),
+                    config.message(),
+                    config.type(),
+                    "Order " + event.newStatus().name() + " updated"
+            );
+        }
+
+        switch (event.newStatus()) {
+            case READY_FOR_PICKUP -> notifyDeliveryAgent(
+                    order,
+                    "Order Ready for Pickup!",
+                    "Order #" + order.getId() + " is ready for pickup at " + order.getRestaurant().getName() + ".",
+                    OrderNotificationType.READY_FOR_PICKUP
+            );
+            case OUT_FOR_DELIVERY -> notifyRestaurantOwner(
+                    order,
+                    "Order Picked Up",
+                    "Order #" + order.getId() + " has been picked up by the delivery partner and is out for delivery.",
+                    OrderNotificationType.OUT_FOR_DELIVERY
+            );
+            case DELIVERED -> {
+                notifyRestaurantOwner(
+                        order,
+                        "Order Delivered!",
+                        "Order #" + order.getId() + " was successfully delivered to the customer.",
+                        OrderNotificationType.DELIVERED
+                );
+                notifyDeliveryAgent(
+                        order,
+                        "Delivery Complete!",
+                        "You have successfully delivered order #" + order.getId() + ".",
+                        OrderNotificationType.DELIVERED
+                );
+            }
+            default -> {}
+        }
+    }
+
+    private void handleOrderCancelled(OrderCancelledEvent event) {
+        Order order = findOrder(event.orderId(), event.customerId());
+        if (order == null) {
+            log.error("[NOTIFICATION] Order not found for cancelled event: {}", event.orderId());
             return;
         }
 
         notifyOrderCustomer(
-                event.orderId(),
-                event.customerId(),
-                config.title(),
-                config.message(),
-                config.type(),
-                "Order " + event.newStatus().name() + " updated"
-        );
-    }
-
-    private void handleOrderCancelled(OrderCancelledEvent event) {
-        notifyOrderCustomer(
-                event.orderId(),
-                event.customerId(),
+                order,
                 "Order Cancelled!",
                 "Your order has been cancelled. If you have any questions, please contact support.",
                 OrderNotificationType.CANCELLED,
                 "Order cancelled"
         );
+
+        notifyRestaurantOwner(
+                order,
+                "Order Cancelled",
+                "Order #" + order.getId() + " has been cancelled.",
+                OrderNotificationType.CANCELLED
+        );
+
+        notifyDeliveryAgent(
+                order,
+                "Order Cancelled",
+                "Order #" + order.getId() + " has been cancelled.",
+                OrderNotificationType.CANCELLED
+        );
     }
 
     private void notifyOrderCustomer(
-            UUID orderId,
-            UUID customerId,
+            Order order,
             String title,
             String message,
             OrderNotificationType type,
             String actionLog) {
-        User customer = userRepository.findById(customerId).orElse(null);
-        if (customer == null) {
-            log.error("[NOTIFICATION] Customer not found for order: {}", orderId);
-            return;
-        }
-
-        Order order = orderRepository.findByIdAndCustomerId(orderId, customer.getId()).orElse(null);
-        if (order == null) {
-            log.error("[NOTIFICATION] Order not found for order: {}", orderId);
+        if (order.getCustomer() == null) {
+            log.error("[NOTIFICATION] Customer not found for order: {}", order.getId());
             return;
         }
 
         notificationService.send(new OrderNotificationPayload(
-                customer,
+                order.getCustomer(),
                 title,
                 message,
                 type,
                 order
         ));
 
-        log.info("[NOTIFICATION] {} for order: {}", actionLog, orderId);
+        log.info("[NOTIFICATION] {} for order: {}", actionLog, order.getId());
+    }
+
+    private void notifyRestaurantOwner(
+            Order order,
+            String title,
+            String message,
+            OrderNotificationType type) {
+        if (order.getRestaurant() != null && order.getRestaurant().getOwner() != null) {
+            notificationService.send(new OrderNotificationPayload(
+                    order.getRestaurant().getOwner(),
+                    title,
+                    message,
+                    type,
+                    order
+            ));
+            log.info("[NOTIFICATION] Sent {} to restaurant owner for order: {}", type, order.getId());
+        }
+    }
+
+    private void notifyDeliveryAgent(
+            Order order,
+            String title,
+            String message,
+            OrderNotificationType type) {
+        if (order.getDeliveryAgent() != null && order.getDeliveryAgent().getUser() != null) {
+            notificationService.send(new OrderNotificationPayload(
+                    order.getDeliveryAgent().getUser(),
+                    title,
+                    message,
+                    type,
+                    order
+            ));
+            log.info("[NOTIFICATION] Sent {} to delivery agent for order: {}", type, order.getId());
+        }
     }
 
     private record StatusNotificationConfig(OrderNotificationType type, String title, String message) {}
@@ -166,5 +256,16 @@ public class OrderEventListener {
             );
             default -> null;
         };
+    }
+
+    private Order findOrder(UUID orderId, UUID customerId) {
+        Order order = orderRepository.findById(orderId).orElse(null);
+        if (order == null && customerId != null) {
+            order = orderRepository.findByIdAndCustomerId(orderId, customerId).orElse(null);
+        }
+        if (order != null && order.getCustomer() == null && customerId != null) {
+            userRepository.findById(customerId).ifPresent(order::setCustomer);
+        }
+        return order;
     }
 }

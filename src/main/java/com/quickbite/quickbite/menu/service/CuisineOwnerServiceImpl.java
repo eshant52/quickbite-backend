@@ -49,12 +49,19 @@ public class CuisineOwnerServiceImpl implements CuisineOwnerService {
         User requester = userRepository.findById(requesterId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         String trimmedName = req.name().trim();
+        String targetKey = canonicalKey(trimmedName);
 
-        if (cuisineRepository.existsByNameIgnoreCase(trimmedName)) {
+        boolean existsInMaster = cuisineRepository.existsByNameIgnoreCase(trimmedName)
+                || cuisineRepository.findAll().stream()
+                        .anyMatch(c -> canonicalKey(c.getName()).equals(targetKey));
+        if (existsInMaster) {
             throw new ResourceConflictException("Cuisine already exists in master catalog");
         }
 
-        if (cuisineRequestRepository.existsByNameIgnoreCaseAndStatus(trimmedName, CuisineStatus.PENDING)) {
+        boolean existsInPending = cuisineRequestRepository.existsByNameIgnoreCaseAndStatus(trimmedName, CuisineStatus.PENDING)
+                || cuisineRequestRepository.findByStatus(CuisineStatus.PENDING).stream()
+                        .anyMatch(cr -> canonicalKey(cr.getName()).equals(targetKey));
+        if (existsInPending) {
             throw new ResourceConflictException("A pending request for this cuisine already exists");
         }
 
@@ -79,5 +86,12 @@ public class CuisineOwnerServiceImpl implements CuisineOwnerService {
         ));
 
         return CuisineRequestResponse.from(savedRequest);
+    }
+
+    private String canonicalKey(String name) {
+        if (name == null) {
+            return "";
+        }
+        return name.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
 }
