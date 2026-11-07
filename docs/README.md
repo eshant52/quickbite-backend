@@ -26,10 +26,15 @@ Welcome to the QuickBite Backend technical documentation directory. This collect
   - cURL and JavaScript `fetch` examples for login, authenticated requests, session eviction, and token rotation.
 
 ### API & Developer References
-- [**REST API Catalog & RBAC Reference (`api-guide.md`)**](api-guide.md)
+- [**REST API Catalog & RBAC Reference (`api-guide.md`)**](./api-guide.md)
   - Complete index of all 35+ REST controllers across domains.
   - Role-Based Access Control (RBAC) matrix for Public, Customer, Restaurant Owner, Delivery Agent, and Admin roles.
+  - Postman Workspace Setup guide (how to select the project root folder to load all 4 collections).
   - Path mappings, request/response structures, and query parameters.
+- [**QuickBite API — Postman Developer Guide (`../postman/documents/QuickBite API — Developer Guide.md`)**](../postman/documents/QuickBite%20API%20%E2%80%94%20Developer%20Guide.md)
+  - Full developer manual for the 4 role-based Postman collections (`Customer Portal`, `Restaurant Owner Portal`, `Delivery Agent Portal`, `Admin Portal`).
+  - Dual-JWT authentication, `X-Client-Type` hybrid transport, and `409 Conflict` device challenge test flows.
+  - Complete OpenAPI 3.1.0 specification (`postman/specs/quickbite-api.yaml`) and local environment variables reference.
 
 ### Domain Deep Dives
 - [**Order & Cart Lifecycle Guide (`order-process.md`)**](order-process.md)

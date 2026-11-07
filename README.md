@@ -12,6 +12,40 @@ QuickBite is an enterprise-grade, cloud-native food ordering, restaurant managem
 
 ---
 
+## Table of Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Key Features & Domain Capabilities](#key-features--domain-capabilities)
+  - [1. Security, Identity & Stateful Sessions (`auth`)](#1-security-identity--stateful-sessions-auth)
+  - [2. Multi-Round Dispatch & Geospatial Tracking (`delivery`)](#2-multi-round-dispatch--geospatial-tracking-delivery)
+  - [3. Order Engine & Pricing Subsystem (`order`, `cart`)](#3-order-engine--pricing-subsystem-order-cart)
+  - [4. Payments, Webhooks & Automated Reconciliation (`payment`)](#4-payments-webhooks--automated-reconciliation-payment)
+  - [5. Multi-Tier Composite Routing Gateway (`common/routing`)](#5-multi-tier-composite-routing-gateway-commonrouting)
+  - [6. Onboarding Pipelines & Workload-Balanced Allotment (`onboarding`, `allotment`)](#6-onboarding-pipelines--workload-balanced-allotment-onboarding-allotment)
+  - [7. Restaurant Catalog, Cuisines & Menu Items (`restaurant`, `menu`)](#7-restaurant-catalog-cuisines--menu-items-restaurant-menu)
+  - [8. Reviews & Rating Recalculation (`review`)](#8-reviews--rating-recalculation-review)
+  - [9. Joined-Inheritance Notification Center (`notification`)](#9-joined-inheritance-notification-center-notification)
+- [Technology Stack](#technology-stack)
+- [Role-Based Access Control (RBAC) Matrix](#role-based-access-control-rbac-matrix)
+- [Quickstart](#quickstart)
+  - [1. Clone & Configure Environment](#1-clone--configure-environment)
+  - [2. Start Infrastructure Services](#2-start-infrastructure-services)
+  - [3. Generate Cryptographic RSA Keys](#3-generate-cryptographic-rsa-keys)
+  - [4. Run the Application](#4-run-the-application)
+  - [5. Postman Workspace Setup (Local View)](#5-postman-workspace-setup-local-view)
+- [🎬 End-to-End Demo Guide: Placing an Order & Delivery Offer Tracking](#-end-to-end-demo-guide-placing-an-order--delivery-offer-tracking)
+  - [Step 1: Start the Interactive Delivery Agent Tracker CLI](#step-1-start-the-interactive-delivery-agent-tracker-cli)
+  - [Step 2: Authenticate in Postman / cURL](#step-2-authenticate-in-postman--curl)
+  - [Step 3: Add Menu Item to Cart (Customer)](#step-3-add-menu-item-to-cart-customer)
+  - [Step 4: Place Order via Cash on Delivery (Customer)](#step-4-place-order-via-cash-on-delivery-customer)
+  - [Step 5: Restaurant Owner Accepts Order (Triggers Dispatch)](#step-5-restaurant-owner-accepts-order-triggers-dispatch)
+  - [Step 6: Accept Offer in the Python CLI Tracker](#step-6-accept-offer-in-the-python-cli-tracker)
+  - [Step 7: Complete Kitchen Prep & Delivery (Optional)](#step-7-complete-kitchen-prep--delivery-optional)
+- [Documentation Directory](#documentation-directory)
+- [Project Status & Milestone Checklist](#project-status--milestone-checklist)
+
+---
+
 ## Architecture Overview
 
 ```mermaid
@@ -210,8 +244,25 @@ curl http://localhost:8080/actuator/health
 * **Email**: `super.admin@quickbite.com`
 * **Password**: `Admin@123`
 
+### 5. Postman Workspace Setup (Local View)
+
+The repository includes a pre-configured [`postman/`](./postman) folder containing 4 role-based collections (**Customer Portal**, **Restaurant Owner Portal**, **Delivery Agent Portal**, **Admin Portal**), dedicated local environments, and the complete OpenAPI 3.1.0 specification.
+
+To import and use the workspace in Postman:
+1. Open the Postman Desktop App.
+2. Click **Workspaces** &rarr; **Create Workspace** (or link a local directory).
+3. **Important**: When prompted to choose the folder location, **select the root path folder of the project** (`QuickBite/app/QuickBite`). Postman will automatically read `.postman/resources.yaml` and recognize all collections, environments, and specs under the `postman/` directory.
+
+<!-- Screenshot 1: Creating workspace and selecting the project root folder -->
+![Screenshot 1: Creating Postman Workspace and Selecting Project Root Folder](./docs/images/postman-create-workspace.png)
+
+4. Once opened, Postman will automatically display all 4 portal collections and matching local development environments in the left sidebar.
+
+<!-- Screenshot 2: Collections UI in Postman -->
+![Screenshot 2: Postman Collections UI with 4 Portals](./docs/images/postman-collections-ui.png)
+
 > [!TIP]
-> For more details, comprehensive environment configuration, Docker setup, and routing engine options, look to the [Installation and Configuration Guide](docs/installation.md).
+> For more details, comprehensive environment configuration, Docker setup, and routing engine options, look to the [Installation and Configuration Guide](./docs/installation.md). For detailed API endpoints, collection variables, and test scripts, see the [Postman Developer Guide](./postman/documents/QuickBite%20API%20%E2%80%94%20Developer%20Guide.md) and [REST API Catalog](./docs/api-guide.md).
 
 ---
 
@@ -225,7 +276,7 @@ This step-by-step walkthrough demonstrates QuickBite's complete reactive order-t
 
 ### Step 1: Start the Interactive Delivery Agent Tracker CLI
 
-In your terminal, launch the Python offer tracker ([`track_delivery_offers.py`](file:///Users/eshant52/Documents/scaler/project/QuickBite/app/QuickBite/scripts/track_delivery_offers.py)):
+In your terminal, launch the Python offer tracker ([`track_delivery_offers.py`](./scripts/track_delivery_offers.py)):
 
 ```bash
 # Local backend (default: http://localhost:8080)
@@ -237,7 +288,7 @@ python3 scripts/track_delivery_offers.py --base-url https://api.your-domain.com 
 
 > [!NOTE]
 > * **100% REST API-Driven**: Polls `GET /api/v1/delivery-agent/offers/active` for each logged-in agent — requires zero direct database connection (`psql` is not needed).
-> * Pre-configured with 6 verified delivery agents in [`scripts/agents.json`](file:///Users/eshant52/Documents/scaler/project/QuickBite/app/QuickBite/scripts/agents.json) (`aarav.sharma@example.com`, `vikram.singh@example.com`, `pooja.patel@example.com`, `mohammed.rizwan@example.com`, `sneha.mukherjee@example.com`, `rajesh.kumar@example.com`, password `Password@123`).
+> * Pre-configured with 6 verified delivery agents in [`scripts/agents.json`](./scripts/agents.json) (`aarav.sharma@example.com`, `vikram.singh@example.com`, `pooja.patel@example.com`, `mohammed.rizwan@example.com`, `sneha.mukherjee@example.com`, `rajesh.kumar@example.com`, password `Password@123`).
 > * Automatically refreshes 15-minute JWTs and resolves `409 Conflict` (session limits) by evicting only the single oldest session.
 > * Sends `PUT /api/v1/delivery-agent/location` heartbeats every 35s to keep active agents alive in Redis GEO.
 > * Queues multiple incoming offers in FIFO order so you can review each offer without missing others.
@@ -249,6 +300,8 @@ Leave this terminal running — it will alert you as soon as an offer is dispatc
 ### Step 2: Authenticate in Postman / cURL
 
 Open Postman (or use cURL in a second terminal) with `Content-Type: application/json` and `X-Client-Type: mobile_app`.
+
+*(Tip: If you linked the Postman workspace as shown in [Step 5](#5-postman-workspace-setup-local-view), you can run **Login with Email & Password** directly from the **Customer Portal** and **Restaurant Owner Portal** collections — tokens and sessions are captured automatically into collection variables!)*
 
 #### 2.1 Customer Login
 * **Method**: `POST`
@@ -381,7 +434,7 @@ The restaurant owner accepts the order within the 2-minute deadline.
 
 ### Step 6: Accept Offer in the Python CLI Tracker
 
-Switch back to the terminal running [`track_delivery_offers.py`](file:///Users/eshant52/Documents/scaler/project/QuickBite/app/QuickBite/scripts/track_delivery_offers.py). Within 1–2 seconds, an audible terminal bell will ring and the offer card will render:
+Switch back to the terminal running [`track_delivery_offers.py`](./scripts/track_delivery_offers.py). Within 1–2 seconds, an audible terminal bell will ring and the offer card will render:
 
 ```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

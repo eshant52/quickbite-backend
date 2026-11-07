@@ -17,6 +17,30 @@ All API endpoints (except explicitly public routes) are protected by Spring Secu
 | **Refresh Token** | 64-Byte Opaque String | **Web**: Cookie `qb_refresh_token` (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1/auth`)<br/>**Mobile**: JSON Body (`AuthResponse.refreshToken` / `RefreshRequest.refreshToken`) | Internal validation against PostgreSQL & Redis | 7 Days (`P7D`) |
 | **Client Context** | Mandatory Auth Header | `X-Client-Type: web_browser \| mobile_app` | Resolved by `YauaaDeviceInfoResolver` | Per-request on `/login`, `/refresh-token`, `/claim-session` |
 
+### 1.2 Postman Workspace Setup (Local View)
+
+The repository provides a complete, pre-configured Postman workspace under the [`postman/`](../postman) folder (Postman Local View format), organizing all 156 endpoints into 4 role-specific collections:
+- **Customer Portal** (`51` requests)
+- **Restaurant Owner Portal** (`51` requests)
+- **Delivery Agent Portal** (`46` requests)
+- **Admin Portal** (`40` requests)
+
+#### How to Load the Collections in Postman:
+1. Open the Postman Desktop App.
+2. Click **Workspaces** &rarr; **Create Workspace** (or link a local directory).
+3. **Important**: When prompted for the workspace folder/location, **select the root path folder of the project** (`QuickBite/app/QuickBite`). Postman will automatically read `.postman/resources.yaml` and load the local workspace with all 4 collections, environments, and OpenAPI specs.
+
+<!-- Screenshot 1: Creating workspace and selecting the project root folder -->
+![Screenshot 1: Creating Postman Workspace and Selecting Project Root Folder](./images/postman-create-workspace.png)
+
+4. Once opened, Postman will automatically recognize all 4 collections and environments in the sidebar:
+
+<!-- Screenshot 2: Collections UI in Postman -->
+![Screenshot 2: Postman Collections UI with 4 Portals](./images/postman-collections-ui.png)
+
+> [!TIP]
+> For a full walkthrough of collection variables, test scripts, and mock flows, refer to the [QuickBite API — Developer Guide](../postman/documents/QuickBite%20API%20%E2%80%94%20Developer%20Guide.md).
+
 ---
 
 ## 2. Role-Based Access Control (RBAC) Matrix
