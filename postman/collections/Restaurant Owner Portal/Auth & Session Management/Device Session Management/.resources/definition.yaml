@@ -1,0 +1,9 @@
+$kind: collection
+description: "Resolves `409 Conflict` concurrent session limit challenges using `Authorization: Bearer {{challenge_token}}` (`SCOPE_AUTH`): list active sessions (`GET /sessions`), revoke an old device (`DELETE /sessions/{sessionId}`), and claim the new session (`POST /claim-session`)."
+auth:
+  - id: 27632410-1bde-4e97-859b-8152a68eb636
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{challenge_token}}"
+order: 3000

@@ -1,0 +1,3 @@
+$kind: collection
+description: "Audit onboarded delivery agents by verification status (`PENDING`, `APPROVED`, `REJECTED`, `SUSPENDED`) and suspend or reinstate courier accounts."
+order: 7000

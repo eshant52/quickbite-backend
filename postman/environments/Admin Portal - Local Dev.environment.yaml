@@ -1,0 +1,92 @@
+name: Admin Portal - Local Dev
+values:
+  - key: base_url
+    value: 'http://localhost:8080'
+    enabled: true
+    type: default
+    description: QuickBite API base URL
+  - key: access_token
+    value: ''
+    enabled: true
+    type: secret
+    description: JWT access token for Admin role (auto-set by Login script)
+  - key: refresh_token
+    value: ''
+    enabled: true
+    type: secret
+    description: Opaque refresh token (HttpOnly cookie, also captured here for reference)
+  - key: challenge_token
+    value: ''
+    enabled: true
+    type: secret
+    description: Short-lived challenge token returned on login when device challenge is triggered
+  - key: session_id
+    value: ''
+    enabled: true
+    type: default
+    description: Active session UUID
+  - key: admin_email
+    value: 'admin@quickbite.local'
+    enabled: true
+    type: default
+    description: Admin login email
+  - key: admin_password
+    value: 'Pass@123'
+    enabled: true
+    type: secret
+    description: Admin login password
+  - key: restaurant_application_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a restaurant onboarding application under review
+  - key: agent_application_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a delivery agent KYC application under review
+  - key: vehicle_application_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a vehicle onboarding application under review
+  - key: delivery_agent_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a delivery agent (for suspend/reinstate)
+  - key: cuisine_request_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a cuisine moderation request
+  - key: order_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of an order (for refund/payment audit)
+  - key: review_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a customer review under moderation
+  - key: user_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a system user
+  - key: allotment_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of an onboarding review allotment
+  - key: notification_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a notification
+  - key: rejection_reason
+    value: 'Documents are incomplete or invalid.'
+    enabled: true
+    type: default
+    description: Default rejection reason text for application rejections

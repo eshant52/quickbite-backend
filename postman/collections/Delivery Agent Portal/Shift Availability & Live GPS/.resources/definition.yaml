@@ -1,0 +1,3 @@
+$kind: collection
+description: "Inspect courier profile, toggle online/offline shift availability (`available`), and stream real-time GPS coordinates (`latitude`, `longitude`) to PostGIS and Redis Geo (`delivery:agents:locations`)."
+order: 5000

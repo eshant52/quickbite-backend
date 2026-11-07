@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/delivery-agent/vehicles/applications/check-vin?vin=MA3EJKD1S00123456"
+method: GET
+queryParams:
+  vin: MA3EJKD1S00123456
+order: 1000

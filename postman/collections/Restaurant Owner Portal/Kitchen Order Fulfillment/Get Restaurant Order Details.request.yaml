@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}?restaurantId={{restaurant_id}}"
+method: GET
+queryParams:
+  restaurantId: "{{restaurant_id}}"
+order: 2000

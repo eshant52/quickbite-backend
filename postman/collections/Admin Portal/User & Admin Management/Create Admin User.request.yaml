@@ -1,0 +1,10 @@
+$kind: http-request
+description: Creates a new internal system administrator (`ROLE_ADMIN`) account with Argon2 password hashing. (AdminUserController#createAdmin | ROLE_ADMIN)
+url: "{{base_url}}/api/v1/admin/users/admins"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"name":"Operations Admin","email":"ops.admin@quickbite.com","phoneNumber":"+919876543219","password":"AdminPassword@123"}'
+order: 1000

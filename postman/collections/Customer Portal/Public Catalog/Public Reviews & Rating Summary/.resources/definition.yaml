@@ -1,0 +1,3 @@
+$kind: collection
+description: "Publicly visible customer reviews (cursor-paginated) and aggregated 1–5 star rating distribution for a restaurant."
+order: 4000

@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/accept"
+method: POST
+order: 4000

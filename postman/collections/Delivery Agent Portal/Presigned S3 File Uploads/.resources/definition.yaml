@@ -1,0 +1,3 @@
+$kind: collection
+description: "Generate short-lived presigned AWS S3 `PUT` URLs (`uploadUrl` + `fileUrl`) for direct client uploads (`RESTAURANT_IMAGE`, `RESTAURANT_DOCUMENT`)."
+order: 8000

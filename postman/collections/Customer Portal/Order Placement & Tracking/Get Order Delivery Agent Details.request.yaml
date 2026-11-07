@@ -1,0 +1,5 @@
+$kind: http-request
+description: Fetches contact information and live coordinates of the delivery agent assigned to the customer's order. (CustomerOrderController#getAssignedDeliveryAgent | ROLE_CUSTOMER)
+url: "{{base_url}}/api/v1/customer/orders/{{order_id}}/delivery-agent"
+method: GET
+order: 6000

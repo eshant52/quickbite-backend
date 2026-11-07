@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/customer/reviews?size=20"
+method: GET
+queryParams:
+  size: "20"
+order: 2000

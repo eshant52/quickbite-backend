@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/webhooks/payments/stub"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{\n    \"transactionId\": \"{{transaction_id}}\",\n    \"status\": \"SUCCESS\"\n}'
+order: 1000

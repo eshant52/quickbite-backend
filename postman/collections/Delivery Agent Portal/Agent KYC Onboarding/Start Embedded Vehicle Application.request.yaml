@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/vehicles/start"
+method: POST
+order: 7000

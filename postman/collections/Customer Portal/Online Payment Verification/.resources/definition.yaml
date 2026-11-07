@@ -1,0 +1,3 @@
+$kind: collection
+description: "Inspect payment attempts for an order or cryptographically verify Razorpay checkout signatures (`gatewayOrderId`, `gatewayPaymentId`, `gatewaySignature`) to transition `AWAITING_PAYMENT` → `PLACED`."
+order: 7000

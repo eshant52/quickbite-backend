@@ -1,0 +1,10 @@
+$kind: http-request
+name: Attach Vehicle RC / Insurance Document
+url: "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/documents"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{\n    \"type\": \"RC\",\n    \"url\": \"https://storage.quickbite.com/documents/vehicles/ka01ab1234-rc.pdf\"\n}'
+order: 8000

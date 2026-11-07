@@ -1,0 +1,3 @@
+$kind: collection
+description: "Redis-backed single-restaurant shopping cart (`24h` rolling TTL): add/update/remove items, clear cart, and compute live road-distance checkout previews (`GET /checkout-preview`, auto-capturing `total_order_amount`)."
+order: 5000

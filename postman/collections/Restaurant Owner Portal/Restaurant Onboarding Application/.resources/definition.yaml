@@ -1,0 +1,3 @@
+$kind: collection
+description: "Step-by-step merchant onboarding workflow (`DRAFT` → `SUBMITTED`, plus `reopen` when `REJECTED`): basic details, street address & PostGIS coordinates, weekly operating hours, gallery images, and `FSSAI_LICENSE` / `GST` / `PAN` / `BANK_PROOF` / `BUSINESS_LICENSE` verification documents."
+order: 2000

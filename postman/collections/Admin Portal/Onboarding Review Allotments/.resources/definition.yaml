@@ -1,0 +1,3 @@
+$kind: collection
+description: "Manage assigned onboarding review task allotments (`RESTAURANT_APPLICATION`, `DELIVERY_AGENT_APPLICATION`, `VEHICLE_APPLICATION`, `CUISINE`): list pending tasks and `accept` or `decline` assignments."
+order: 2000

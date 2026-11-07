@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/files/upload-url"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"context":"RESTAURANT_IMAGE","applicationId":"{{restaurant_application_id}}","contentType":"image/jpeg","fileName":"storefront.jpg"}'
+order: 1000

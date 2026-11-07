@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/documents/DRIVING_LICENSE"
+method: DELETE
+order: 6000

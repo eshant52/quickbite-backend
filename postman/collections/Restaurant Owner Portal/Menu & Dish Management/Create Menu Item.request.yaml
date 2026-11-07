@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{\n    \"name\": \"Shahi Gulab Jamun (2 Pcs)\",\n    \"description\": \"Fresh mawa and chenna dumplings deep-fried to deep golden and steeped in rose-saffron cardamom syrup.\",\n    \"cuisineId\": \"{{cuisine_id}}\",\n    \"price\": 75.00,\n    \"category\": \"Mithai & Sweets\",\n    \"isAvailable\": true\n}'
+order: 1000

@@ -1,0 +1,7 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/admin/restaurants/applications?status=SUBMITTED&size=20"
+method: GET
+queryParams:
+  status: SUBMITTED
+  size: "20"
+order: 1000

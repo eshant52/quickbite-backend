@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/customer/orders/{{order_id}}/retry-payment"
+method: POST
+order: 4000

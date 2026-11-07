@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurants?name=Pizza&cuisineId={{cuisine_id}}&minRating=4.0&size=20"
+method: GET
+queryParams:
+  name: Pizza
+  cuisineId: "{{cuisine_id}}"
+  minRating: "4.0"
+  size: "20"
+order: 1000

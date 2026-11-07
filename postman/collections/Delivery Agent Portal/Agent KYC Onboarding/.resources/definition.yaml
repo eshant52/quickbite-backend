@@ -1,0 +1,3 @@
+$kind: collection
+description: "Delivery partner KYC onboarding workflow (`DRAFT` → `SUBMITTED`, plus `reopen` when `REJECTED`) including `AADHAR` / `DRIVING_LICENSE` document attachments and embedded initial vehicle onboarding."
+order: 2000

@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/admin/allotments/{{allotment_id}}/decline"
+method: POST
+order: 3000

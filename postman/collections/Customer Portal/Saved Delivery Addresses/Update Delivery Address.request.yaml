@@ -1,0 +1,23 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/customer/me/addresses/{{address_id}}"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+        "label": "Home",
+        "houseNumber": "Flat 302",
+        "buildingName": "Shiv Kripa Heights",
+        "street": "West High Court Road, Dharampeth",
+        "landmark": "Near Shivaji Nagar Garden",
+        "city": "Nagpur",
+        "state": "Maharashtra",
+        "country": "India",
+        "postalCode": "440010",
+        "latitude": 21.1415,
+        "longitude": 79.062,
+        "isDefault": true
+    }
+order: 3000

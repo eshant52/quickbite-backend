@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/details"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{\n    \"vinNumber\": \"MBHJA06EYM1234567\",\n    \"numberPlate\": \"KA01AB1234\",\n    \"vehicleType\": \"BIKE\",\n    \"brand\": \"Hero\",\n    \"model\": \"Splendor Plus\",\n    \"isOwnershipTransferred\": false\n}'
+order: 6000

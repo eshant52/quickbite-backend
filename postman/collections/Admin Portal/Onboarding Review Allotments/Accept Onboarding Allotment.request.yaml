@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/admin/allotments/{{allotment_id}}/accept"
+method: POST
+order: 2000

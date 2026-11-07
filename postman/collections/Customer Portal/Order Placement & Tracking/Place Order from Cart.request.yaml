@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/customer/orders"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+        "addressId": "{{address_id}}",
+        "paymentMethod": "UPI",
+        "tipAmount": {{tip_amount}},
+        "expectedTotal": {{total_order_amount}}
+    }
+order: 1000

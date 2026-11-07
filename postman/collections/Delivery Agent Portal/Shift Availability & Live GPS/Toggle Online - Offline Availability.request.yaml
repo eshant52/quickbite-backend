@@ -1,0 +1,13 @@
+$kind: http-request
+name: Toggle Online / Offline Availability
+url: "{{base_url}}/api/v1/delivery-agent/availability"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+        "available": true
+    }
+order: 2000

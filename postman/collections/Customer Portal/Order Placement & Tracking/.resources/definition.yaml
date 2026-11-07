@@ -1,0 +1,3 @@
+$kind: collection
+description: "Convert the active cart into an Order (`UPI`, `CARD`, `NET_BANKING`, `WALLET`, `COD`) with `expectedTotal` price-drift protection (`409 Conflict`), track order status history & assigned courier, retry failed payments within the 10-minute window, or cancel pre-acceptance orders."
+order: 6000

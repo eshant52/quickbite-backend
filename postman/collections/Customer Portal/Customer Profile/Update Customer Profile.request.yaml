@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/customer/me"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+        "name": "Eshant Sonune",
+        "phoneNumber": "+919420476359",
+        "email": "eshantsonune52@gmail.com"
+    }
+order: 2000

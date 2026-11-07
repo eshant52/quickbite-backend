@@ -1,0 +1,21 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/auth/refresh-token"
+method: POST
+headers:
+  Content-Type: application/json
+  X-Client-Type: web_browser
+body:
+  type: text
+  content: "{}"
+scripts:
+  - type: afterResponse
+    code: |-
+      const response = pm.response.json(); 
+      pm.collectionVariables.set("access_token", response.accessToken); 
+      pm.collectionVariables.set("refresh_token", response.refreshToken); 
+      pm.collectionVariables.set("session_id", response.sessionId);
+    language: text/javascript
+  - type: beforeRequest
+    code: pm.collectionVariables.set("access_token", "");
+    language: text/javascript
+order: 2000

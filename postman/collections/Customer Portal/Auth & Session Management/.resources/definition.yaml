@@ -1,0 +1,3 @@
+$kind: collection
+description: "Authentication and session lifecycle: Argon2 self-registration, dual-audience RSA JWT issuance (`quickbite-api` 15m + `quickbite-auth` 5m), `X-Client-Type`-aware SHA-256 refresh token rotation (`HttpOnly` cookie for `web_browser`, JSON body for `mobile_app`), and Yauaa device session tracking."
+order: 1000

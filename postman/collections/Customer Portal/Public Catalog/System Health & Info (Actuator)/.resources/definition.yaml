@@ -1,0 +1,3 @@
+$kind: collection
+description: "Public Spring Boot Actuator probes (`/actuator/health` and `/actuator/info`) for local diagnostics and readiness checks."
+order: 5000

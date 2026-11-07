@@ -1,0 +1,18 @@
+$kind: collection
+name: Restaurant Owner Portal
+description: "End-to-end `ROLE_RESTAURANT_OWNER` API collection: multi-step restaurant onboarding, cuisine category proposals, storefront & schedule operations, menu & dish image management, kitchen order fulfillment & earnings analytics, notifications, and presigned S3 uploads. Pair with the `Restaurant Owner Portal - Local Dev` environment."
+auth:
+  - id: c1a72410-1bde-4e97-859b-8152a68eb002
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{access_token}}"
+variables:
+  - key: access_token
+    value: ""
+  - key: refresh_token
+    value: ""
+  - key: challenge_token
+    value: ""
+  - key: session_id
+    value: ""

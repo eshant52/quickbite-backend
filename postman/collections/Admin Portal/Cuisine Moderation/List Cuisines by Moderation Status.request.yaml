@@ -1,0 +1,7 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/admin/cuisines?status=PENDING&size=20"
+method: GET
+queryParams:
+  status: PENDING
+  size: "20"
+order: 1000

@@ -1,0 +1,3 @@
+$kind: collection
+description: "Propose new cuisine categories (`PENDING`) for Admin moderation before attaching them to menu items."
+order: 3000

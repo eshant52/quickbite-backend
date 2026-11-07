@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/reopen"
+method: POST
+order: 11000

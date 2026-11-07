@@ -1,0 +1,3 @@
+$kind: collection
+description: "Manage approved restaurants owned by the merchant: update restaurant profile, replace weekly operating hours, manage gallery images, and toggle temporary open/closed status."
+order: 4000

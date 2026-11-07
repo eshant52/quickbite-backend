@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/details"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"name":"Spice Symphony Kitchen","description":"Authentic North Indian & Mughlai delicacies."}'
+order: 5000

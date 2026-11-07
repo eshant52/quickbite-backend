@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/webhooks/payments/razorpay"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_RzpTest67890","order_id":"order_RzpTest12345","status":"captured"}}}}'
+order: 2000

@@ -1,0 +1,3 @@
+$kind: collection
+description: "Inspect approved `VehicleOwnership` records and select or deactivate the active delivery vehicle required before going online for shifts."
+order: 4000

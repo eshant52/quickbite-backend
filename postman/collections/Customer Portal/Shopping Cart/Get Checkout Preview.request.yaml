@@ -1,0 +1,16 @@
+$kind: http-request
+description: Calculates real-time price breakdown and order totals (subtotal, delivery fee based on GPS distance, platform fee, taxes, tips, and item discounts) before placing an order.
+url: "{{base_url}}/api/v1/customer/cart/checkout-preview?addressId={{address_id}}&tipAmount={{tip_amount}}"
+method: GET
+headers:
+  Accept: application/json
+queryParams:
+  addressId: "{{address_id}}"
+  tipAmount: "{{tip_amount}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      const response = pm.response.json(); 
+      pm.collectionVariables.set("total_order_amount", response.priceBreakdown.totalAmount.toFixed(2));
+    language: text/javascript
+order: 6000

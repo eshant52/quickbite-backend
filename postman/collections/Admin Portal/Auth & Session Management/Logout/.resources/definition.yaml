@@ -1,0 +1,3 @@
+$kind: collection
+description: "Single-device (`/logout`) and global all-device (`/logout-all`) session revocation in PostgreSQL and Redis (`SCOPE_API`), clearing the `refreshToken` cookie."
+order: 4000

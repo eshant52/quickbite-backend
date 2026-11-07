@@ -1,0 +1,3 @@
+$kind: collection
+description: "List, inspect, approve (activating the `DeliveryAgent` profile), or reject submitted `DeliveryAgentApplication` KYC records."
+order: 4000

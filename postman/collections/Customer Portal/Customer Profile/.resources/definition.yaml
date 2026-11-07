@@ -1,0 +1,3 @@
+$kind: collection
+description: "View and update the authenticated customer's personal profile (`name`, `phoneNumber`, `email`)."
+order: 3000

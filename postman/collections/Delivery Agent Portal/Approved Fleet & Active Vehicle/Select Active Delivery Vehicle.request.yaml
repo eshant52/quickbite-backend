@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/delivery-agent/vehicles/{{ownership_id}}/select"
+method: PATCH
+order: 3000

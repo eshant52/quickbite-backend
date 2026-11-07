@@ -1,0 +1,3520 @@
+openapi: 3.1.0
+info:
+  title: QuickBite API
+  version: 1.0.0
+  description: |-
+    REST API for the **QuickBite** multi-tenant food delivery platform (Spring Boot 4.1.0, Java 25).
+
+    ## Authentication & Dual-JWT Architecture
+    Protected endpoints require an RSA-signed (`RS256`) Bearer JWT obtained via `POST /api/v1/auth/login`.
+    Every authentication/session-issuing call (`login`, `refresh-token`, `claim-session`) **requires** the `X-Client-Type` header (`web_browser` or `mobile_app`).
+
+    - **Access Token** (`aud: quickbite-api`, TTL `15m`) — carries `SCOPE_API` + `ROLE_*`. Sent as `Authorization: Bearer <accessToken>`.
+    - **Challenge Token** (`aud: quickbite-auth`, TTL `5m`) — carries `SCOPE_AUTH` only. Returned inside `409 Conflict` (`SessionLimitErrorResponse`) when concurrent active device limits (`max-sessions-per-user = 2`) are exceeded; used exclusively on `/api/v1/auth/sessions` and `/api/v1/auth/claim-session`.
+    - **Refresh Token** (opaque, SHA-256 hashed in PostgreSQL with family-based rotation & reuse breach detection, TTL `7d`):
+      - `X-Client-Type: web_browser` → transported via `HttpOnly; Secure; SameSite=Strict` cookie (`refreshToken`, `Path=/api/v1/auth`); `refreshToken` in JSON body is `null`.
+      - `X-Client-Type: mobile_app` → returned in `AuthResponse.refreshToken` JSON body and sent back in `RefreshRequest` JSON body.
+
+    ## Roles
+    | Role | Description |
+    |------|-------------|
+    | `ROLE_CUSTOMER` | End customer browsing catalog, managing cart, placing orders, paying, and reviewing |
+    | `ROLE_RESTAURANT_OWNER` | Merchant onboarding restaurants, managing menus/schedules, and fulfilling kitchen orders |
+    | `ROLE_DELIVERY_AGENT` | Courier completing KYC/vehicle onboarding, streaming live GPS, and fulfilling dispatches |
+    | `ROLE_ADMIN` | Internal platform administrator moderating onboarding, cuisines, reviews, agents, vehicles, and refunds |
+
+  contact:
+    name: QuickBite Engineering
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8080
+    description: Local Development
+
+tags:
+  - name: Auth
+    description: Registration, login, silent refresh token rotation, and logout
+  - name: Sessions
+    description: Concurrent device session challenge inspection, revocation, and claiming (SCOPE_AUTH)
+  - name: Customer Profile
+    description: Customer profile and saved GPS delivery addresses
+  - name: Shopping Cart
+    description: Redis-backed single-restaurant cart management and live checkout preview
+  - name: Orders (Customer)
+    description: Order placement, live tracking, payment retry, and customer cancellation
+  - name: Payments (Customer)
+    description: Order payment inspection and client-side gateway signature verification
+  - name: Reviews (Customer)
+    description: Post-delivery 1–5 star customer review submission and management
+  - name: Restaurant Owner — Onboarding
+    description: Step-by-step restaurant onboarding application lifecycle
+  - name: Restaurant Owner — Operations
+    description: Approved restaurant profile, operating hours, gallery, and open/closed toggle
+  - name: Restaurant Owner — Menu
+    description: Dish catalog CRUD and menu item image management
+  - name: Restaurant Owner — Orders
+    description: Kitchen order fulfillment, courier tracking, and restaurant earnings summary
+  - name: Restaurant Owner — Cuisines
+    description: Proposals for new platform cuisine categories
+  - name: Delivery Agent — Onboarding
+    description: Delivery partner KYC application and embedded vehicle onboarding
+  - name: Delivery Agent — Vehicles
+    description: Standalone vehicle onboarding applications and approved fleet management
+  - name: Delivery Agent — Shift
+    description: Courier profile, shift availability toggle, and Redis Geo live GPS streaming
+  - name: Delivery Agent — Dispatch
+    description: Active dispatch offers, offer acceptance/rejection, package pickup, and delivery completion
+  - name: Admin — Users
+    description: Internal administrator account provisioning and listing
+  - name: Admin — Restaurant Applications
+    description: Restaurant onboarding application review, approval, and rejection
+  - name: Admin — Agent Applications
+    description: Delivery agent KYC application review, approval, and rejection
+  - name: Admin — Vehicle Applications
+    description: Vehicle onboarding application review and active vehicle ownership governance
+  - name: Admin — Agent Compliance
+    description: Delivery agent directory, suspension, and reinstatement
+  - name: Admin — Cuisine Moderation
+    description: Moderation of merchant-proposed cuisine categories
+  - name: Admin — Review Moderation
+    description: Platform-wide customer review inspection and policy takedowns
+  - name: Admin — Orders & Payments
+    description: Administrative post-delivery order refunds and payment audit logs
+  - name: Admin — Allotments
+    description: Onboarding review task allotment queue (accept / decline)
+  - name: Notifications
+    description: Polymorphic in-app notifications across orders, payments, onboarding, and cuisines
+  - name: File Uploads
+    description: Presigned AWS S3 PUT URL generation for direct client uploads
+  - name: Webhooks
+    description: Server-to-server Razorpay and local dev stub payment webhook receivers
+  - name: Public Catalog
+    description: Unauthenticated cuisine directory, PostGIS restaurant search, menus, and public reviews
+  - name: Actuator
+    description: Spring Boot health and build info probes
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Pass `accessToken` (`aud: quickbite-api`, `SCOPE_API`) for standard protected APIs,
+        or `challengeToken` (`aud: quickbite-auth`, `SCOPE_AUTH`) for `/api/v1/auth/sessions` and `/api/v1/auth/claim-session`.
+
+  parameters:
+    ClientTypeHeader:
+      in: header
+      name: X-Client-Type
+      required: true
+      description: Client platform identifier controlling refresh token delivery (`HttpOnly` cookie vs JSON body).
+      schema:
+        type: string
+        enum: [web_browser, mobile_app]
+
+    CursorParam:
+      in: query
+      name: cursor
+      required: false
+      description: UUIDv7 cursor (`nextCursor` from previous page) for keyset pagination.
+      schema:
+        type: string
+        format: uuid
+
+    PageSizeParam:
+      in: query
+      name: size
+      required: false
+      description: Maximum number of records per page.
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+
+  schemas:
+    OrderStatus:
+      type: string
+      enum:
+        - AWAITING_PAYMENT
+        - PAYMENT_FAILED
+        - PLACED
+        - ACCEPTED
+        - PREPARING
+        - READY_FOR_PICKUP
+        - OUT_FOR_DELIVERY
+        - DELIVERED
+        - CANCELLED
+        - DECLINED
+        - ABANDONED
+
+    OrderCancellationReason:
+      type: string
+      enum:
+        - CUSTOMER_REQUESTED
+        - RESTAURANT_UNRESPONSIVE
+        - NO_AGENT_FOUND
+
+    PaymentMethod:
+      type: string
+      enum: [UPI, CARD, NET_BANKING, WALLET, COD]
+
+    PaymentStatus:
+      type: string
+      enum: [PENDING, SUCCESS, FAILED, CANCELLED, REFUNDED, REFUND_FAILED]
+
+    ApplicationStatus:
+      type: string
+      enum: [DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED]
+
+    RegisterRequest:
+      type: object
+      required: [name, email, phoneNumber, password]
+      properties:
+        name:
+          type: string
+          example: Aarav Sharma
+        email:
+          type: string
+          format: email
+          example: aarav.sharma@quickbite.com
+        phoneNumber:
+          type: string
+          minLength: 10
+          maxLength: 20
+          example: "+919876543210"
+        password:
+          type: string
+          format: password
+          example: Pass@123
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    RefreshRequest:
+      type: object
+      description: Required when `X-Client-Type` is `mobile_app`. Ignored for `web_browser` (cookie is used).
+      properties:
+        refreshToken:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: [string, "null"]
+          description: Populated for `mobile_app`; `null` for `web_browser` (delivered via `HttpOnly` cookie).
+        expiresIn:
+          type: integer
+          format: int64
+          example: 900
+        sessionId:
+          type: string
+          format: uuid
+        tokenType:
+          type: string
+          example: Bearer
+
+    SessionLimitErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Maximum active sessions reached. Please revoke an existing session to continue.
+        challengeToken:
+          type: string
+          description: "5-minute RSA JWT (`aud: quickbite-auth`, `SCOPE_AUTH`) used to inspect/revoke sessions and claim a new session."
+        maxSessions:
+          type: integer
+          example: 2
+
+    SessionResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        deviceName:
+          type: string
+        deviceOS:
+          type: string
+        clientType:
+          type: string
+          enum: [WEB_BROWSER, MOBILE_APP]
+        ipAddress:
+          type: string
+        lastUsedAt:
+          type: string
+          format: date-time
+        loginAt:
+          type: string
+          format: date-time
+        daysLeft:
+          type: integer
+
+    CursorPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items: {}
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+        hasNext:
+          type: boolean
+        size:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+
+    AddressRequest:
+      type: object
+      required: [label, street, city, state, country, latitude, longitude]
+      properties:
+        label:
+          type: string
+          maxLength: 50
+          example: Home
+        houseNumber:
+          type: string
+          maxLength: 20
+        buildingName:
+          type: string
+          maxLength: 100
+        street:
+          type: string
+          maxLength: 150
+        landmark:
+          type: string
+          maxLength: 100
+        city:
+          type: string
+          maxLength: 50
+        state:
+          type: string
+          maxLength: 50
+        country:
+          type: string
+          maxLength: 50
+        postalCode:
+          type: string
+          maxLength: 10
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        isDefault:
+          type: boolean
+
+    RestaurantApplicationAddressRequest:
+      type: object
+      required: [street, city, state, country, latitude, longitude]
+      properties:
+        street:
+          type: string
+          maxLength: 150
+        city:
+          type: string
+          maxLength: 50
+        state:
+          type: string
+          maxLength: 50
+        country:
+          type: string
+          maxLength: 50
+        postalCode:
+          type: string
+          maxLength: 10
+        houseNumber:
+          type: string
+          maxLength: 20
+        buildingName:
+          type: string
+          maxLength: 100
+        landmark:
+          type: string
+          maxLength: 100
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+
+    CartItemRequest:
+      type: object
+      required: [menuItemId, quantity]
+      properties:
+        menuItemId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 99
+
+    PlaceOrderRequest:
+      type: object
+      required: [addressId, paymentMethod]
+      properties:
+        addressId:
+          type: string
+          format: uuid
+        paymentMethod:
+          $ref: '#/components/schemas/PaymentMethod'
+        tipAmount:
+          type: number
+          format: double
+          minimum: 0
+          default: 0
+        expectedTotal:
+          type: number
+          format: double
+          minimum: 0
+          description: Optional price-drift guard matching `priceBreakdown.totalAmount` from `/checkout-preview`. Triggers `409 Conflict` if menu/fee totals changed.
+
+    OrderStatusHistoryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        timestamp:
+          type: string
+          format: date-time
+        changedById:
+          type: [string, "null"]
+          format: uuid
+        changedByName:
+          type: [string, "null"]
+
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        restaurantId:
+          type: string
+          format: uuid
+        restaurantName:
+          type: string
+        deliveryAddress:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              menuItemId:
+                type: string
+                format: uuid
+              menuItemName:
+                type: string
+              quantity:
+                type: integer
+              unitPrice:
+                type: number
+              totalPrice:
+                type: number
+        subtotal:
+          type: number
+        discountAmount:
+          type: number
+        deliveryFee:
+          type: number
+        platformFee:
+          type: number
+        taxAmount:
+          type: number
+        tipAmount:
+          type: number
+        totalAmount:
+          type: number
+        currentStatus:
+          $ref: '#/components/schemas/OrderStatus'
+        cancellationReason:
+          oneOf:
+            - $ref: '#/components/schemas/OrderCancellationReason'
+            - type: "null"
+        restaurantAcceptanceDeadline:
+          type: [string, "null"]
+          format: date-time
+        deliveryAgent:
+          type: [object, "null"]
+        statusHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderStatusHistoryDto'
+        deliveryDistanceMeters:
+          type: [number, "null"]
+          format: double
+        estimatedDeliverySeconds:
+          type: [integer, "null"]
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+
+    RestaurantEarningsResponse:
+      type: object
+      properties:
+        restaurantId:
+          type: string
+          format: uuid
+        deliveredOrdersCount:
+          type: integer
+          format: int64
+        totalGrossSales:
+          type: number
+        totalFoodSubtotal:
+          type: number
+        totalPlatformFees:
+          type: number
+        totalTaxesCollected:
+          type: number
+        computedAt:
+          type: string
+          format: date-time
+
+    OrderOfferSummaryResponse:
+      type: object
+      properties:
+        offerId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        roundNumber:
+          type: integer
+        radiusKm:
+          type: number
+        orderStatus:
+          type: string
+        orderSubtotal:
+          type: number
+        orderTotalAmount:
+          type: number
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              quantity:
+                type: integer
+              unitPrice:
+                type: number
+              subTotal:
+                type: number
+        restaurantName:
+          type: string
+        restaurantAddress:
+          type: string
+        deliveryAddress:
+          type: string
+        deliveryDistanceKm:
+          type: [number, "null"]
+          format: double
+        estimatedDeliverySeconds:
+          type: [integer, "null"]
+          format: int64
+        guaranteedPayout:
+          type: number
+        tipAmount:
+          type: number
+        estimatedTotalPayout:
+          type: number
+        offeredAt:
+          type: string
+          format: date-time
+        offerExpiresAt:
+          type: string
+          format: date-time
+        secondsRemaining:
+          type: integer
+          format: int64
+
+    ReviewRequest:
+      type: object
+      required: [orderId, rating]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          maxLength: 1000
+
+    MenuItemRequest:
+      type: object
+      required: [name, description, cuisineId, price, category]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+        cuisineId:
+          type: string
+          format: uuid
+        price:
+          type: number
+          format: double
+          minimum: 0.01
+        category:
+          type: string
+          maxLength: 50
+        isAvailable:
+          type: boolean
+
+    RejectRequest:
+      type: object
+      required: [remarks]
+      properties:
+        remarks:
+          type: string
+          maxLength: 500
+
+    ExpireVehicleOwnershipRequest:
+      type: object
+      required: [remarks]
+      properties:
+        remarks:
+          type: string
+          maxLength: 500
+
+    SuspendAgentRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+
+    RefundRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+
+    UpdateLocationRequest:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+
+    AvailabilityRequest:
+      type: object
+      required: [available]
+      properties:
+        available:
+          type: boolean
+
+    VehicleDetailsRequest:
+      type: object
+      required: [vinNumber, numberPlate, vehicleType, brand, model]
+      properties:
+        vinNumber:
+          type: string
+          minLength: 6
+          maxLength: 30
+        numberPlate:
+          type: string
+          minLength: 3
+          maxLength: 20
+        vehicleType:
+          type: string
+          enum: [BIKE, SCOOTER, BICYCLE, CAR]
+        brand:
+          type: string
+          maxLength: 50
+        model:
+          type: string
+          maxLength: 50
+        isOwnershipTransferred:
+          type: boolean
+
+    DocumentAttachRequest:
+      type: object
+      required: [type, url]
+      properties:
+        type:
+          type: string
+          description: Document enum value (`FSSAI_LICENSE`, `GST`, `PAN`, `BANK_PROOF`, `BUSINESS_LICENSE` for restaurants; `AADHAR`, `DRIVING_LICENSE`, `OTHER` for agents; `RC`, `INSURANCE`, `TRANSFER_NOC`, `OTHER` for vehicles).
+        url:
+          type: string
+          format: uri
+
+    FileUploadUrlRequest:
+      type: object
+      required: [context, applicationId, contentType, fileName]
+      properties:
+        context:
+          type: string
+          enum: [RESTAURANT_IMAGE, RESTAURANT_DOCUMENT]
+        applicationId:
+          type: string
+          format: uuid
+        contentType:
+          type: string
+          example: image/jpeg
+        fileName:
+          type: string
+          example: storefront.jpg
+
+    FileUploadUrlResponse:
+      type: object
+      properties:
+        uploadUrl:
+          type: string
+          format: uri
+        fileUrl:
+          type: string
+          format: uri
+
+    PaymentVerifyRequest:
+      type: object
+      required: [gatewayOrderId, gatewayPaymentId, gatewaySignature]
+      properties:
+        gatewayOrderId:
+          type: string
+        gatewayPaymentId:
+          type: string
+        gatewaySignature:
+          type: string
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  # ─── AUTH ────────────────────────────────────────────────────────────────────
+
+  /api/v1/auth/register/customer:
+    post:
+      tags: [Auth]
+      summary: Register Customer
+      description: Creates a new `ROLE_CUSTOMER` account with Argon2 password hashing. Does not start a session; call `POST /api/v1/auth/login` next.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Customer registered successfully
+        '409':
+          description: Email or phone number already in use
+
+  /api/v1/auth/register/restaurant-owner:
+    post:
+      tags: [Auth]
+      summary: Register Restaurant Owner
+      description: Creates a new `ROLE_RESTAURANT_OWNER` account. Does not start a session; call `POST /api/v1/auth/login` next.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Restaurant owner registered successfully
+        '409':
+          description: Email or phone number already in use
+
+  /api/v1/auth/register/delivery-agent:
+    post:
+      tags: [Auth]
+      summary: Register Delivery Agent
+      description: Creates a new `ROLE_DELIVERY_AGENT` account. Does not start a session; call `POST /api/v1/auth/login` next.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Delivery agent registered successfully
+        '409':
+          description: Email or phone number already in use
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with Email & Password
+      description: Verifies Argon2 credentials and issues an RSA access token (`15m`) plus a refresh token (`HttpOnly` cookie for `web_browser`, JSON body for `mobile_app`). Returns `409 Conflict` with a 5-minute `challengeToken` if concurrent session limits are exceeded.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ClientTypeHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Missing or invalid `X-Client-Type` header
+        '401':
+          description: Invalid credentials
+        '409':
+          description: Maximum active sessions reached — `SCOPE_AUTH` challenge token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionLimitErrorResponse'
+
+  /api/v1/auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Refresh Access Token
+      description: Rotates the refresh token within its token family (detecting token reuse breaches) and issues a fresh access token. Reads the `refreshToken` `HttpOnly` cookie for `web_browser`, or the JSON request body for `mobile_app`.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ClientTypeHeader'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: New access token and rotated refresh token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Refresh token missing, expired, or revoked (reuse breach detected)
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout Current Device
+      description: Revokes the current device session (`sid` claim) in PostgreSQL and Redis and clears the `refreshToken` cookie.
+      responses:
+        '204':
+          description: Logged out successfully
+
+  /api/v1/auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Logout All Devices
+      description: Revokes all active sessions across all devices for the authenticated user and clears the `refreshToken` cookie.
+      responses:
+        '204':
+          description: All sessions revoked
+
+  # ─── SESSIONS (SCOPE_AUTH) ───────────────────────────────────────────────────
+
+  /api/v1/auth/sessions:
+    get:
+      tags: [Sessions]
+      summary: List Active Device Sessions
+      description: "Requires `Authorization: Bearer <challengeToken>` (`SCOPE_AUTH`). Lists active sessions so the user can pick one to revoke."
+      responses:
+        '200':
+          description: List of active device sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SessionResponse'
+
+  /api/v1/auth/sessions/{sessionId}:
+    delete:
+      tags: [Sessions]
+      summary: Revoke Device Session
+      description: "Requires `Authorization: Bearer <challengeToken>` (`SCOPE_AUTH`). Revokes an existing device session to free a slot."
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Session revoked
+
+  /api/v1/auth/claim-session:
+    post:
+      tags: [Sessions]
+      summary: Claim Challenged Session
+      description: "Requires `Authorization: Bearer <challengeToken>` (`SCOPE_AUTH`) and `X-Client-Type`. Creates the new session after freeing a slot and issues `SCOPE_API` tokens."
+      parameters:
+        - $ref: '#/components/parameters/ClientTypeHeader'
+      responses:
+        '200':
+          description: Session claimed, access and refresh tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '409':
+          description: Concurrent session limit still full
+
+  # ─── CUSTOMER PROFILE ────────────────────────────────────────────────────────
+
+  /api/v1/customer/me:
+    get:
+      tags: [Customer Profile]
+      summary: Get Customer Profile
+      responses:
+        '200':
+          description: Customer profile
+    put:
+      tags: [Customer Profile]
+      summary: Update Customer Profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phoneNumber, email]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                phoneNumber:
+                  type: string
+                  minLength: 10
+                  maxLength: 15
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Profile updated
+
+  /api/v1/customer/me/addresses:
+    get:
+      tags: [Customer Profile]
+      summary: List Saved Delivery Addresses
+      responses:
+        '200':
+          description: List of saved addresses
+    post:
+      tags: [Customer Profile]
+      summary: Add Delivery Address
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+      responses:
+        '201':
+          description: Address created
+
+  /api/v1/customer/me/addresses/{id}:
+    put:
+      tags: [Customer Profile]
+      summary: Update Delivery Address
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+      responses:
+        '200':
+          description: Address updated
+    delete:
+      tags: [Customer Profile]
+      summary: Delete Delivery Address
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Address deleted
+
+  /api/v1/customer/me/addresses/{id}/default:
+    put:
+      tags: [Customer Profile]
+      summary: Set Default Delivery Address
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Default address updated
+
+  # ─── SHOPPING CART ───────────────────────────────────────────────────────────
+
+  /api/v1/customer/cart:
+    get:
+      tags: [Shopping Cart]
+      summary: Get Active Cart
+      responses:
+        '200':
+          description: Active Redis-backed cart with items and subtotal
+    delete:
+      tags: [Shopping Cart]
+      summary: Clear Entire Cart
+      responses:
+        '204':
+          description: Cart cleared
+
+  /api/v1/customer/cart/items:
+    post:
+      tags: [Shopping Cart]
+      summary: Add Item to Cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartItemRequest'
+      responses:
+        '200':
+          description: Item added to cart
+        '409':
+          description: Cart conflict — cart already contains items from another restaurant
+
+  /api/v1/customer/cart/items/{cartItemId}:
+    put:
+      tags: [Shopping Cart]
+      summary: Update Cart Item Quantity
+      parameters:
+        - in: path
+          name: cartItemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+                  maximum: 99
+      responses:
+        '200':
+          description: Quantity updated
+    delete:
+      tags: [Shopping Cart]
+      summary: Remove Item from Cart
+      parameters:
+        - in: path
+          name: cartItemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Item removed
+
+  /api/v1/customer/cart/checkout-preview:
+    get:
+      tags: [Shopping Cart]
+      summary: Get Checkout Preview
+      description: Computes live road-distance (OSRM / Mapbox / Haversine fallback) delivery fee, platform fee, GST, tip, and `totalAmount` (`expectedTotal` for order placement).
+      parameters:
+        - in: query
+          name: addressId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: tipAmount
+          schema:
+            type: number
+            format: double
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Checkout price breakdown and ETA preview
+
+  # ─── ORDERS (CUSTOMER) ───────────────────────────────────────────────────────
+
+  /api/v1/customer/orders:
+    get:
+      tags: [Orders (Customer)]
+      summary: List My Orders
+      parameters:
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated order list
+    post:
+      tags: [Orders (Customer)]
+      summary: Place Order from Cart
+      description: Converts the active cart into an Order (`PLACED` immediately for `COD`, or `AWAITING_PAYMENT` with a 10-minute payment window for online methods). Returns polymorphic `PaymentResult` (`COD`, `STUB_ONLINE`, or `ONLINE`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceOrderRequest'
+      responses:
+        '201':
+          description: Order created and payment initiated
+        '409':
+          description: Price changed since checkout preview (`expectedTotal` mismatch)
+
+  /api/v1/customer/orders/{orderId}:
+    get:
+      tags: [Orders (Customer)]
+      summary: Get Order Details & Tracking
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order details with status history and actor audit trail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+
+  /api/v1/customer/orders/{orderId}/cancel:
+    delete:
+      tags: [Orders (Customer)]
+      summary: Cancel Order
+      description: Cancels an order in `AWAITING_PAYMENT`, `PAYMENT_FAILED`, or `PLACED` status (automatically initiating a gateway refund if already paid). Blocked once `ACCEPTED`.
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Order cancelled
+
+  /api/v1/customer/orders/{orderId}/retry-payment:
+    post:
+      tags: [Orders (Customer)]
+      summary: Retry Failed Order Payment
+      description: Retries payment for an order in `AWAITING_PAYMENT` or `PAYMENT_FAILED` within the 10-minute payment window, optionally switching `paymentMethod` (including to `COD`).
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: paymentMethod
+          required: false
+          schema:
+            $ref: '#/components/schemas/PaymentMethod'
+      responses:
+        '200':
+          description: New payment attempt initiated
+
+  /api/v1/customer/orders/{orderId}/delivery-agent:
+    get:
+      tags: [Orders (Customer)]
+      summary: Get Order Delivery Agent Details
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Assigned delivery agent info, vehicle details, and live coordinates
+
+  # ─── PAYMENTS (CUSTOMER) ─────────────────────────────────────────────────────
+
+  /api/v1/customer/payments/order/{orderId}:
+    get:
+      tags: [Payments (Customer)]
+      summary: Get Payment Status by Order
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment status and attempt history
+
+  /api/v1/customer/payments/verify:
+    post:
+      tags: [Payments (Customer)]
+      summary: Verify Online Payment Signature
+      description: Verifies Razorpay HMAC-SHA256 checkout signature (`gatewayOrderId|gatewayPaymentId`) and transitions the order from `AWAITING_PAYMENT` to `PLACED`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentVerifyRequest'
+      responses:
+        '200':
+          description: Payment verified
+        '400':
+          description: Signature mismatch
+
+  # ─── REVIEWS (CUSTOMER) ──────────────────────────────────────────────────────
+
+  /api/v1/customer/reviews:
+    get:
+      tags: [Reviews (Customer)]
+      summary: List My Submitted Reviews
+      parameters:
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated list of customer reviews
+    post:
+      tags: [Reviews (Customer)]
+      summary: Submit Order Review
+      description: Submits a 1–5 star review for a `DELIVERED` order (at most one review per order).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewRequest'
+      responses:
+        '201':
+          description: Review submitted
+
+  /api/v1/customer/reviews/{id}:
+    get:
+      tags: [Reviews (Customer)]
+      summary: Get My Review by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Review details
+    put:
+      tags: [Reviews (Customer)]
+      summary: Update Submitted Review
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                comment:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Review updated
+    delete:
+      tags: [Reviews (Customer)]
+      summary: Delete My Review
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Review deleted
+
+  # ─── RESTAURANT OWNER — ONBOARDING ───────────────────────────────────────────
+
+  /api/v1/restaurant-owner/applications/start:
+    post:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Start Restaurant Onboarding Application
+      responses:
+        '201':
+          description: Application created in `DRAFT` status
+
+  /api/v1/restaurant-owner/applications/current:
+    get:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Get Current Restaurant Application
+      responses:
+        '200':
+          description: Current active onboarding application
+
+  /api/v1/restaurant-owner/applications/{id}:
+    get:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Get Restaurant Application by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application details
+
+  /api/v1/restaurant-owner/applications/{id}/details:
+    get:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Get Restaurant Basic Details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Basic details
+    patch:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Save Restaurant Basic Details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, description]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 200
+                description:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Details saved
+
+  /api/v1/restaurant-owner/applications/{id}/address:
+    get:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Get Restaurant Location & Address
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Address details
+    patch:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Save Restaurant Location & Address
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestaurantApplicationAddressRequest'
+      responses:
+        '200':
+          description: Address saved
+
+  /api/v1/restaurant-owner/applications/{id}/hours:
+    get:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Get Weekly Operating Hours
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Operating hours
+    post:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Save Weekly Operating Hours
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hours]
+              properties:
+                hours:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [dayOfWeek, openTime, closeTime]
+                    properties:
+                      dayOfWeek:
+                        type: string
+                        enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]
+                      openTime:
+                        type: string
+                        example: "09:00:00"
+                      closeTime:
+                        type: string
+                        example: "23:00:00"
+      responses:
+        '200':
+          description: Hours saved
+
+  /api/v1/restaurant-owner/applications/{id}/images:
+    get:
+      tags: [Restaurant Owner — Onboarding]
+      summary: List Application Images
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of images
+    post:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Add Storefront / Kitchen Image
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageUrl, displayOrder]
+              properties:
+                imageUrl:
+                  type: string
+                  format: uri
+                displayOrder:
+                  type: integer
+                  minimum: 0
+      responses:
+        '201':
+          description: Image added
+
+  /api/v1/restaurant-owner/applications/{id}/images/{imageId}:
+    delete:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Remove Application Image
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: imageId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Image removed
+
+  /api/v1/restaurant-owner/applications/{id}/documents:
+    get:
+      tags: [Restaurant Owner — Onboarding]
+      summary: List Attached Verification Documents
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of documents
+    post:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Attach Verification Document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentAttachRequest'
+      responses:
+        '201':
+          description: Document attached
+
+  /api/v1/restaurant-owner/applications/{id}/documents/{type}:
+    delete:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Remove Verification Document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: type
+          required: true
+          schema:
+            type: string
+            enum: [FSSAI_LICENSE, GST, PAN, BANK_PROOF, BUSINESS_LICENSE]
+      responses:
+        '204':
+          description: Document removed
+
+  /api/v1/restaurant-owner/applications/{id}/submit:
+    post:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Submit Application for Admin Review
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application submitted (`SUBMITTED`)
+
+  /api/v1/restaurant-owner/applications/{id}/reopen:
+    post:
+      tags: [Restaurant Owner — Onboarding]
+      summary: Reopen Rejected Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application reopened (`DRAFT`)
+
+  # ─── RESTAURANT OWNER — OPERATIONS ───────────────────────────────────────────
+
+  /api/v1/restaurant-owner/restaurants:
+    get:
+      tags: [Restaurant Owner — Operations]
+      summary: List My Approved Restaurants
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED]
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated list of owned restaurants
+
+  /api/v1/restaurant-owner/restaurants/{id}:
+    get:
+      tags: [Restaurant Owner — Operations]
+      summary: Get My Restaurant Details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Restaurant details
+    put:
+      tags: [Restaurant Owner — Operations]
+      summary: Update Restaurant Info
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, description]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 200
+                description:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Restaurant updated
+
+  /api/v1/restaurant-owner/restaurants/{id}/toggle-closed:
+    patch:
+      tags: [Restaurant Owner — Operations]
+      summary: Toggle Restaurant Open / Closed Status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Temporary closed status toggled
+
+  /api/v1/restaurant-owner/restaurants/{id}/hours:
+    put:
+      tags: [Restaurant Owner — Operations]
+      summary: Update Restaurant Operating Hours
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required: [dayOfWeek, openTime, closeTime]
+                properties:
+                  dayOfWeek:
+                    type: string
+                    enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]
+                  openTime:
+                    type: string
+                    example: "09:00:00"
+                  closeTime:
+                    type: string
+                    example: "23:00:00"
+      responses:
+        '200':
+          description: Hours updated
+
+  /api/v1/restaurant-owner/restaurants/{id}/images:
+    post:
+      tags: [Restaurant Owner — Operations]
+      summary: Add Restaurant Gallery Image
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageUrl, displayOrder]
+              properties:
+                imageUrl:
+                  type: string
+                  format: uri
+                displayOrder:
+                  type: integer
+                  minimum: 0
+      responses:
+        '201':
+          description: Image added
+
+  /api/v1/restaurant-owner/restaurants/{id}/images/{imageId}:
+    delete:
+      tags: [Restaurant Owner — Operations]
+      summary: Remove Restaurant Gallery Image
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: imageId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Image removed
+
+  # ─── RESTAURANT OWNER — MENU ─────────────────────────────────────────────────
+
+  /api/v1/restaurant-owner/restaurants/{restaurantId}/menu-items:
+    post:
+      tags: [Restaurant Owner — Menu]
+      summary: Create Menu Item
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuItemRequest'
+      responses:
+        '201':
+          description: Menu item created
+
+  /api/v1/restaurant-owner/restaurants/{restaurantId}/menu-items/{itemId}:
+    put:
+      tags: [Restaurant Owner — Menu]
+      summary: Update Menu Item
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: itemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuItemRequest'
+      responses:
+        '200':
+          description: Menu item updated
+    delete:
+      tags: [Restaurant Owner — Menu]
+      summary: Delete Menu Item
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: itemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Menu item deleted
+
+  /api/v1/restaurant-owner/restaurants/{restaurantId}/menu-items/{itemId}/images:
+    post:
+      tags: [Restaurant Owner — Menu]
+      summary: Add Menu Item Image
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: itemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageUrl, displayOrder]
+              properties:
+                imageUrl:
+                  type: string
+                  format: uri
+                displayOrder:
+                  type: integer
+                  minimum: 0
+      responses:
+        '201':
+          description: Image added
+
+  /api/v1/restaurant-owner/restaurants/{restaurantId}/menu-items/{itemId}/images/{imageId}:
+    delete:
+      tags: [Restaurant Owner — Menu]
+      summary: Remove Menu Item Image
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: itemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: imageId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Image removed
+
+  # ─── RESTAURANT OWNER — ORDERS ───────────────────────────────────────────────
+
+  /api/v1/restaurant-owner/orders:
+    get:
+      tags: [Restaurant Owner — Orders]
+      summary: List Incoming & Past Restaurant Orders
+      parameters:
+        - in: query
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: status
+          required: false
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated restaurant order list
+
+  /api/v1/restaurant-owner/orders/{orderId}:
+    get:
+      tags: [Restaurant Owner — Orders]
+      summary: Get Restaurant Order Details
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+
+  /api/v1/restaurant-owner/orders/{orderId}/accept:
+    post:
+      tags: [Restaurant Owner — Orders]
+      summary: Accept Incoming Order
+      description: Transitions an incoming `PLACED` order (within its 2-minute acceptance window) to `ACCEPTED` and triggers asynchronous courier dispatch.
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order accepted (`ACCEPTED`)
+
+  /api/v1/restaurant-owner/orders/{orderId}/decline:
+    post:
+      tags: [Restaurant Owner — Orders]
+      summary: Decline Incoming Order
+      description: Declines an incoming `PLACED` order (`DECLINED`) and automatically triggers a refund for paid online orders.
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order declined (`DECLINED`)
+
+  /api/v1/restaurant-owner/orders/{orderId}/mark-preparing:
+    post:
+      tags: [Restaurant Owner — Orders]
+      summary: Mark Order as Preparing
+      description: Advances kitchen state from `ACCEPTED` to `PREPARING`.
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status updated (`PREPARING`)
+
+  /api/v1/restaurant-owner/orders/{orderId}/mark-ready:
+    post:
+      tags: [Restaurant Owner — Orders]
+      summary: Mark Order Ready for Pickup
+      description: Advances kitchen state from `PREPARING` to `READY_FOR_PICKUP`.
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status updated (`READY_FOR_PICKUP`)
+
+  /api/v1/restaurant-owner/orders/{orderId}/delivery-agent:
+    get:
+      tags: [Restaurant Owner — Orders]
+      summary: Get Kitchen Order Delivery Agent Details
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Assigned delivery agent info
+
+  /api/v1/restaurant-owner/orders/earnings:
+    get:
+      tags: [Restaurant Owner — Orders]
+      summary: Get Restaurant Sales & Earnings Summary
+      parameters:
+        - in: query
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Aggregated delivered-order sales and earnings summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantEarningsResponse'
+
+  # ─── RESTAURANT OWNER — CUISINES ─────────────────────────────────────────────
+
+  /api/v1/restaurant-owner/cuisines:
+    post:
+      tags: [Restaurant Owner — Cuisines]
+      summary: Request New Cuisine Category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+      responses:
+        '201':
+          description: Cuisine request submitted (`PENDING`)
+
+  # ─── DELIVERY AGENT — ONBOARDING ─────────────────────────────────────────────
+
+  /api/v1/delivery-agent/applications/start:
+    post:
+      tags: [Delivery Agent — Onboarding]
+      summary: Start Delivery Agent Application
+      responses:
+        '201':
+          description: Agent KYC application created (`DRAFT`)
+
+  /api/v1/delivery-agent/applications/current:
+    get:
+      tags: [Delivery Agent — Onboarding]
+      summary: Get Current Agent Application
+      responses:
+        '200':
+          description: Current agent application
+
+  /api/v1/delivery-agent/applications/{id}:
+    get:
+      tags: [Delivery Agent — Onboarding]
+      summary: Get Agent Application by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application details
+
+  /api/v1/delivery-agent/applications/{id}/documents:
+    get:
+      tags: [Delivery Agent — Onboarding]
+      summary: List Attached Agent Documents
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of attached documents
+    post:
+      tags: [Delivery Agent — Onboarding]
+      summary: Attach Identity / License Document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentAttachRequest'
+      responses:
+        '201':
+          description: Document attached
+
+  /api/v1/delivery-agent/applications/{id}/documents/{type}:
+    delete:
+      tags: [Delivery Agent — Onboarding]
+      summary: Remove Attached Agent Document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: type
+          required: true
+          schema:
+            type: string
+            enum: [AADHAR, DRIVING_LICENSE, OTHER]
+      responses:
+        '204':
+          description: Document removed
+
+  /api/v1/delivery-agent/applications/{id}/vehicles/start:
+    post:
+      tags: [Delivery Agent — Onboarding]
+      summary: Start Embedded Vehicle Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Embedded vehicle application started
+
+  /api/v1/delivery-agent/applications/{id}/vehicles/current:
+    get:
+      tags: [Delivery Agent — Onboarding]
+      summary: Get Embedded Vehicle Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Embedded vehicle application
+
+  /api/v1/delivery-agent/applications/{id}/submit:
+    post:
+      tags: [Delivery Agent — Onboarding]
+      summary: Submit Agent Application for Review
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application submitted (`SUBMITTED`)
+
+  /api/v1/delivery-agent/applications/{id}/reopen:
+    post:
+      tags: [Delivery Agent — Onboarding]
+      summary: Reopen Rejected Agent Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application reopened (`DRAFT`)
+
+  # ─── DELIVERY AGENT — VEHICLES ───────────────────────────────────────────────
+
+  /api/v1/delivery-agent/vehicles/applications/start:
+    post:
+      tags: [Delivery Agent — Vehicles]
+      summary: Start Standalone Vehicle Application
+      responses:
+        '201':
+          description: Vehicle application created (`DRAFT`)
+
+  /api/v1/delivery-agent/vehicles/applications/check-vin:
+    get:
+      tags: [Delivery Agent — Vehicles]
+      summary: Check Vehicle VIN Availability
+      parameters:
+        - in: query
+          name: vin
+          required: true
+          schema:
+            type: string
+            minLength: 6
+            maxLength: 30
+      responses:
+        '200':
+          description: VIN availability and transfer eligibility result
+
+  /api/v1/delivery-agent/vehicles/applications:
+    get:
+      tags: [Delivery Agent — Vehicles]
+      summary: List My Vehicle Applications
+      responses:
+        '200':
+          description: List of vehicle applications
+
+  /api/v1/delivery-agent/vehicles/applications/{id}:
+    get:
+      tags: [Delivery Agent — Vehicles]
+      summary: Get Vehicle Application Details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application details
+
+  /api/v1/delivery-agent/vehicles/applications/{id}/details:
+    get:
+      tags: [Delivery Agent — Vehicles]
+      summary: Get Vehicle Specifications
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vehicle specifications
+    patch:
+      tags: [Delivery Agent — Vehicles]
+      summary: Save Vehicle Specifications & Plate
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleDetailsRequest'
+      responses:
+        '200':
+          description: Specifications saved
+
+  /api/v1/delivery-agent/vehicles/applications/{id}/documents:
+    get:
+      tags: [Delivery Agent — Vehicles]
+      summary: List Attached Vehicle Documents
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of attached documents
+    post:
+      tags: [Delivery Agent — Vehicles]
+      summary: Attach Vehicle RC / Insurance Document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentAttachRequest'
+      responses:
+        '201':
+          description: Document attached
+
+  /api/v1/delivery-agent/vehicles/applications/{id}/documents/{type}:
+    delete:
+      tags: [Delivery Agent — Vehicles]
+      summary: Remove Vehicle Document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: type
+          required: true
+          schema:
+            type: string
+            enum: [RC, INSURANCE, TRANSFER_NOC, OTHER]
+      responses:
+        '204':
+          description: Document removed
+
+  /api/v1/delivery-agent/vehicles/applications/{id}/submit:
+    post:
+      tags: [Delivery Agent — Vehicles]
+      summary: Submit Vehicle Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application submitted
+
+  /api/v1/delivery-agent/vehicles/applications/{id}/reopen:
+    post:
+      tags: [Delivery Agent — Vehicles]
+      summary: Reopen Rejected Vehicle Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application reopened
+
+  /api/v1/delivery-agent/vehicles:
+    get:
+      tags: [Delivery Agent — Vehicles]
+      summary: List My Approved Vehicles
+      responses:
+        '200':
+          description: List of approved `VehicleOwnership` records
+
+  /api/v1/delivery-agent/vehicles/{ownershipId}:
+    get:
+      tags: [Delivery Agent — Vehicles]
+      summary: Get Approved Vehicle Details
+      parameters:
+        - in: path
+          name: ownershipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vehicle ownership details
+
+  /api/v1/delivery-agent/vehicles/{ownershipId}/select:
+    patch:
+      tags: [Delivery Agent — Vehicles]
+      summary: Select Active Delivery Vehicle
+      parameters:
+        - in: path
+          name: ownershipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vehicle selected as active for shift dispatch
+
+  /api/v1/delivery-agent/vehicles/{ownershipId}/deactivate:
+    patch:
+      tags: [Delivery Agent — Vehicles]
+      summary: Deactivate Approved Vehicle
+      parameters:
+        - in: path
+          name: ownershipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vehicle deactivated
+
+  # ─── DELIVERY AGENT — SHIFT ───────────────────────────────────────────────────
+
+  /api/v1/delivery-agent/profile:
+    get:
+      tags: [Delivery Agent — Shift]
+      summary: Get Delivery Agent Profile & Status
+      responses:
+        '200':
+          description: Agent profile, verification status, active vehicle, and availability
+
+  /api/v1/delivery-agent/availability:
+    patch:
+      tags: [Delivery Agent — Shift]
+      summary: Toggle Online / Offline Availability
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvailabilityRequest'
+      responses:
+        '200':
+          description: Availability updated
+
+  /api/v1/delivery-agent/location:
+    put:
+      tags: [Delivery Agent — Shift]
+      summary: Update Live GPS Location
+      description: Updates the courier's live coordinates in PostGIS and Redis Geo (`delivery:agents:locations` with 5-minute heartbeat TTL).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationRequest'
+      responses:
+        '200':
+          description: Location updated and updated profile returned
+
+  # ─── DELIVERY AGENT — DISPATCH ───────────────────────────────────────────────
+
+  /api/v1/delivery-agent/offers/active:
+    get:
+      tags: [Delivery Agent — Dispatch]
+      summary: List Active Delivery Dispatch Offers
+      description: Returns all currently active (`PENDING`, non-expired) radial dispatch offers broadcast to the authenticated delivery agent.
+      responses:
+        '200':
+          description: Active dispatch offers with countdown and payout breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderOfferSummaryResponse'
+
+  /api/v1/delivery-agent/orders/{orderId}/offer-summary:
+    get:
+      tags: [Delivery Agent — Dispatch]
+      summary: Get Delivery Offer Summary
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Offer details (pickup/dropoff, distance, countdown, estimated payout)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderOfferSummaryResponse'
+
+  /api/v1/delivery-agent/orders/{orderId}/accept:
+    post:
+      tags: [Delivery Agent — Dispatch]
+      summary: Accept Delivery Dispatch Offer
+      description: Atomically claims an active dispatch offer under a Redisson distributed lock (`lock:dispatch:order:{orderId}`).
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Offer accepted and courier assigned
+
+  /api/v1/delivery-agent/orders/{orderId}/reject:
+    post:
+      tags: [Delivery Agent — Dispatch]
+      summary: Reject Delivery Dispatch Offer
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Offer rejected
+
+  /api/v1/delivery-agent/orders/{orderId}/pickup:
+    post:
+      tags: [Delivery Agent — Dispatch]
+      summary: Mark Order Picked Up (Out for Delivery)
+      description: Transitions a `READY_FOR_PICKUP` order to `OUT_FOR_DELIVERY`.
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status updated to `OUT_FOR_DELIVERY`
+
+  /api/v1/delivery-agent/orders/{orderId}/delivered:
+    post:
+      tags: [Delivery Agent — Dispatch]
+      summary: Mark Order Delivered
+      description: Transitions an `OUT_FOR_DELIVERY` order to `DELIVERED` (automatically marking `COD` payment as `SUCCESS`).
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order marked as `DELIVERED`
+
+  # ─── ADMIN — USERS ───────────────────────────────────────────────────────────
+
+  /api/v1/admin/users/admins:
+    get:
+      tags: [Admin — Users]
+      summary: List System Admins
+      responses:
+        '200':
+          description: List of internal admin users
+    post:
+      tags: [Admin — Users]
+      summary: Create Admin User
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, phoneNumber, password]
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                email:
+                  type: string
+                  format: email
+                phoneNumber:
+                  type: string
+                  minLength: 10
+                  maxLength: 20
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '201':
+          description: Admin user created
+
+  # ─── ADMIN — RESTAURANT APPLICATIONS ─────────────────────────────────────────
+
+  /api/v1/admin/restaurants/applications:
+    get:
+      tags: [Admin — Restaurant Applications]
+      summary: List Restaurant Onboarding Applications
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/ApplicationStatus'
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated list of restaurant applications
+
+  /api/v1/admin/restaurants/applications/{id}:
+    get:
+      tags: [Admin — Restaurant Applications]
+      summary: Inspect Restaurant Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Full application details
+
+  /api/v1/admin/restaurants/applications/{id}/approve:
+    post:
+      tags: [Admin — Restaurant Applications]
+      summary: Approve Restaurant Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application approved and live `Restaurant` provisioned
+
+  /api/v1/admin/restaurants/applications/{id}/reject:
+    post:
+      tags: [Admin — Restaurant Applications]
+      summary: Reject Restaurant Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectRequest'
+      responses:
+        '200':
+          description: Application rejected
+
+  # ─── ADMIN — AGENT APPLICATIONS ──────────────────────────────────────────────
+
+  /api/v1/admin/delivery-agents/applications:
+    get:
+      tags: [Admin — Agent Applications]
+      summary: List Delivery Agent Applications
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            $ref: '#/components/schemas/ApplicationStatus'
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated list of agent KYC applications
+
+  /api/v1/admin/delivery-agents/applications/{id}:
+    get:
+      tags: [Admin — Agent Applications]
+      summary: Inspect Delivery Agent Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application details
+
+  /api/v1/admin/delivery-agents/applications/{id}/approve:
+    post:
+      tags: [Admin — Agent Applications]
+      summary: Approve Delivery Agent Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application approved and `DeliveryAgent` activated
+
+  /api/v1/admin/delivery-agents/applications/{id}/reject:
+    post:
+      tags: [Admin — Agent Applications]
+      summary: Reject Delivery Agent Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectRequest'
+      responses:
+        '200':
+          description: Application rejected
+
+  # ─── ADMIN — VEHICLE APPLICATIONS & OWNERSHIP ────────────────────────────────
+
+  /api/v1/admin/vehicles/applications:
+    get:
+      tags: [Admin — Vehicle Applications]
+      summary: List Vehicle Onboarding Applications
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            $ref: '#/components/schemas/ApplicationStatus'
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated list of vehicle applications
+
+  /api/v1/admin/vehicles/applications/{id}:
+    get:
+      tags: [Admin — Vehicle Applications]
+      summary: Inspect Vehicle Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application details
+
+  /api/v1/admin/vehicles/applications/{id}/approve:
+    post:
+      tags: [Admin — Vehicle Applications]
+      summary: Approve Vehicle Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application approved and `VehicleOwnership` activated
+
+  /api/v1/admin/vehicles/applications/{id}/reject:
+    post:
+      tags: [Admin — Vehicle Applications]
+      summary: Reject Vehicle Application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectRequest'
+      responses:
+        '200':
+          description: Application rejected
+
+  /api/v1/admin/vehicles/agents/{agentId}:
+    get:
+      tags: [Admin — Vehicle Applications]
+      summary: List Vehicles for Delivery Agent
+      parameters:
+        - in: path
+          name: agentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of vehicle ownership summaries for the specified agent
+
+  /api/v1/admin/vehicles/ownerships/{ownershipId}:
+    get:
+      tags: [Admin — Vehicle Applications]
+      summary: Inspect Vehicle Ownership Details
+      parameters:
+        - in: path
+          name: ownershipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detailed vehicle ownership and verification document record
+
+  /api/v1/admin/vehicles/ownerships/{ownershipId}/expire:
+    patch:
+      tags: [Admin — Vehicle Applications]
+      summary: Expire Active Vehicle Ownership
+      parameters:
+        - in: path
+          name: ownershipId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpireVehicleOwnershipRequest'
+      responses:
+        '200':
+          description: Vehicle ownership expired
+
+  # ─── ADMIN — AGENT COMPLIANCE ─────────────────────────────────────────────────
+
+  /api/v1/admin/delivery-agents:
+    get:
+      tags: [Admin — Agent Compliance]
+      summary: List All Delivery Agents
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED, SUSPENDED]
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated list of delivery agents
+
+  /api/v1/admin/delivery-agents/{id}/suspend:
+    post:
+      tags: [Admin — Agent Compliance]
+      summary: Suspend Delivery Agent
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuspendAgentRequest'
+      responses:
+        '200':
+          description: Agent suspended
+
+  /api/v1/admin/delivery-agents/{id}/reinstate:
+    post:
+      tags: [Admin — Agent Compliance]
+      summary: Reinstate Suspended Delivery Agent
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Agent reinstated
+
+  # ─── ADMIN — CUISINE MODERATION ──────────────────────────────────────────────
+
+  /api/v1/admin/cuisines:
+    get:
+      tags: [Admin — Cuisine Moderation]
+      summary: List Cuisines by Moderation Status
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED]
+            default: PENDING
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated list of cuisine requests
+
+  /api/v1/admin/cuisines/{id}/approve:
+    post:
+      tags: [Admin — Cuisine Moderation]
+      summary: Approve Requested Cuisine
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cuisine approved and added to public catalog
+
+  /api/v1/admin/cuisines/{id}/reject:
+    post:
+      tags: [Admin — Cuisine Moderation]
+      summary: Reject Requested Cuisine
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectRequest'
+      responses:
+        '200':
+          description: Cuisine rejected
+
+  # ─── ADMIN — REVIEW MODERATION ───────────────────────────────────────────────
+
+  /api/v1/admin/reviews:
+    get:
+      tags: [Admin — Review Moderation]
+      summary: List Customer Reviews (Moderation)
+      parameters:
+        - in: query
+          name: restaurantId
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated list of customer reviews
+
+  /api/v1/admin/reviews/{id}:
+    get:
+      tags: [Admin — Review Moderation]
+      summary: Inspect Single Review
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Review details
+    delete:
+      tags: [Admin — Review Moderation]
+      summary: Remove Inappropriate Review
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Review removed
+
+  # ─── ADMIN — ORDERS & PAYMENTS ───────────────────────────────────────────────
+
+  /api/v1/admin/payments/order/{orderId}:
+    get:
+      tags: [Admin — Orders & Payments]
+      summary: Inspect Payment Details by Order
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment details and status audit log
+
+  /api/v1/admin/orders/{orderId}/refund:
+    post:
+      tags: [Admin — Orders & Payments]
+      summary: Refund Delivered Order
+      description: Issues an administrative post-delivery refund on a `DELIVERED` order (`PaymentStatus` transitions to `REFUNDED` while `OrderStatus` remains `DELIVERED`).
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+      responses:
+        '200':
+          description: Refund initiated
+
+  # ─── ADMIN — ALLOTMENTS ──────────────────────────────────────────────────────
+
+  /api/v1/admin/allotments/pending:
+    get:
+      tags: [Admin — Allotments]
+      summary: List My Pending Onboarding Allotments
+      responses:
+        '200':
+          description: List of pending onboarding review allotments (`RESTAURANT_APPLICATION`, `DELIVERY_AGENT_APPLICATION`, `VEHICLE_APPLICATION`, `CUISINE`)
+
+  /api/v1/admin/allotments/{allotmentId}/accept:
+    post:
+      tags: [Admin — Allotments]
+      summary: Accept Onboarding Allotment
+      parameters:
+        - in: path
+          name: allotmentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Allotment accepted
+
+  /api/v1/admin/allotments/{allotmentId}/decline:
+    post:
+      tags: [Admin — Allotments]
+      summary: Decline Onboarding Allotment
+      parameters:
+        - in: path
+          name: allotmentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Allotment declined and reassigned
+
+  # ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: List My Notifications
+      description: Returns joined-inheritance in-app notifications (`OrderNotification`, `PaymentNotification`, `RestaurantApplicationNotification`, `DeliveryAgentApplicationNotification`, `VehicleApplicationNotification`, `CuisineNotification`).
+      parameters:
+        - in: query
+          name: unread
+          schema:
+            type: boolean
+            default: false
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated notifications
+
+  /api/v1/notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Get Unread Notification Count
+      responses:
+        '200':
+          description: Unread notification count
+
+  /api/v1/notifications/{id}/read:
+    put:
+      tags: [Notifications]
+      summary: Mark Notification as Read
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification marked as read
+
+  /api/v1/notifications/read-all:
+    put:
+      tags: [Notifications]
+      summary: Mark All Notifications as Read
+      responses:
+        '204':
+          description: All notifications marked as read
+
+  # ─── FILE UPLOADS ─────────────────────────────────────────────────────────────
+
+  /api/v1/files/upload-url:
+    post:
+      tags: [File Uploads]
+      summary: Generate Presigned S3 Upload URL
+      description: Generates a short-lived presigned AWS S3 `PUT` URL (`uploadUrl`) and canonical object URL (`fileUrl`) for direct client uploads.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileUploadUrlRequest'
+      responses:
+        '200':
+          description: Presigned URL and canonical file URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUploadUrlResponse'
+
+  # ─── WEBHOOKS ─────────────────────────────────────────────────────────────────
+
+  /api/v1/webhooks/payments/razorpay:
+    post:
+      tags: [Webhooks]
+      summary: Razorpay Payment Webhook Receiver
+      description: Server-to-server webhook endpoint verified via HMAC-SHA256 `X-Razorpay-Signature` over the raw JSON body (`payment.captured`, `payment.failed`, `refund.processed`, `refund.failed`).
+      security: []
+      parameters:
+        - in: header
+          name: X-Razorpay-Signature
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+
+  /api/v1/webhooks/payments/stub:
+    post:
+      tags: [Webhooks]
+      summary: Local Stub Payment Webhook
+      description: Development-only (`dev` profile) stub for simulating payment gateway callbacks without external credentials.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transactionId, status]
+              properties:
+                transactionId:
+                  type: string
+                status:
+                  $ref: '#/components/schemas/PaymentStatus'
+      responses:
+        '200':
+          description: Stub webhook processed
+
+  # ─── PUBLIC CATALOG ───────────────────────────────────────────────────────────
+
+  /api/v1/cuisines:
+    get:
+      tags: [Public Catalog]
+      summary: List Approved Cuisines
+      security: []
+      responses:
+        '200':
+          description: List of admin-approved cuisine categories
+
+  /api/v1/restaurants:
+    get:
+      tags: [Public Catalog]
+      summary: List Approved Restaurants
+      security: []
+      parameters:
+        - in: query
+          name: name
+          schema:
+            type: string
+        - in: query
+          name: cuisineId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: minRating
+          schema:
+            type: number
+            format: double
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated approved restaurant list
+
+  /api/v1/restaurants/nearby:
+    get:
+      tags: [Public Catalog]
+      summary: Search Nearby Restaurants (Geo-Spatial)
+      description: PostGIS `ST_DWithin` spatial radius search (`100`–`50000` metres) with optional name, cuisine, and minimum rating filters, sorted by distance.
+      security: []
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+        - in: query
+          name: lng
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - in: query
+          name: radius
+          description: Search radius in metres (`100`–`50000`).
+          schema:
+            type: integer
+            default: 5000
+            minimum: 100
+            maximum: 50000
+        - in: query
+          name: name
+          schema:
+            type: string
+        - in: query
+          name: cuisineId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: minRating
+          schema:
+            type: number
+            format: double
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - in: query
+          name: size
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: Nearby restaurants sorted by distance
+
+  /api/v1/restaurants/{id}:
+    get:
+      tags: [Public Catalog]
+      summary: Get Public Restaurant Details
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Public restaurant details
+
+  /api/v1/restaurants/{restaurantId}/menu-items:
+    get:
+      tags: [Public Catalog]
+      summary: List Restaurant Menu Items
+      security: []
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - in: query
+          name: available
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Paginated menu items
+
+  /api/v1/restaurants/{restaurantId}/menu-items/{itemId}:
+    get:
+      tags: [Public Catalog]
+      summary: Get Menu Item Details
+      security: []
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: itemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Menu item details
+
+  /api/v1/restaurants/{restaurantId}/reviews:
+    get:
+      tags: [Public Catalog]
+      summary: List Restaurant Customer Reviews
+      security: []
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated public reviews
+
+  /api/v1/restaurants/{restaurantId}/reviews/summary:
+    get:
+      tags: [Public Catalog]
+      summary: Get Restaurant Rating Summary
+      security: []
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rating summary (average, total count, 1–5 star distribution)
+
+  # ─── ACTUATOR ─────────────────────────────────────────────────────────────────
+
+  /actuator/health:
+    get:
+      tags: [Actuator]
+      summary: Check Application Health
+      security: []
+      responses:
+        '200':
+          description: Application is healthy
+        '503':
+          description: Application is unhealthy
+
+  /actuator/info:
+    get:
+      tags: [Actuator]
+      summary: Get Application Build Info
+      security: []
+      responses:
+        '200':
+          description: Build and version info

@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/delivery-agent/location"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"latitude":12.9721,"longitude":77.595}'
+order: 3000

@@ -1,0 +1,3 @@
+$kind: collection
+description: "Standalone vehicle onboarding applications (`BIKE`, `SCOOTER`, `BICYCLE`, `CAR`): check VIN availability & ownership transfer eligibility, save plate/model specs, and attach `RC`, `INSURANCE`, or `TRANSFER_NOC` documents."
+order: 3000

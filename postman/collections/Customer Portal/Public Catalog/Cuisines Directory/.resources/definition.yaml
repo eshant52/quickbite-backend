@@ -1,0 +1,3 @@
+$kind: collection
+description: "Lists all admin-approved cuisine categories available across the platform."
+order: 1000

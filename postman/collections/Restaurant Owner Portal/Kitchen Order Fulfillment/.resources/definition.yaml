@@ -1,0 +1,3 @@
+$kind: collection
+description: "List and inspect restaurant orders (filterable by `OrderStatus`), accept or decline incoming `PLACED` orders within the 2-minute window, advance kitchen preparation (`ACCEPTED` → `PREPARING` → `READY_FOR_PICKUP`), view assigned courier details, and query delivered sales & earnings summaries (`/orders/earnings`)."
+order: 6000

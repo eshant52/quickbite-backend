@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/admin/delivery-agents/{{agent_id}}/suspend"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"reason":"Repeated SLA violations and unverified vehicle swap."}'
+order: 2000

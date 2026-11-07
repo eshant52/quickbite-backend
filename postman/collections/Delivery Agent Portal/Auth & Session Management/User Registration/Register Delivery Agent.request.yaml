@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/auth/register/delivery-agent"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+        "name": "Rajesh Kumar",
+        "email": "rajesh.kumar@example.com",
+        "phoneNumber": "+919820334455",
+        "password": "Password@123"
+    }
+order: 2000

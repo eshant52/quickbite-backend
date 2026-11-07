@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/cuisines"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{\n    \"name\": \"Indian\"\n}'
+order: 1000

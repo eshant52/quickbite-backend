@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/images"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{\n    \"imageUrl\": \"https://cdn.quickbite.com/restaurants/storefront-1.jpg\",\n    \"displayOrder\": 1\n}'
+order: 5000

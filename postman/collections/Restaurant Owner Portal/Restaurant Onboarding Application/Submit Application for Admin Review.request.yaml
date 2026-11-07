@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/submit"
+method: POST
+order: 16000

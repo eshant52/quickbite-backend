@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/address"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"street":"100 Feet Road, Indiranagar","city":"Bengaluru","state":"Karnataka","country":"India","postalCode":"560038","houseNumber":"Plot 42","buildingName":"Symphony Plaza","landmark":"Opposite Indiranagar Club","latitude":12.9718,"longitude":77.6412}'
+order: 7000

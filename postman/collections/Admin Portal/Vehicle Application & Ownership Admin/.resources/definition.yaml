@@ -1,0 +1,3 @@
+$kind: collection
+description: "Review, approve, or reject `VehicleApplication` submissions and inspect or administratively expire active `VehicleOwnership` records (`/admin/vehicles/agents/{agentId}`, `/admin/vehicles/ownerships/{ownershipId}/expire`)."
+order: 5000

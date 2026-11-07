@@ -1,0 +1,3 @@
+$kind: collection
+description: "Browse approved restaurants with cursor pagination (`name`, `cuisineId`, `minRating`) or PostGIS `ST_DWithin` spatial radius queries (`lat`, `lng`, `radius` in metres)."
+order: 2000

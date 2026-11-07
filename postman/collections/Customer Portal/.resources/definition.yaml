@@ -1,0 +1,20 @@
+$kind: collection
+name: Customer Portal
+description: "End-to-end `ROLE_CUSTOMER` API collection: public restaurant & PostGIS geo-catalog discovery, profile & saved GPS addresses, Redis-backed shopping cart & OSRM/Mapbox checkout preview, order placement & tracking, Razorpay/stub payment verification, reviews, notifications, and presigned S3 uploads. Pair with the `Customer Portal - Local Dev` environment."
+auth:
+  - id: c1a72410-1bde-4e97-859b-8152a68eb001
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{access_token}}"
+variables:
+  - key: access_token
+    value: ""
+  - key: refresh_token
+    value: ""
+  - key: challenge_token
+    value: ""
+  - key: session_id
+    value: ""
+  - key: total_order_amount
+    value: "0"

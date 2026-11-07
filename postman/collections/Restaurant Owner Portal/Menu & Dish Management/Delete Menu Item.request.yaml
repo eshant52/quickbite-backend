@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}"
+method: DELETE
+order: 3000

@@ -1,0 +1,3 @@
+$kind: collection
+description: "Create, update, or delete menu items (`cuisineId`, `price`, `category`, `isAvailable`) and manage dish gallery images for an owned restaurant."
+order: 5000

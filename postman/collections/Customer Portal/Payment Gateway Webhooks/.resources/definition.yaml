@@ -1,0 +1,7 @@
+$kind: collection
+description: "Public server-to-server webhook receivers (`noauth`) for simulating local `dev` payment callbacks (`/webhooks/payments/stub`) or processing HMAC-verified `X-Razorpay-Signature` events (`/webhooks/payments/razorpay`)."
+auth:
+  - id: ""
+    type: noauth
+    name: No Auth
+order: 8000

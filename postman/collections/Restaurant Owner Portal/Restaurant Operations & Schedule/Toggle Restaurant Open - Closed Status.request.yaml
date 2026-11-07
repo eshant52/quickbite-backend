@@ -1,0 +1,5 @@
+$kind: http-request
+name: Toggle Restaurant Open / Closed Status
+url: "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/toggle-closed"
+method: PATCH
+order: 7000

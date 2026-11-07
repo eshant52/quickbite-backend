@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/hours"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '[\n    {\n        \"dayOfWeek\": \"MONDAY\",\n        \"openTime\": \"09:00:00\",\n        \"closeTime\": \"23:00:00\"\n    },\n    {\n        \"dayOfWeek\": \"TUESDAY\",\n        \"openTime\": \"09:00:00\",\n        \"closeTime\": \"23:00:00\"\n    },\n    {\n        \"dayOfWeek\": \"WEDNESDAY\",\n        \"openTime\": \"09:00:00\",\n        \"closeTime\": \"23:00:00\"\n    },\n    {\n        \"dayOfWeek\": \"THURSDAY\",\n        \"openTime\": \"09:00:00\",\n        \"closeTime\": \"23:00:00\"\n    },\n    {\n        \"dayOfWeek\": \"FRIDAY\",\n        \"openTime\": \"09:00:00\",\n        \"closeTime\": \"23:30:00\"\n    },\n    {\n        \"dayOfWeek\": \"SATURDAY\",\n        \"openTime\": \"10:00:00\",\n        \"closeTime\": \"23:30:00\"\n    },\n    {\n        \"dayOfWeek\": \"SUNDAY\",\n        \"openTime\": \"10:00:00\",\n        \"closeTime\": \"23:00:00\"\n    }\n]'
+order: 4000

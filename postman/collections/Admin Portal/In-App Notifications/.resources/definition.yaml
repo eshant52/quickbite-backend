@@ -1,0 +1,3 @@
+$kind: collection
+description: "Fetch, count unread, and mark polymorphic joined-inheritance in-app notifications as read (`OrderNotification`, `PaymentNotification`, `RestaurantApplicationNotification`, `DeliveryAgentApplicationNotification`, `VehicleApplicationNotification`, `CuisineNotification`)."
+order: 11000

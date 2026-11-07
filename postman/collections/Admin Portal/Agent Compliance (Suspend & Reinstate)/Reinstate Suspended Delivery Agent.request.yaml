@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/admin/delivery-agents/{{agent_id}}/reinstate"
+method: POST
+order: 3000

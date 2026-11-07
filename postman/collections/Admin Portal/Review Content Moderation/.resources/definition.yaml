@@ -1,0 +1,3 @@
+$kind: collection
+description: "List (optionally filtered by `restaurantId`), inspect, and remove policy-violating customer reviews across the platform."
+order: 9000

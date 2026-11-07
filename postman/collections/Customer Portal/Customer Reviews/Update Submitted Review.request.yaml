@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/customer/reviews/{{review_id}}"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"rating":4,"comment":"Great taste, slightly delayed delivery."}'
+order: 4000

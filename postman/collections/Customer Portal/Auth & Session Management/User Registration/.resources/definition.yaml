@@ -1,0 +1,7 @@
+$kind: collection
+description: "Public self-registration endpoint (`noauth`) that creates a `ROLE_CUSTOMER` account with Argon2 password hashing (`201 Created`). Follow with `POST /api/v1/auth/login` to start a device session."
+auth:
+  - id: ""
+    type: noauth
+    name: No Auth
+order: 1000

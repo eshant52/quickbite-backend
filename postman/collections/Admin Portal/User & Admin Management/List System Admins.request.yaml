@@ -1,0 +1,5 @@
+$kind: http-request
+description: Retrieves a list of all active administrator accounts in the platform. (AdminUserController#listAdmins | ROLE_ADMIN)
+url: "{{base_url}}/api/v1/admin/users/admins"
+method: GET
+order: 2000

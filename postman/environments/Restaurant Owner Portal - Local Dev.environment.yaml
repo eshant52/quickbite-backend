@@ -1,0 +1,87 @@
+name: Restaurant Owner Portal - Local Dev
+values:
+  - key: base_url
+    value: 'http://localhost:8080'
+    enabled: true
+    type: default
+    description: QuickBite API base URL
+  - key: access_token
+    value: ''
+    enabled: true
+    type: secret
+    description: JWT access token for Restaurant Owner role (auto-set by Login script)
+  - key: refresh_token
+    value: ''
+    enabled: true
+    type: secret
+    description: Opaque refresh token (HttpOnly cookie, also captured here for reference)
+  - key: challenge_token
+    value: ''
+    enabled: true
+    type: secret
+    description: Short-lived challenge token returned on login when device challenge is triggered
+  - key: session_id
+    value: ''
+    enabled: true
+    type: default
+    description: Active session UUID
+  - key: owner_email
+    value: 'owner@quickbite.local'
+    enabled: true
+    type: default
+    description: Restaurant owner login email
+  - key: owner_password
+    value: 'Pass@123'
+    enabled: true
+    type: secret
+    description: Restaurant owner login password
+  - key: restaurant_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of the owner's approved restaurant
+  - key: restaurant_application_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of the restaurant onboarding application
+  - key: menu_item_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a menu item
+  - key: cuisine_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a cuisine category
+  - key: cuisine_request_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a cuisine proposal request
+  - key: order_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of an incoming kitchen order
+  - key: document_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of an attached verification document
+  - key: image_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a restaurant or menu item image
+  - key: notification_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a notification
+  - key: s3_upload_key
+    value: ''
+    enabled: true
+    type: default
+    description: S3 object key returned from presigned URL generation

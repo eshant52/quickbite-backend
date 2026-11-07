@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/documents"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"type":"FSSAI_LICENSE","url":"https://cdn.quickbite.com/onboarding/restaurants/fssai.pdf"}'
+order: 14000

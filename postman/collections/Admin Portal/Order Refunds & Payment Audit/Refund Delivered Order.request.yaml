@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/admin/orders/{{order_id}}/refund"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"reason":"Customer received damaged packaging; verified by support."}'
+order: 1000

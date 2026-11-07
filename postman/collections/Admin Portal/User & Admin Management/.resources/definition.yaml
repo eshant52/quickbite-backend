@@ -1,0 +1,3 @@
+$kind: collection
+description: "List internal system administrators and provision new `ROLE_ADMIN` staff accounts (`POST /api/v1/admin/users/admins`)."
+order: 10000

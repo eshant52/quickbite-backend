@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/customer/payments/verify"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+        "gatewayOrderId": "order_To9mnWuLC878kM",
+        "gatewayPaymentId": "pay_RzpTest67890",
+        "gatewaySignature": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+order: 2000

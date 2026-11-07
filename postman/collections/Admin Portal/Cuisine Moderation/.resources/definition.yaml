@@ -1,0 +1,3 @@
+$kind: collection
+description: "List (`PENDING`, `APPROVED`, `REJECTED`), approve, or reject cuisine category proposals submitted by restaurant owners."
+order: 6000

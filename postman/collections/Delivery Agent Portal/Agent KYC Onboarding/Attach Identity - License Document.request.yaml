@@ -1,0 +1,10 @@
+$kind: http-request
+name: Attach Identity / License Document
+url: "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/documents"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{\n    \"type\": \"DRIVING_LICENSE\",\n    \"url\": \"https://storage.quickbite.com/documents/agents/aarav-sharma-dl.pdf\"\n}'
+order: 5000

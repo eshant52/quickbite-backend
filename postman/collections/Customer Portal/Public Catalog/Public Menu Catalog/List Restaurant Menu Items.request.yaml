@@ -1,0 +1,7 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurants/{{restaurant_id}}/menu-items?size=20&available=true"
+method: GET
+queryParams:
+  size: "20"
+  available: "true"
+order: 1000

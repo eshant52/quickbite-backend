@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurants/nearby?lat=12.9716&lng=77.5946&radius=5000&name=Pizza&cuisineId={{cuisine_id}}&minRating=4.0&page=0&size=20"
+method: GET
+queryParams:
+  lat: "12.9716"
+  lng: "77.5946"
+  radius: "5000"
+  name: Pizza
+  cuisineId: "{{cuisine_id}}"
+  minRating: "4.0"
+  page: "0"
+  size: "20"
+order: 2000

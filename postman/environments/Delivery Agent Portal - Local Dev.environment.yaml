@@ -1,0 +1,82 @@
+name: Delivery Agent Portal - Local Dev
+values:
+  - key: base_url
+    value: 'http://localhost:8080'
+    enabled: true
+    type: default
+    description: QuickBite API base URL
+  - key: access_token
+    value: ''
+    enabled: true
+    type: secret
+    description: JWT access token for Delivery Agent role (auto-set by Login script)
+  - key: refresh_token
+    value: ''
+    enabled: true
+    type: secret
+    description: Opaque refresh token (HttpOnly cookie, also captured here for reference)
+  - key: challenge_token
+    value: ''
+    enabled: true
+    type: secret
+    description: Short-lived challenge token returned on login when device challenge is triggered
+  - key: session_id
+    value: ''
+    enabled: true
+    type: default
+    description: Active session UUID
+  - key: agent_email
+    value: 'agent@quickbite.local'
+    enabled: true
+    type: default
+    description: Delivery agent login email
+  - key: agent_password
+    value: 'Pass@123'
+    enabled: true
+    type: secret
+    description: Delivery agent login password
+  - key: agent_application_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of the delivery agent KYC application
+  - key: vehicle_application_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a vehicle onboarding application
+  - key: vehicle_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of an approved vehicle
+  - key: order_dispatch_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of an order dispatch / delivery offer
+  - key: document_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of an attached KYC or vehicle document
+  - key: notification_id
+    value: ''
+    enabled: true
+    type: default
+    description: UUID of a notification
+  - key: latitude
+    value: '12.9716'
+    enabled: true
+    type: default
+    description: Agent current latitude (Bengaluru default)
+  - key: longitude
+    value: '77.5946'
+    enabled: true
+    type: default
+    description: Agent current longitude (Bengaluru default)
+  - key: s3_upload_key
+    value: ''
+    enabled: true
+    type: default
+    description: S3 object key returned from presigned URL generation

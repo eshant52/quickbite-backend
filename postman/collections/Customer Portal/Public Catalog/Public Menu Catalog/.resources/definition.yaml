@@ -1,0 +1,3 @@
+$kind: collection
+description: "Browse cursor-paginated menu items (`available` filter) and dish details for a specific approved restaurant."
+order: 3000

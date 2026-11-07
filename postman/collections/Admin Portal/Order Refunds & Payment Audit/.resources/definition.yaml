@@ -1,0 +1,3 @@
+$kind: collection
+description: "Audit gateway payment records by order (`/admin/payments/order/{orderId}`) and issue administrative post-delivery refunds on `DELIVERED` orders (`PaymentStatus` → `REFUNDED`, `OrderStatus` remains `DELIVERED`)."
+order: 8000

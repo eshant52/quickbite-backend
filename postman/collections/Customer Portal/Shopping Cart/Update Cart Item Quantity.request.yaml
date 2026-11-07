@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/customer/cart/items/{{cart_item_id}}"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+        "quantity": 5
+    }
+order: 3000

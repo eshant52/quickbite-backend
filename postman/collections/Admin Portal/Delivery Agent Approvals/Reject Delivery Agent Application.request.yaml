@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/admin/delivery-agents/applications/{{agent_application_id}}/reject"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"remarks":"Submitted documents are blurry or incomplete. Please re-upload clear copies."}'
+order: 4000

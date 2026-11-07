@@ -1,0 +1,7 @@
+$kind: collection
+description: "Public self-registration is disabled for `ROLE_ADMIN` (`noauth` placeholder folder). New internal administrators are provisioned by existing admins via `POST /api/v1/admin/users/admins` in `User & Admin Management`."
+auth:
+  - id: ""
+    type: noauth
+    name: No Auth
+order: 1000

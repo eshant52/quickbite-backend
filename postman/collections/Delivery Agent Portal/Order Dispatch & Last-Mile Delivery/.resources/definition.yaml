@@ -1,0 +1,3 @@
+$kind: collection
+description: "Inspect radial dispatch offers (`GET /offers/active`, `GET /orders/{orderId}/offer-summary`), atomically accept or reject order assignments, confirm restaurant package pickup (`OUT_FOR_DELIVERY`), and complete customer handoff (`DELIVERED`)."
+order: 6000

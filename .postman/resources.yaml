@@ -1,0 +1,7 @@
+workspace:
+  id: d5262da4-36f1-4af3-a4da-471a50916d09
+cloudResources:
+  collections: {}
+resourceNameMappings:
+  specs:
+    - ../postman/specs/quickbite-api.yaml: quickbite-api.yaml

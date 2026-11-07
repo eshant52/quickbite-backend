@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/hours"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"hours":[{"dayOfWeek":"MONDAY","openTime":"09:00:00","closeTime":"23:00:00"},{"dayOfWeek":"TUESDAY","openTime":"09:00:00","closeTime":"23:00:00"}]}'
+order: 9000

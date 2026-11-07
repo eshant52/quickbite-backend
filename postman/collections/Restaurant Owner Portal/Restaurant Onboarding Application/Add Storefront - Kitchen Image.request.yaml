@@ -1,0 +1,10 @@
+$kind: http-request
+name: Add Storefront / Kitchen Image
+url: "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/images"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"imageUrl":"https://cdn.quickbite.com/onboarding/restaurants/kitchen-1.jpg","displayOrder":1}'
+order: 11000

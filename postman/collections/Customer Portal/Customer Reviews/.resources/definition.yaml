@@ -1,0 +1,3 @@
+$kind: collection
+description: "Submit, update, list, or delete 1–5 star customer reviews for completed (`DELIVERED`) orders (one review per order)."
+order: 9000

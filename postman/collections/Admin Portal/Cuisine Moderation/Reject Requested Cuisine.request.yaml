@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/admin/cuisines/{{cuisine_id}}/reject"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"remarks":"Duplicate cuisine category."}'
+order: 3000

@@ -1,0 +1,23 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/customer/me/addresses"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+        "label": "Work",
+        "houseNumber": "Tower B, 4th Floor",
+        "buildingName": "Nagpur IT Park",
+        "street": "Gayatri Nagar Road, Pratap Nagar",
+        "landmark": "Opposite VNIT Campus Gate",
+        "city": "Nagpur",
+        "state": "Maharashtra",
+        "country": "India",
+        "postalCode": "440022",
+        "latitude": 21.1165,
+        "longitude": 79.0515,
+        "isDefault": false
+    }
+order: 2000
