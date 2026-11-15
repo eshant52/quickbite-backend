@@ -45,20 +45,25 @@ docker compose --env-file .env.local --profile full up -d
 ./mvnw spring-boot:run
 ```
 
-### 2. Open Local Workspace in Postman
+### 2. Import Collections & Environments in Postman
 
-To import and use this workspace in Postman:
-1. Open the Postman Desktop App.
-2. Click **Workspaces** &rarr; **Create Workspace** (or link a local folder).
-3. **Important**: When prompted for the workspace folder/location, **select the root path folder of the project** (`QuickBite/app/QuickBite`). Postman will automatically read `.postman/resources.yaml` and load the local workspace with all 4 collections, environments, and OpenAPI specs.
+All exported collections (`postman/exports/collections/`) and environment files (`postman/exports/environments/`) are bundled inside the [`/postman/exports`](../exports) folder for one-step import without requiring local workspace permissions:
 
-<!-- Screenshot 1: Creating workspace and selecting the project root folder -->
-![Screenshot 1: Creating Postman Workspace and Selecting Project Root Folder](../../docs/images/postman-create-workspace.png)
+1. **Create Workspace**: Open Postman, click **Workspaces** &rarr; **Create Workspace**, and create a new workspace named **"Quickbite Internal"**:
 
-4. Once loaded, Postman will automatically display all 4 collections and matching local dev environments in the sidebar:
+   ![1. Create Quickbite Internal Workspace](../../docs/images/postman-create-workspace.jpeg)
 
-<!-- Screenshot 2: Collections UI in Postman -->
-![Screenshot 2: Postman Collections UI with 4 Portals](../../docs/images/postman-collections-ui.png)
+2. **Click Import**: Click the **Import** button in the top-left sidebar:
+
+   ![2. Click Import Button](../../docs/images/postman-click-imports.jpeg)
+
+3. **Select `/postman/exports` Folder**: Click **Folders** in the import dialog and choose the [`/postman/exports`](../exports) directory:
+
+   ![3. Click Folders and Select /postman/exports](../../docs/images/postman-click-folders.jpeg)
+
+4. **Confirm & Import**: The 4 portal collections and environment file (`Quickbite Local Dev`) will appear in the import preview. Click **Import** to finish setup:
+
+   ![4. Preview and Import Collections & Environment](../../docs/images/postman-import-preview.jpeg)
 
 ### 3. Select the matching environment
 

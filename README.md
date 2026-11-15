@@ -32,7 +32,7 @@ QuickBite is an enterprise-grade, cloud-native food ordering, restaurant managem
   - [2. Start Infrastructure Services](#2-start-infrastructure-services)
   - [3. Generate Cryptographic RSA Keys](#3-generate-cryptographic-rsa-keys)
   - [4. Run the Application](#4-run-the-application)
-  - [5. Postman Workspace Setup (Local View)](#5-postman-workspace-setup-local-view)
+  - [5. Postman Workspace & Collection Import Setup](#5-postman-workspace--collection-import-setup)
 - [🎬 End-to-End Demo Guide: Placing an Order & Delivery Offer Tracking](#-end-to-end-demo-guide-placing-an-order--delivery-offer-tracking)
   - [Step 1: Start the Interactive Delivery Agent Tracker CLI](#step-1-start-the-interactive-delivery-agent-tracker-cli)
   - [Step 2: Authenticate in Postman (Customer & Restaurant Owner)](#step-2-authenticate-in-postman-customer--restaurant-owner)
@@ -244,22 +244,27 @@ curl http://localhost:8080/actuator/health
 * **Email**: `super.admin@quickbite.com`
 * **Password**: `Admin@123`
 
-### 5. Postman Workspace Setup (Local View)
+### 5. Postman Workspace & Collection Import Setup
 
-The repository includes a pre-configured [`postman/`](./postman) folder containing 4 role-based collections (**Customer Portal**, **Restaurant Owner Portal**, **Delivery Agent Portal**, **Admin Portal**), dedicated local environments, and the complete OpenAPI 3.1.0 specification.
+The repository provides ready-to-import Postman collections (`Customer Portal`, `Restaurant Owner Portal`, `Delivery Agent Portal`, `Admin Portal`) and environment files under [`postman/exports/`](./postman/exports).
 
-To import and use the workspace in Postman:
-1. Open the Postman Desktop App.
-2. Click **Workspaces** &rarr; **Create Workspace** (or link a local directory).
-3. **Important**: When prompted to choose the folder location, **select the root path folder of the project** (`QuickBite/app/QuickBite`). Postman will automatically read `.postman/resources.yaml` and recognize all collections, environments, and specs under the `postman/` directory.
+To import and use the collections in Postman:
 
-<!-- Screenshot 1: Creating workspace and selecting the project root folder -->
-![Screenshot 1: Creating Postman Workspace and Selecting Project Root Folder](./docs/images/postman-create-workspace.png)
+1. **Create a New Workspace**: Open Postman, click **Workspaces** &rarr; **Create Workspace**, and create a workspace named **"Quickbite Internal"** as shown below:
 
-4. Once opened, Postman will automatically display all 4 portal collections and matching local development environments in the left sidebar.
+   ![1. Create Quickbite Internal Workspace](./docs/images/postman-create-workspace.jpeg)
 
-<!-- Screenshot 2: Collections UI in Postman -->
-![Screenshot 2: Postman Collections UI with 4 Portals](./docs/images/postman-collections-ui.png)
+2. **Click Import**: Inside your new workspace, click the **Import** button in the top-left sidebar:
+
+   ![2. Click Import Button](./docs/images/postman-click-imports.jpeg)
+
+3. **Select `/postman/exports` Folder**: In the import dialog, click **Folders** and select the [`/postman/exports`](./postman/exports) folder from the project directory:
+
+   ![3. Click Folders and Select /postman/exports](./docs/images/postman-click-folders.jpeg)
+
+4. **Confirm & Import**: All 4 portal collections and the environment file (`Quickbite Local Dev`) will appear in the preview modal. Click **Import** — you can now immediately use the Postman API collections:
+
+   ![4. Preview and Import Collections & Environment](./docs/images/postman-import-preview.jpeg)
 
 > [!TIP]
 > For more details, comprehensive environment configuration, Docker setup, and routing engine options, look to the [Installation and Configuration Guide](./docs/installation.md). For detailed API endpoints, collection variables, and test scripts, see the [Postman Developer Guide](./postman/documents/QuickBite%20API%20%E2%80%94%20Developer%20Guide.md) and [REST API Catalog](./docs/api-guide.md).

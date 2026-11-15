@@ -17,26 +17,30 @@ All API endpoints (except explicitly public routes) are protected by Spring Secu
 | **Refresh Token** | 64-Byte Opaque String | **Web**: Cookie `qb_refresh_token` (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1/auth`)<br/>**Mobile**: JSON Body (`AuthResponse.refreshToken` / `RefreshRequest.refreshToken`) | Internal validation against PostgreSQL & Redis | 7 Days (`P7D`) |
 | **Client Context** | Mandatory Auth Header | `X-Client-Type: web_browser \| mobile_app` | Resolved by `YauaaDeviceInfoResolver` | Per-request on `/login`, `/refresh-token`, `/claim-session` |
 
-### 1.2 Postman Workspace Setup (Local View)
+### 1.2 Postman Workspace & Collection Import Setup
 
-The repository provides a complete, pre-configured Postman workspace under the [`postman/`](../postman) folder (Postman Local View format), organizing all 156 endpoints into 4 role-specific collections:
+The repository provides ready-to-import Postman collections and environment files under [`postman/exports/`](../postman/exports), organizing all 156 endpoints into 4 role-specific collections:
 - **Customer Portal** (`51` requests)
 - **Restaurant Owner Portal** (`51` requests)
 - **Delivery Agent Portal** (`46` requests)
 - **Admin Portal** (`40` requests)
 
-#### How to Load the Collections in Postman:
-1. Open the Postman Desktop App.
-2. Click **Workspaces** &rarr; **Create Workspace** (or link a local directory).
-3. **Important**: When prompted for the workspace folder/location, **select the root path folder of the project** (`QuickBite/app/QuickBite`). Postman will automatically read `.postman/resources.yaml` and load the local workspace with all 4 collections, environments, and OpenAPI specs.
+#### How to Import the Collections & Environments in Postman:
+1. **Create Workspace**: Open Postman, click **Workspaces** &rarr; **Create Workspace**, and create a new workspace named **"Quickbite Internal"**:
 
-<!-- Screenshot 1: Creating workspace and selecting the project root folder -->
-![Screenshot 1: Creating Postman Workspace and Selecting Project Root Folder](./images/postman-create-workspace.png)
+   ![1. Create Quickbite Internal Workspace](./images/postman-create-workspace.jpeg)
 
-4. Once opened, Postman will automatically recognize all 4 collections and environments in the sidebar:
+2. **Click Import**: Click the **Import** button in the top-left sidebar:
 
-<!-- Screenshot 2: Collections UI in Postman -->
-![Screenshot 2: Postman Collections UI with 4 Portals](./images/postman-collections-ui.png)
+   ![2. Click Import Button](./images/postman-click-imports.jpeg)
+
+3. **Select `/postman/exports` Folder**: Click **Folders** in the import modal and select the [`/postman/exports`](../postman/exports) folder from the project directory:
+
+   ![3. Click Folders and Select /postman/exports](./images/postman-click-folders.jpeg)
+
+4. **Confirm & Import**: The 4 portal collections and environment file (`Quickbite Local Dev`) will be visible in the preview dialog. Click **Import** to load everything into your workspace:
+
+   ![4. Preview and Import Collections & Environment](./images/postman-import-preview.jpeg)
 
 > [!TIP]
 > For a full walkthrough of collection variables, test scripts, and mock flows, refer to the [QuickBite API — Developer Guide](../postman/documents/QuickBite%20API%20%E2%80%94%20Developer%20Guide.md).

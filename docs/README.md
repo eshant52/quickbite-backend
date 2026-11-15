@@ -29,7 +29,7 @@ Welcome to the QuickBite Backend technical documentation directory. This collect
 - [**REST API Catalog & RBAC Reference (`api-guide.md`)**](./api-guide.md)
   - Complete index of all 35+ REST controllers across domains.
   - Role-Based Access Control (RBAC) matrix for Public, Customer, Restaurant Owner, Delivery Agent, and Admin roles.
-  - Postman Workspace Setup guide (how to select the project root folder to load all 4 collections).
+  - Postman Workspace & Collection Import guide (importing `/postman/exports` into a `"Quickbite Internal"` workspace).
   - Path mappings, request/response structures, and query parameters.
 - [**QuickBite API — Postman Developer Guide (`../postman/documents/QuickBite API — Developer Guide.md`)**](../postman/documents/QuickBite%20API%20%E2%80%94%20Developer%20Guide.md)
   - Full developer manual for the 4 role-based Postman collections (`Customer Portal`, `Restaurant Owner Portal`, `Delivery Agent Portal`, `Admin Portal`).

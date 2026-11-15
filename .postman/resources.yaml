@@ -1,10 +1,23 @@
 workspace:
   id: d5262da4-36f1-4af3-a4da-471a50916d09
-
-# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
-
 cloudResources:
-  collections: {}
+  collections:
+    ../postman/collections/Admin Portal: 22557011-28b35255-fff0-4799-81c2-bb41ef6e141e
+    ../postman/collections/Customer Portal: 22557011-bd5b935c-f2bc-40e3-9346-e192f3d4f57a
+    ../postman/collections/Delivery Agent Portal: 22557011-356ad099-89c8-4e7b-aea5-8366b797a8ee
+    ../postman/collections/Restaurant Owner Portal: 22557011-71a2f13e-83eb-48b4-81a4-bcefb1855dfe
+  environments:
+    ../postman/environments/Quickbite Local Dev.environment.yaml: 22557011-8b37f168-9670-44c8-85eb-43d4e1c12c31
+  specs:
+    ../postman/specs/quickbite-api.yaml: a5e3967c-6fb9-49a2-bdb6-d250ccba47be
+  documents:
+    ../postman/documents/QuickBite API — Developer Guide.md: e8f3692b-47d9-4514-a41a-8b55eeaeb48c
+  mocks:
+    ../postman/mocks/new-mock/config.yaml: 01a1ab25-b390-773d-bca9-84fb5b542085
+  datasets:
+    ../postman/datasets/New-Dataset/New-Dataset.dataset.yaml: 186eb3d2-de67-4149-8868-4872234be14a
+  globals:
+    ../postman/globals/workspace.globals.yaml: 50d90fc1-4739-43b1-8e44-38045709fa20
 resourceNameMappings:
   specs:
     - ../postman/specs/quickbite-api.yaml: quickbite-api.yaml

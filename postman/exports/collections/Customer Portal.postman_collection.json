@@ -1,0 +1,1734 @@
+{
+  "info": {
+    "_postman_id": "bd5b935c-f2bc-40e3-9346-e192f3d4f57a",
+    "name": "Customer Portal",
+    "description": "End-to-end `ROLE_CUSTOMER` API collection: public restaurant & PostGIS geo-catalog discovery, profile & saved GPS addresses, Redis-backed shopping cart & OSRM/Mapbox checkout preview, order placement & tracking, Razorpay/stub payment verification, reviews, notifications, and presigned S3 uploads. Pair with the `Customer Portal - Local Dev` environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "22557011",
+    "_collection_link": "https://go.postman.co/collection/22557011-bd5b935c-f2bc-40e3-9346-e192f3d4f57a?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth & Session Management",
+      "item": [
+        {
+          "name": "User Registration",
+          "item": [
+            {
+              "name": "Register Customer",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Aarav Sharma\",\n    \"email\": \"aarav.sharma@quickbite.com\",\n    \"phoneNumber\": \"+919876543210\",\n    \"password\": \"Password@123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/register/customer",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "register",
+                    "customer"
+                  ]
+                },
+                "description": "Registers a new customer account on the QuickBite platform. (UserRegistrationController#registerCustomer | Public / noauth)"
+              },
+              "response": []
+            }
+          ],
+          "description": "Public self-registration endpoint (`noauth`) that creates a `ROLE_CUSTOMER` account with Argon2 password hashing (`201 Created`). Follow with `POST /api/v1/auth/login` to start a device session.",
+          "auth": {
+            "type": "noauth"
+          }
+        },
+        {
+          "name": "Login & Token Refresh",
+          "item": [
+            {
+              "name": "Login with Email & Password",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json(); \npm.collectionVariables.set(\"challenge_token\", response.challengeToken); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.collectionVariables.set(\"access_token\", \"\")"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Type",
+                    "value": "mobile_app"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"email\": \"eshantsonune52@gmail.com\",\n    \"password\": \"Pass@123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/login",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "Eshant Login",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "X-Client-Type",
+                        "value": "web_browser"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n    \"email\": \"eshantsonune52@gmail.com\",\n    \"password\": \"Pass@123\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/auth/login",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "auth",
+                        "login"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "text",
+                  "header": null,
+                  "cookie": [],
+                  "body": ""
+                }
+              ]
+            },
+            {
+              "name": "Refresh Access Token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.collectionVariables.set(\"access_token\", \"\");\nconst refreshToken = pm.collectionVariables.get(\"refresh_token\");\n\nif (refreshToken) {\n    console.log(refreshToken)\n    pm.request.body.raw = JSON.stringify({\n       \"refreshToken\": refreshToken \n    });\n}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Type",
+                    "value": "mobile_app"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "",
+                  "options": {
+                    "raw": {
+                      "language": "text"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/refresh-token",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "refresh-token"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Argon2 credential login and silent refresh token rotation (`noauth`). Requires `X-Client-Type: web_browser | mobile_app` and automatically populates `access_token`, `refresh_token`, `challenge_token`, and `session_id` via Postman test scripts.",
+          "auth": {
+            "type": "noauth"
+          }
+        },
+        {
+          "name": "Device Session Management",
+          "item": [
+            {
+              "name": "List Active Device Sessions",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/sessions",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "sessions"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Claim Challenged Session",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-Client-Type",
+                    "value": "mobile_app"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/claim-session",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "claim-session"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Revoke Device Session",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/sessions/{{session_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "sessions",
+                    "{{session_id}}"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Resolves `409 Conflict` concurrent session limit challenges using `Authorization: Bearer {{challenge_token}}` (`SCOPE_AUTH`): list active sessions (`GET /sessions`), revoke an old device (`DELETE /sessions/{sessionId}`), and claim the new session (`POST /claim-session`).",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{challenge_token}}",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Logout",
+          "item": [
+            {
+              "name": "Logout Current Device",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/logout",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "logout"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Logout All Devices",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/logout-all",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "logout-all"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Single-device (`/logout`) and global all-device (`/logout-all`) session revocation in PostgreSQL and Redis (`SCOPE_API`), clearing the `refreshToken` cookie."
+        }
+      ],
+      "description": "Authentication and session lifecycle: Argon2 self-registration, dual-audience RSA JWT issuance (`quickbite-api` 15m + `quickbite-auth` 5m), `X-Client-Type`-aware SHA-256 refresh token rotation (`HttpOnly` cookie for `web_browser`, JSON body for `mobile_app`), and Yauaa device session tracking."
+    },
+    {
+      "name": "Public Catalog",
+      "item": [
+        {
+          "name": "Cuisines Directory",
+          "item": [
+            {
+              "name": "List Approved Cuisines",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/cuisines",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cuisines"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Lists all admin-approved cuisine categories available across the platform."
+        },
+        {
+          "name": "Restaurant Discovery & Geo-Search",
+          "item": [
+            {
+              "name": "List Approved Restaurants",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/restaurants?cuisineId={{cuisine_id}}&size=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "restaurants"
+                  ],
+                  "query": [
+                    {
+                      "key": "name",
+                      "value": "Pizza",
+                      "disabled": true
+                    },
+                    {
+                      "key": "cuisineId",
+                      "value": "{{cuisine_id}}"
+                    },
+                    {
+                      "key": "minRating",
+                      "value": "4.0",
+                      "disabled": true
+                    },
+                    {
+                      "key": "size",
+                      "value": "20"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Search Nearby Restaurants (Geo-Spatial)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/restaurants/nearby?lat=12.9716&lng=77.5946&radius=5000&cuisineId={{cuisine_id}}&minRating=4.0&page=0&size=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "restaurants",
+                    "nearby"
+                  ],
+                  "query": [
+                    {
+                      "key": "lat",
+                      "value": "12.9716"
+                    },
+                    {
+                      "key": "lng",
+                      "value": "77.5946"
+                    },
+                    {
+                      "key": "radius",
+                      "value": "5000"
+                    },
+                    {
+                      "key": "name",
+                      "value": "Pizza",
+                      "disabled": true
+                    },
+                    {
+                      "key": "cuisineId",
+                      "value": "{{cuisine_id}}"
+                    },
+                    {
+                      "key": "minRating",
+                      "value": "4.0"
+                    },
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "20"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Public Restaurant Details",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/restaurants/{{restaurant_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "restaurants",
+                    "{{restaurant_id}}"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Browse approved restaurants with cursor pagination (`name`, `cuisineId`, `minRating`) or PostGIS `ST_DWithin` spatial radius queries (`lat`, `lng`, `radius` in metres)."
+        },
+        {
+          "name": "Public Menu Catalog",
+          "item": [
+            {
+              "name": "List Restaurant Menu Items",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/restaurants/{{restaurant_id}}/menu-items?size=20&available=true",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "restaurants",
+                    "{{restaurant_id}}",
+                    "menu-items"
+                  ],
+                  "query": [
+                    {
+                      "key": "size",
+                      "value": "20"
+                    },
+                    {
+                      "key": "available",
+                      "value": "true"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Menu Item Details",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "restaurants",
+                    "{{restaurant_id}}",
+                    "menu-items",
+                    "{{menu_item_id}}"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Browse cursor-paginated menu items (`available` filter) and dish details for a specific approved restaurant."
+        },
+        {
+          "name": "Public Reviews & Rating Summary",
+          "item": [
+            {
+              "name": "List Restaurant Customer Reviews",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/restaurants/{{restaurant_id}}/reviews?size=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "restaurants",
+                    "{{restaurant_id}}",
+                    "reviews"
+                  ],
+                  "query": [
+                    {
+                      "key": "size",
+                      "value": "20"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Restaurant Rating Summary",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/restaurants/{{restaurant_id}}/reviews/summary",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "restaurants",
+                    "{{restaurant_id}}",
+                    "reviews",
+                    "summary"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Publicly visible customer reviews (cursor-paginated) and aggregated 1–5 star rating distribution for a restaurant."
+        },
+        {
+          "name": "System Health & Info (Actuator)",
+          "item": [
+            {
+              "name": "Check Application Health",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/actuator/health",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "actuator",
+                    "health"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Application Build Info",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/actuator/info",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "actuator",
+                    "info"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Public Spring Boot Actuator probes (`/actuator/health` and `/actuator/info`) for local diagnostics and readiness checks."
+        }
+      ],
+      "description": "Unauthenticated (`noauth`) read-only endpoints for browsing approved cuisines, searching nearby restaurants via PostGIS `ST_DWithin`, inspecting menus, reading public customer reviews, and checking Spring Boot Actuator health.",
+      "auth": {
+        "type": "noauth"
+      }
+    },
+    {
+      "name": "Customer Profile",
+      "item": [
+        {
+          "name": "Get Customer Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Customer Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Eshant Sonune\",\n    \"phoneNumber\": \"+919420476359\",\n    \"email\": \"eshantsonune52@gmail.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "View and update the authenticated customer's personal profile (`name`, `phoneNumber`, `email`)."
+    },
+    {
+      "name": "Saved Delivery Addresses",
+      "item": [
+        {
+          "name": "List Saved Delivery Addresses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/me/addresses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "me",
+                "addresses"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Delivery Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"label\": \"Work\",\n    \"houseNumber\": \"Tower B, 4th Floor\",\n    \"buildingName\": \"Nagpur IT Park\",\n    \"street\": \"Gayatri Nagar Road, Pratap Nagar\",\n    \"landmark\": \"Opposite VNIT Campus Gate\",\n    \"city\": \"Nagpur\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"postalCode\": \"440022\",\n    \"latitude\": 21.1165,\n    \"longitude\": 79.0515,\n    \"isDefault\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/me/addresses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "me",
+                "addresses"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Delivery Address",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"label\": \"Home\",\n    \"houseNumber\": \"Flat 302\",\n    \"buildingName\": \"Shiv Kripa Heights\",\n    \"street\": \"West High Court Road, Dharampeth\",\n    \"landmark\": \"Near Shivaji Nagar Garden\",\n    \"city\": \"Nagpur\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"postalCode\": \"440010\",\n    \"latitude\": 21.1415,\n    \"longitude\": 79.062,\n    \"isDefault\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/me/addresses/{{address_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "me",
+                "addresses",
+                "{{address_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Delivery Address",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/me/addresses/{{address_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "me",
+                "addresses",
+                "{{address_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Default Delivery Address",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/me/addresses/{{address_id}}/default",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "me",
+                "addresses",
+                "{{address_id}}",
+                "default"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Manage saved customer delivery addresses with validated GPS coordinates (`latitude`, `longitude`) and default address selection."
+    },
+    {
+      "name": "Shopping Cart",
+      "item": [
+        {
+          "name": "Get Active Cart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/cart",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "cart"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Item to Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"menuItemId\": \"{{menu_item_id}}\",\n    \"quantity\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/cart/items",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "cart",
+                "items"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Cart Item Quantity",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"quantity\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/cart/items/{{cart_item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "cart",
+                "items",
+                "{{cart_item_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Item from Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/cart/items/{{cart_item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "cart",
+                "items",
+                "{{cart_item_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Entire Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/cart",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "cart"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Checkout Preview",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const response = pm.response.json(); \npm.collectionVariables.set(\"total_order_amount\", response.priceBreakdown.totalAmount.toFixed(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/cart/checkout-preview?addressId={{address_id}}&tipAmount={{tip_amount}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "cart",
+                "checkout-preview"
+              ],
+              "query": [
+                {
+                  "key": "addressId",
+                  "value": "{{address_id}}"
+                },
+                {
+                  "key": "tipAmount",
+                  "value": "{{tip_amount}}"
+                }
+              ]
+            },
+            "description": "Calculates real-time price breakdown and order totals (subtotal, delivery fee based on GPS distance, platform fee, taxes, tips, and item discounts) before placing an order."
+          },
+          "response": []
+        }
+      ],
+      "description": "Redis-backed single-restaurant shopping cart (`24h` rolling TTL): add/update/remove items, clear cart, and compute live road-distance checkout previews (`GET /checkout-preview`, auto-capturing `total_order_amount`)."
+    },
+    {
+      "name": "Order Placement & Tracking",
+      "item": [
+        {
+          "name": "Place Order from Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "alert(\"dsd\")"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"addressId\": \"{{address_id}}\",\n    \"paymentMethod\": \"NET_BANKING\",\n    \"tipAmount\": {{tip_amount}},\n    \"expectedTotal\": {{total_order_amount}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "orders"
+              ]
+            },
+            "description": "NOTE: Before placing order. First do Checkout Preview so that you will get final amount set into the collection variable automatically using script."
+          },
+          "response": []
+        },
+        {
+          "name": "List My Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/orders?size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Order Details & Tracking",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "orders",
+                "{{order_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Retry Failed Order Payment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/orders/{{order_id}}/retry-payment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "orders",
+                "{{order_id}}",
+                "retry-payment"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/orders/{{order_id}}/cancel",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "orders",
+                "{{order_id}}",
+                "cancel"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Order Delivery Agent Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/orders/{{order_id}}/delivery-agent",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "orders",
+                "{{order_id}}",
+                "delivery-agent"
+              ]
+            },
+            "description": "Fetches contact information and live coordinates of the delivery agent assigned to the customer's order. (CustomerOrderController#getAssignedDeliveryAgent | ROLE_CUSTOMER)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Convert the active cart into an Order (`UPI`, `CARD`, `NET_BANKING`, `WALLET`, `COD`) with `expectedTotal` price-drift protection (`409 Conflict`), track order status history & assigned courier, retry failed payments within the 10-minute window, or cancel pre-acceptance orders."
+    },
+    {
+      "name": "Online Payment Verification",
+      "item": [
+        {
+          "name": "Get Payment Status by Order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/payments/order/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "payments",
+                "order",
+                "{{order_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Online Payment Signature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gatewayOrderId\": \"order_U0OCGwbMFONDal\",\n  \"gatewayPaymentId\": \"pay_U0OCvsK0LtUdp5\",\n  \"gatewaySignature\": \"f93f6caa0348471ec198af5df91a6371e9bdbd224479d83978e082670c7c39e2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/payments/verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "payments",
+                "verify"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Inspect payment attempts for an order or cryptographically verify Razorpay checkout signatures (`gatewayOrderId`, `gatewayPaymentId`, `gatewaySignature`) to transition `AWAITING_PAYMENT` → `PLACED`."
+    },
+    {
+      "name": "Payment Gateway Webhooks",
+      "item": [
+        {
+          "name": "Local Stub Payment Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"transactionId\\\": \\\"{{transaction_id}}\\\",\\n    \\\"status\\\": \\\"SUCCESS\\\"\\n}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/webhooks/payments/stub",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "payments",
+                "stub"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Razorpay Payment Webhook Receiver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"event\": \"payment.captured\",\n    \"payload\": {\n        \"payment\": {\n            \"entity\": {\n                \"id\": \"pay_RzpTest67890\",\n                \"order_id\": \"order_TzMxrNtD2zExuj\",\n                \"status\": \"captured\"\n            }\n        }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/webhooks/payments/razorpay",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "payments",
+                "razorpay"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Public server-to-server webhook receivers (`noauth`) for simulating local `dev` payment callbacks (`/webhooks/payments/stub`) or processing HMAC-verified `X-Razorpay-Signature` events (`/webhooks/payments/razorpay`).",
+      "auth": {
+        "type": "noauth"
+      }
+    },
+    {
+      "name": "Customer Reviews",
+      "item": [
+        {
+          "name": "Submit Order Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"orderId\": \"{{order_id}}\",\n    \"rating\": 5,\n    \"comment\": \"Hot, fresh food and super fast delivery!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/reviews",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "reviews"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List My Submitted Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/reviews?size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Review by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/reviews/{{review_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "reviews",
+                "{{review_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Submitted Review",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"rating\":4,\"comment\":\"Great taste, slightly delayed delivery.\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/reviews/{{review_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "reviews",
+                "{{review_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete My Review",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customer/reviews/{{review_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customer",
+                "reviews",
+                "{{review_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Submit, update, list, or delete 1–5 star customer reviews for completed (`DELIVERED`) orders (one review per order)."
+    },
+    {
+      "name": "In-App Notifications",
+      "item": [
+        {
+          "name": "List My Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications?unread=true&size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "unread",
+                  "value": "true"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Unread Notification Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/unread-count",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "unread-count"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/{{notification_id}}/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "{{notification_id}}",
+                "read"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Notifications as Read",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/read-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "read-all"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Fetch, count unread, and mark polymorphic joined-inheritance in-app notifications as read (`OrderNotification`, `PaymentNotification`, `RestaurantApplicationNotification`, `DeliveryAgentApplicationNotification`, `VehicleApplicationNotification`, `CuisineNotification`)."
+    },
+    {
+      "name": "Presigned S3 File Uploads",
+      "item": [
+        {
+          "name": "Generate Presigned S3 Upload URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"context\":\"RESTAURANT_IMAGE\",\"applicationId\":\"{{restaurant_application_id}}\",\"contentType\":\"image/jpeg\",\"fileName\":\"storefront.jpg\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/files/upload-url",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "files",
+                "upload-url"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Generate short-lived presigned AWS S3 `PUT` URLs (`uploadUrl` + `fileUrl`) for direct client uploads (`RESTAURANT_IMAGE`, `RESTAURANT_DOCUMENT`)."
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "challenge_token",
+      "value": ""
+    },
+    {
+      "key": "session_id",
+      "value": ""
+    },
+    {
+      "key": "total_order_amount",
+      "value": "0"
+    },
+    {
+      "key": "menu_item_id",
+      "value": ""
+    },
+    {
+      "key": "cuisine_id",
+      "value": ""
+    },
+    {
+      "key": "restaurant_id",
+      "value": ""
+    },
+    {
+      "key": "address_id",
+      "value": ""
+    },
+    {
+      "key": "tip_amount",
+      "value": ""
+    },
+    {
+      "key": "tip_amount",
+      "value": ""
+    },
+    {
+      "key": "address_id",
+      "value": ""
+    },
+    {
+      "key": "order_id",
+      "value": ""
+    },
+    {
+      "key": "razorpay_signature",
+      "value": ""
+    },
+    {
+      "key": "razorpay_order_id",
+      "value": ""
+    },
+    {
+      "key": "razorpay_payment_id",
+      "value": ""
+    }
+  ]
+}

@@ -1,0 +1,1300 @@
+{
+  "info": {
+    "_postman_id": "28b35255-fff0-4799-81c2-bb41ef6e141e",
+    "name": "Admin Portal",
+    "description": "End-to-end `ROLE_ADMIN` governance collection: onboarding review allotments, restaurant/courier/vehicle application approvals & ownership expiration, cuisine & review moderation, courier suspension/reinstatement, post-delivery order refunds & payment audits, internal admin provisioning, notifications, and presigned S3 uploads. Pair with the `Admin Portal - Local Dev` environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "22557011",
+    "_collection_link": "https://go.postman.co/collection/22557011-28b35255-fff0-4799-81c2-bb41ef6e141e?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth & Session Management",
+      "item": [
+        {
+          "name": "Login & Token Refresh",
+          "item": [
+            {
+              "name": "Login with Email & Password",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json(); \npm.collectionVariables.set(\"challenge_token\", response.challengeToken); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.collectionVariables.set(\"access_token\", \"\")"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Type",
+                    "value": "mobile_app"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"email\": \"super.admin@quickbite.com\",\n    \"password\": \"Admin@123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/login",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "Super Admin login",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "X-Client-Type",
+                        "value": "web_browser"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n    \"email\": \"super.admin@quickbite.com\",\n    \"password\": \"Admin@123\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/auth/login",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "auth",
+                        "login"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "text",
+                  "header": null,
+                  "cookie": [],
+                  "body": ""
+                }
+              ]
+            },
+            {
+              "name": "Refresh Access Token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.collectionVariables.set(\"access_token\", \"\");"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Type",
+                    "value": "mobile_app"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "text"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/refresh-token",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "refresh-token"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Argon2 credential login and silent refresh token rotation (`noauth`). Requires `X-Client-Type: web_browser | mobile_app` and automatically populates `access_token`, `refresh_token`, `challenge_token`, and `session_id` via Postman test scripts.",
+          "auth": {
+            "type": "noauth"
+          }
+        },
+        {
+          "name": "Device Session Management",
+          "item": [
+            {
+              "name": "List Active Device Sessions",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/sessions",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "sessions"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Claim Challenged Session",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-Client-Type",
+                    "value": "mobile_app"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/claim-session",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "claim-session"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Revoke Device Session",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/sessions/{{session_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "sessions",
+                    "{{session_id}}"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Resolves `409 Conflict` concurrent session limit challenges using `Authorization: Bearer {{challenge_token}}` (`SCOPE_AUTH`): list active sessions (`GET /sessions`), revoke an old device (`DELETE /sessions/{sessionId}`), and claim the new session (`POST /claim-session`).",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{challenge_token}}",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Logout",
+          "item": [
+            {
+              "name": "Logout Current Device",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/logout",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "logout"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Logout All Devices",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/logout-all",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "logout-all"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Single-device (`/logout`) and global all-device (`/logout-all`) session revocation in PostgreSQL and Redis (`SCOPE_API`), clearing the `refreshToken` cookie."
+        }
+      ],
+      "description": "Authentication and session lifecycle: Argon2 self-registration, dual-audience RSA JWT issuance (`quickbite-api` 15m + `quickbite-auth` 5m), `X-Client-Type`-aware SHA-256 refresh token rotation (`HttpOnly` cookie for `web_browser`, JSON body for `mobile_app`), and Yauaa device session tracking."
+    },
+    {
+      "name": "Onboarding Review Allotments",
+      "item": [
+        {
+          "name": "List My Pending Onboarding Allotments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/allotments/pending",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "allotments",
+                "pending"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Onboarding Allotment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/allotments/{{allotment_id}}/accept",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "allotments",
+                "{{allotment_id}}",
+                "accept"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Decline Onboarding Allotment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/allotments/{{allotment_id}}/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "allotments",
+                "{{allotment_id}}",
+                "decline"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Manage assigned onboarding review task allotments (`RESTAURANT_APPLICATION`, `DELIVERY_AGENT_APPLICATION`, `VEHICLE_APPLICATION`, `CUISINE`): list pending tasks and `accept` or `decline` assignments."
+    },
+    {
+      "name": "Restaurant Application Approvals",
+      "item": [
+        {
+          "name": "List Restaurant Onboarding Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/restaurants/applications?status=SUBMITTED&size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "restaurants",
+                "applications"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "SUBMITTED"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Inspect Restaurant Application",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/restaurants/applications/{{restaurant_application_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "restaurants",
+                "applications",
+                "{{restaurant_application_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Restaurant Application",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/restaurants/applications/{{restaurant_application_id}}/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "restaurants",
+                "applications",
+                "{{restaurant_application_id}}",
+                "approve"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Restaurant Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"remarks\":\"Submitted documents are blurry or incomplete. Please re-upload clear copies.\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/restaurants/applications/{{restaurant_application_id}}/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "restaurants",
+                "applications",
+                "{{restaurant_application_id}}",
+                "reject"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "List, inspect, approve (provisioning a live `Restaurant`), or reject submitted `RestaurantApplication` records."
+    },
+    {
+      "name": "Delivery Agent Approvals",
+      "item": [
+        {
+          "name": "List Delivery Agent Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/delivery-agents/applications?size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "delivery-agents",
+                "applications"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Inspect Delivery Agent Application",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/delivery-agents/applications/{{agent_application_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "delivery-agents",
+                "applications",
+                "{{agent_application_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Delivery Agent Application",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/delivery-agents/applications/{{agent_application_id}}/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "delivery-agents",
+                "applications",
+                "{{agent_application_id}}",
+                "approve"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Delivery Agent Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"remarks\":\"Submitted documents are blurry or incomplete. Please re-upload clear copies.\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/delivery-agents/applications/{{agent_application_id}}/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "delivery-agents",
+                "applications",
+                "{{agent_application_id}}",
+                "reject"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "List, inspect, approve (activating the `DeliveryAgent` profile), or reject submitted `DeliveryAgentApplication` KYC records."
+    },
+    {
+      "name": "Vehicle Application & Ownership Admin",
+      "item": [
+        {
+          "name": "List Vehicle Onboarding Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/vehicles/applications?size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "vehicles",
+                "applications"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Inspect Vehicle Application",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/vehicles/applications/{{vehicle_application_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "vehicles",
+                "applications",
+                "{{vehicle_application_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Vehicle Application",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/vehicles/applications/{{vehicle_application_id}}/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "vehicles",
+                "applications",
+                "{{vehicle_application_id}}",
+                "approve"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Vehicle Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"remarks\":\"Submitted documents are blurry or incomplete. Please re-upload clear copies.\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/vehicles/applications/{{vehicle_application_id}}/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "vehicles",
+                "applications",
+                "{{vehicle_application_id}}",
+                "reject"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Review, approve, or reject `VehicleApplication` submissions and inspect or administratively expire active `VehicleOwnership` records (`/admin/vehicles/agents/{agentId}`, `/admin/vehicles/ownerships/{ownershipId}/expire`)."
+    },
+    {
+      "name": "Cuisine Moderation",
+      "item": [
+        {
+          "name": "List Cuisines by Moderation Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/cuisines?status=PENDING&size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Requested Cuisine",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/cuisines/{{cuisine_id}}/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines",
+                "{{cuisine_id}}",
+                "approve"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Requested Cuisine",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"remarks\":\"Duplicate cuisine category.\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/cuisines/{{cuisine_id}}/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cuisines",
+                "{{cuisine_id}}",
+                "reject"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "List (`PENDING`, `APPROVED`, `REJECTED`), approve, or reject cuisine category proposals submitted by restaurant owners."
+    },
+    {
+      "name": "Agent Compliance (Suspend & Reinstate)",
+      "item": [
+        {
+          "name": "List All Delivery Agents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/delivery-agents?size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "delivery-agents"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Suspend Delivery Agent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reason\":\"Repeated SLA violations and unverified vehicle swap.\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/delivery-agents/{{agent_id}}/suspend",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "delivery-agents",
+                "{{agent_id}}",
+                "suspend"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reinstate Suspended Delivery Agent",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/delivery-agents/{{agent_id}}/reinstate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "delivery-agents",
+                "{{agent_id}}",
+                "reinstate"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Audit onboarded delivery agents by verification status (`PENDING`, `APPROVED`, `REJECTED`, `SUSPENDED`) and suspend or reinstate courier accounts."
+    },
+    {
+      "name": "Order Refunds & Payment Audit",
+      "item": [
+        {
+          "name": "Refund Delivered Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reason\":\"Customer received damaged packaging; verified by support.\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/orders/{{order_id}}/refund",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "orders",
+                "{{order_id}}",
+                "refund"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Inspect Payment Details by Order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/payments/order/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "payments",
+                "order",
+                "{{order_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Audit gateway payment records by order (`/admin/payments/order/{orderId}`) and issue administrative post-delivery refunds on `DELIVERED` orders (`PaymentStatus` → `REFUNDED`, `OrderStatus` remains `DELIVERED`)."
+    },
+    {
+      "name": "Review Content Moderation",
+      "item": [
+        {
+          "name": "List Customer Reviews (Moderation)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/reviews?restaurantId={{restaurant_id}}&size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "restaurantId",
+                  "value": "{{restaurant_id}}"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Inspect Single Review",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/reviews/{{review_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "reviews",
+                "{{review_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Inappropriate Review",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/reviews/{{review_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "reviews",
+                "{{review_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "List (optionally filtered by `restaurantId`), inspect, and remove policy-violating customer reviews across the platform."
+    },
+    {
+      "name": "User & Admin Management",
+      "item": [
+        {
+          "name": "Create Admin User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Operations Admin\",\"email\":\"ops.admin@quickbite.com\",\"phoneNumber\":\"+919876543219\",\"password\":\"AdminPassword@123\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/users/admins",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "admins"
+              ]
+            },
+            "description": "Creates a new internal system administrator (`ROLE_ADMIN`) account with Argon2 password hashing. (AdminUserController#createAdmin | ROLE_ADMIN)"
+          },
+          "response": []
+        },
+        {
+          "name": "List System Admins",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/users/admins",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "admins"
+              ]
+            },
+            "description": "Retrieves a list of all active administrator accounts in the platform. (AdminUserController#listAdmins | ROLE_ADMIN)"
+          },
+          "response": []
+        }
+      ],
+      "description": "List internal system administrators and provision new `ROLE_ADMIN` staff accounts (`POST /api/v1/admin/users/admins`)."
+    },
+    {
+      "name": "In-App Notifications",
+      "item": [
+        {
+          "name": "List My Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications?unread=true&size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "unread",
+                  "value": "true"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Unread Notification Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/unread-count",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "unread-count"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/{{notification_id}}/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "{{notification_id}}",
+                "read"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Notifications as Read",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/read-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "read-all"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Fetch, count unread, and mark polymorphic joined-inheritance in-app notifications as read (`OrderNotification`, `PaymentNotification`, `RestaurantApplicationNotification`, `DeliveryAgentApplicationNotification`, `VehicleApplicationNotification`, `CuisineNotification`)."
+    },
+    {
+      "name": "Presigned S3 File Uploads",
+      "item": [
+        {
+          "name": "Generate Presigned S3 Upload URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"context\":\"RESTAURANT_IMAGE\",\"applicationId\":\"{{restaurant_application_id}}\",\"contentType\":\"image/jpeg\",\"fileName\":\"storefront.jpg\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/files/upload-url",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "files",
+                "upload-url"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Generate short-lived presigned AWS S3 `PUT` URLs (`uploadUrl` + `fileUrl`) for direct client uploads (`RESTAURANT_IMAGE`, `RESTAURANT_DOCUMENT`)."
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "challenge_token",
+      "value": ""
+    },
+    {
+      "key": "session_id",
+      "value": ""
+    }
+  ]
+}
