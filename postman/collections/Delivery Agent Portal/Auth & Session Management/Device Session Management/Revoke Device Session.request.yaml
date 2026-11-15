@@ -1,4 +1,7 @@
 $kind: http-request
 url: "{{base_url}}/api/v1/auth/sessions/{{session_id}}"
 method: DELETE
+body:
+  type: json
+  content: ""
 order: 3000

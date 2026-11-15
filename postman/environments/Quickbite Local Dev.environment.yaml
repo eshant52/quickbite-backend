@@ -1,0 +1,5 @@
+name: Quickbite Local Dev
+values:
+  - key: base_url
+    value: 'http://localhost:8001'
+color: 120

@@ -2,6 +2,7 @@ package com.quickbite.quickbite.order.controller;
 
 import com.quickbite.quickbite.auth.util.AuthenticatedSessionResolver;
 import com.quickbite.quickbite.common.dto.CursorPage;
+import com.quickbite.quickbite.order.dto.AssignedDeliveryAgentResponse;
 import com.quickbite.quickbite.order.dto.OrderResponse;
 import com.quickbite.quickbite.order.dto.OrderSummaryResponse;
 import com.quickbite.quickbite.order.dto.PlaceOrderRequest;
@@ -87,7 +88,7 @@ public class CustomerOrderController {
     }
 
     @GetMapping("/{orderId}/delivery-agent")
-    public ResponseEntity<com.quickbite.quickbite.order.dto.AssignedDeliveryAgentResponse> getAssignedDeliveryAgent(
+    public ResponseEntity<AssignedDeliveryAgentResponse> getAssignedDeliveryAgent(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID orderId) {
         UUID customerId = authenticatedSessionResolver.userIdFromJwt(jwt);

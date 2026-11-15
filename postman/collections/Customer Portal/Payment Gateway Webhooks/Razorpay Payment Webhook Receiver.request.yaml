@@ -5,5 +5,17 @@ headers:
   Content-Type: application/json
 body:
   type: text
-  content: '{"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_RzpTest67890","order_id":"order_RzpTest12345","status":"captured"}}}}'
+  content: |-
+    {
+        "event": "payment.captured",
+        "payload": {
+            "payment": {
+                "entity": {
+                    "id": "pay_RzpTest67890",
+                    "order_id": "order_TzMxrNtD2zExuj",
+                    "status": "captured"
+                }
+            }
+        }
+    }
 order: 2000

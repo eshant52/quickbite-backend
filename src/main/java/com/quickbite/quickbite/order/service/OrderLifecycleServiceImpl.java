@@ -128,10 +128,12 @@ public class OrderLifecycleServiceImpl implements OrderLifecycleService {
     @Override
     @Transactional
     public void abandonOrder(Order order, String reason) {
-        // Idempotency guard: skip if already in a terminal state.
-        // Prevents double-abandonment from concurrent placeOrder calls or scheduler overlaps.
-        if (isTerminal(order.getCurrentStatus())) {
-            log.info("Order {} already in terminal state {}, skipping abandonment.",
+        // Guard: Only orders awaiting payment or in payment failed state can be abandoned.
+        // If the order was already paid (PLACED, ACCEPTED, PREPARING, OUT_FOR_DELIVERY, etc.)
+        // or is already terminal, skip abandonment.
+        if (order.getCurrentStatus() != OrderStatus.AWAITING_PAYMENT
+                && order.getCurrentStatus() != OrderStatus.PAYMENT_FAILED) {
+            log.info("Order {} is in status {}, skipping abandonment.",
                     order.getId(), order.getCurrentStatus());
             return;
         }

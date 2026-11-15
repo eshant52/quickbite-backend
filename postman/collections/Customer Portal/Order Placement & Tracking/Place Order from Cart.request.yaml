@@ -1,4 +1,5 @@
 $kind: http-request
+description: "NOTE: Before placing order. First do Checkout Preview so that you will get final amount set into the collection variable automatically using script."
 url: "{{base_url}}/api/v1/customer/orders"
 method: POST
 headers:
@@ -8,8 +9,12 @@ body:
   content: |-
     {
         "addressId": "{{address_id}}",
-        "paymentMethod": "UPI",
+        "paymentMethod": "NET_BANKING",
         "tipAmount": {{tip_amount}},
         "expectedTotal": {{total_order_amount}}
     }
+scripts:
+  - type: afterResponse
+    code: alert("dsd")
+    language: text/javascript
 order: 1000

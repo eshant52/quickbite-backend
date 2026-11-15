@@ -9,7 +9,7 @@ request:
     type: json
     content: |-
       {
-          "email": "rakesh.agarwal@haldiramsnagpur.com",
+          "email": "aarav.sharma@example.com",
           "password": "Password@123"
       }
 response:

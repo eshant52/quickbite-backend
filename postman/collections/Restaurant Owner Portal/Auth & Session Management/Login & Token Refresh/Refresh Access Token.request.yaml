@@ -3,7 +3,7 @@ url: "{{base_url}}/api/v1/auth/refresh-token"
 method: POST
 headers:
   Content-Type: application/json
-  X-Client-Type: web_browser
+  X-Client-Type: mobile_app
 body:
   type: text
   content: "{}"
@@ -16,6 +16,15 @@ scripts:
       pm.collectionVariables.set("session_id", response.sessionId);
     language: text/javascript
   - type: beforeRequest
-    code: pm.collectionVariables.set("access_token", "");
+    code: |-
+      pm.collectionVariables.set("access_token", "");
+      const refreshToken = pm.collectionVariables.get("refresh_token");
+
+      if (refreshToken) {
+          console.log(refreshToken)
+          pm.request.body.raw = JSON.stringify({
+             "refreshToken": refreshToken 
+          });
+      }
     language: text/javascript
 order: 2000

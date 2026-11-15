@@ -9,8 +9,8 @@ request:
     type: json
     content: |-
       {
-          "email": "rakesh.agarwal@haldiramsnagpur.com",
-          "password": "Password@123"
+          "email": "eshantsonune52@gmail.com",
+          "password": "Pass@123"
       }
 response:
   statusCode: 200

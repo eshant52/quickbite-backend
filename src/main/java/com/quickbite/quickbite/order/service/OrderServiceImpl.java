@@ -4,10 +4,7 @@ import com.quickbite.quickbite.common.config.property.OrderProperties;
 import com.quickbite.quickbite.common.dto.CursorPage;
 import com.quickbite.quickbite.common.exception.BadRequestException;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
-import com.quickbite.quickbite.order.dto.AssignedDeliveryAgentResponse;
-import com.quickbite.quickbite.order.dto.OrderResponse;
-import com.quickbite.quickbite.order.dto.OrderSummaryResponse;
-import com.quickbite.quickbite.order.dto.PlaceOrderRequest;
+import com.quickbite.quickbite.order.dto.*;
 import com.quickbite.quickbite.order.exception.OrderNotFoundException;
 import com.quickbite.quickbite.order.model.Order;
 import com.quickbite.quickbite.order.model.OrderStatus;
@@ -254,11 +251,14 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
 
     @Override
     @Transactional(readOnly = true)
-    public com.quickbite.quickbite.order.dto.RestaurantEarningsResponse getEarnings(UUID restaurantId, UUID ownerId) {
+    public RestaurantEarningsResponse getEarnings(UUID restaurantId, UUID ownerId) {
         User owner = loadUser(ownerId);
         Restaurant restaurant = loadOwnedRestaurant(restaurantId, owner);
 
-        List<Object[]> rows = orderRepository.aggregateDeliveredEarningsByRestaurant(restaurant.getId());
+        List<Object[]> rows = orderRepository.aggregateDeliveredEarningsByRestaurant(
+                restaurant.getId(),
+                OrderStatus.DELIVERED
+        );
         long count = 0L;
         BigDecimal gross = BigDecimal.ZERO;
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -268,13 +268,13 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
         if (rows != null && !rows.isEmpty() && rows.getFirst() != null) {
             Object[] row = rows.getFirst();
             count = row[0] != null ? ((Number) row[0]).longValue() : 0L;
-            gross = row[1] != null ? (BigDecimal) row[1] : BigDecimal.ZERO;
-            subtotal = row[2] != null ? (BigDecimal) row[2] : BigDecimal.ZERO;
-            platformFees = row[3] != null ? (BigDecimal) row[3] : BigDecimal.ZERO;
-            taxes = row[4] != null ? (BigDecimal) row[4] : BigDecimal.ZERO;
+            gross = toBigDecimal(row[1]);
+            subtotal = toBigDecimal(row[2]);
+            platformFees = toBigDecimal(row[3]);
+            taxes = toBigDecimal(row[4]);
         }
 
-        return new com.quickbite.quickbite.order.dto.RestaurantEarningsResponse(
+        return new RestaurantEarningsResponse(
                 restaurant.getId(),
                 count,
                 gross,
@@ -344,5 +344,18 @@ public class OrderServiceImpl implements CustomerOrderService, RestaurantOrderSe
         Order order = orderRepository.findByIdAndRestaurantId(orderId, restaurant.getId())
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         return new LoadedRestaurantOrder(order, owner);
+    }
+
+    private static BigDecimal toBigDecimal(Object value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        if (value instanceof BigDecimal bd) {
+            return bd;
+        }
+        if (value instanceof Number) {
+            return new BigDecimal(value.toString());
+        }
+        return BigDecimal.ZERO;
     }
 }

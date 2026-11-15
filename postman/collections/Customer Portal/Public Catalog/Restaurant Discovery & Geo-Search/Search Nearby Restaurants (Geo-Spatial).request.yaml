@@ -1,13 +1,37 @@
 $kind: http-request
-url: "{{base_url}}/api/v1/restaurants/nearby?lat=12.9716&lng=77.5946&radius=5000&name=Pizza&cuisineId={{cuisine_id}}&minRating=4.0&page=0&size=20"
+url: "{{base_url}}/api/v1/restaurants/nearby?lat=12.9716&lng=77.5946&radius=5000&cuisineId={{cuisine_id}}&minRating=4.0&page=0&size=20"
 method: GET
 queryParams:
-  lat: "12.9716"
-  lng: "77.5946"
-  radius: "5000"
-  name: Pizza
-  cuisineId: "{{cuisine_id}}"
-  minRating: "4.0"
-  page: "0"
-  size: "20"
+  - key: lat
+    value: "12.9716"
+    disabled: false
+    description: ""
+  - key: lng
+    value: "77.5946"
+    disabled: false
+    description: ""
+  - key: radius
+    value: "5000"
+    disabled: false
+    description: ""
+  - key: name
+    value: Pizza
+    disabled: true
+    description: ""
+  - key: cuisineId
+    value: "{{cuisine_id}}"
+    disabled: false
+    description: ""
+  - key: minRating
+    value: "4.0"
+    disabled: false
+    description: ""
+  - key: page
+    value: "0"
+    disabled: false
+    description: ""
+  - key: size
+    value: "20"
+    disabled: false
+    description: ""
 order: 2000

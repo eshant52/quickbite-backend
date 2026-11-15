@@ -1,9 +1,21 @@
 $kind: http-request
-url: "{{base_url}}/api/v1/restaurants?name=Pizza&cuisineId={{cuisine_id}}&minRating=4.0&size=20"
+url: "{{base_url}}/api/v1/restaurants?cuisineId={{cuisine_id}}&size=20"
 method: GET
 queryParams:
-  name: Pizza
-  cuisineId: "{{cuisine_id}}"
-  minRating: "4.0"
-  size: "20"
+  - key: name
+    value: Pizza
+    disabled: true
+    description: ""
+  - key: cuisineId
+    value: "{{cuisine_id}}"
+    disabled: false
+    description: ""
+  - key: minRating
+    value: "4.0"
+    disabled: true
+    description: ""
+  - key: size
+    value: "20"
+    disabled: false
+    description: ""
 order: 1000

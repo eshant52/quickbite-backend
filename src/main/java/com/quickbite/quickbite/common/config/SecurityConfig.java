@@ -52,7 +52,9 @@ public class SecurityConfig {
                                 "/api/v1/webhooks/**",
                                 "/actuator/health",
                                 "/actuator/health/**",
-                                "/actuator/info"
+                                "/actuator/info",
+                                "/checkout.html",
+                                "/favicon.ico"
                         ).permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,

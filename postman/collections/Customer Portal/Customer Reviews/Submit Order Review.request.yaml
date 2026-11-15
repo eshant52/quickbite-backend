@@ -5,5 +5,10 @@ headers:
   Content-Type: application/json
 body:
   type: text
-  content: '{"orderId":"{{order_id}}","rating":5,"comment":"Hot, fresh food and super fast delivery!"}'
+  content: |-
+    {
+        "orderId": "{{order_id}}",
+        "rating": 5,
+        "comment": "Hot, fresh food and super fast delivery!"
+    }
 order: 1000

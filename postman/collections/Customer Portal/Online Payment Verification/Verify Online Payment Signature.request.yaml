@@ -7,8 +7,12 @@ body:
   type: json
   content: |-
     {
-        "gatewayOrderId": "order_To9mnWuLC878kM",
-        "gatewayPaymentId": "pay_RzpTest67890",
-        "gatewaySignature": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      "gatewayOrderId": "order_U0OCGwbMFONDal",
+      "gatewayPaymentId": "pay_U0OCvsK0LtUdp5",
+      "gatewaySignature": "f93f6caa0348471ec198af5df91a6371e9bdbd224479d83978e082670c7c39e2"
     }
+scripts:
+  - type: beforeRequest
+    code: ""
+    language: text/javascript
 order: 2000

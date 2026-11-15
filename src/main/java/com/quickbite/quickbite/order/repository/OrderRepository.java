@@ -169,7 +169,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
                    COALESCE(SUM(o.taxAmount), 0)
             FROM Order o
             WHERE o.restaurant.id = :restaurantId
-              AND o.currentStatus = com.quickbite.quickbite.order.model.OrderStatus.DELIVERED
+              AND o.currentStatus = :status
             """)
-    List<Object[]> aggregateDeliveredEarningsByRestaurant(@Param("restaurantId") UUID restaurantId);
+    List<Object[]> aggregateDeliveredEarningsByRestaurant(
+            @Param("restaurantId") UUID restaurantId,
+            @Param("status") OrderStatus status
+    );
 }

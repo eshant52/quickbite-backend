@@ -35,12 +35,12 @@ QuickBite is an enterprise-grade, cloud-native food ordering, restaurant managem
   - [5. Postman Workspace Setup (Local View)](#5-postman-workspace-setup-local-view)
 - [🎬 End-to-End Demo Guide: Placing an Order & Delivery Offer Tracking](#-end-to-end-demo-guide-placing-an-order--delivery-offer-tracking)
   - [Step 1: Start the Interactive Delivery Agent Tracker CLI](#step-1-start-the-interactive-delivery-agent-tracker-cli)
-  - [Step 2: Authenticate in Postman / cURL](#step-2-authenticate-in-postman--curl)
-  - [Step 3: Add Menu Item to Cart (Customer)](#step-3-add-menu-item-to-cart-customer)
-  - [Step 4: Place Order via Cash on Delivery (Customer)](#step-4-place-order-via-cash-on-delivery-customer)
-  - [Step 5: Restaurant Owner Accepts Order (Triggers Dispatch)](#step-5-restaurant-owner-accepts-order-triggers-dispatch)
-  - [Step 6: Accept Offer in the Python CLI Tracker](#step-6-accept-offer-in-the-python-cli-tracker)
-  - [Step 7: Complete Kitchen Prep & Delivery (Optional)](#step-7-complete-kitchen-prep--delivery-optional)
+  - [Step 2: Authenticate in Postman (Customer & Restaurant Owner)](#step-2-authenticate-in-postman-customer--restaurant-owner)
+  - [Step 3: Add Menu Item to Cart & Preview Checkout (Customer)](#step-3-add-menu-item-to-cart--preview-checkout-customer)
+  - [Step 4: Place Order — Cash on Delivery (COD) or Online Payment (Razorpay)](#step-4-place-order--cash-on-delivery-cod-or-online-payment-razorpay)
+  - [Step 5: Restaurant Owner Accepts & Prepares Order (Triggers Dispatch)](#step-5-restaurant-owner-accepts--prepares-order-triggers-dispatch)
+  - [Step 6: Accept Dispatch Offer in Python CLI & Mark Order Ready](#step-6-accept-dispatch-offer-in-python-cli--mark-order-ready)
+  - [Step 7: Delivery Agent Login, Session Challenge & Order Delivery](#step-7-delivery-agent-login-session-challenge--order-delivery)
 - [Documentation Directory](#documentation-directory)
 - [Project Status & Milestone Checklist](#project-status--milestone-checklist)
 
@@ -297,20 +297,17 @@ Leave this terminal running — it will alert you as soon as an offer is dispatc
 
 ---
 
-### Step 2: Authenticate in Postman / cURL
+### Step 2: Authenticate in Postman (Customer & Restaurant Owner)
 
-Open Postman (or use cURL in a second terminal) with `Content-Type: application/json` and `X-Client-Type: mobile_app`.
+First, log in as the **Customer** (`Customer Portal` collection) and **Restaurant Owner** (`Restaurant Owner Portal` collection) in Postman via `Auth & Session Management → Login & Token Refresh → Login with Email & Password`.
 
-*(Tip: If you linked the Postman workspace as shown in [Step 5](#5-postman-workspace-setup-local-view), you can run **Login with Email & Password** directly from the **Customer Portal** and **Restaurant Owner Portal** collections — tokens and sessions are captured automatically into collection variables!)*
+> [!NOTE]
+> * **Automatic Token & Session Capture**: When you call **Login with Email & Password** or **Refresh Access Token**, the Postman post-response script automatically sets `access_token`, `refresh_token`, `challenge_token`, and `session_id` in your **collection variables**.
+> * **15-Minute Access Token Expiry**: `accessToken` expires in **15 minutes**. Whenever it expires, simply call the **Refresh Access Token** (`POST /api/v1/auth/refresh-token`) request provided in Postman to rotate and refresh your token automatically.
+> * **Login & Session Challenge Screenshots**: Customer and Restaurant Owner login screenshots are omitted here for brevity — the complete login and **`409 Conflict` (`session_limit_exceeded`) device session challenge resolution flow** is shown step-by-step with screenshots in **[Step 7](#step-7-delivery-agent-login-session-challenge--order-delivery)** when logging in as the Delivery Agent.
 
-#### 2.1 Customer Login
-* **Method**: `POST`
-* **URL**: `http://localhost:8080/api/v1/auth/login`
-* **Headers**:
-  ```http
-  Content-Type: application/json
-  X-Client-Type: mobile_app
-  ```
+#### 2.1 Customer Login (`Customer Portal`)
+* **Endpoint**: `POST http://localhost:8080/api/v1/auth/login`
 * **Body**:
   ```json
   {
@@ -318,16 +315,9 @@ Open Postman (or use cURL in a second terminal) with `Content-Type: application/
     "password": "Password@123"
   }
   ```
-* **Action**: Copy the `accessToken` from the response JSON and save it as your `CUSTOMER_TOKEN`.
 
-#### 2.2 Restaurant Owner Login
-* **Method**: `POST`
-* **URL**: `http://localhost:8080/api/v1/auth/login`
-* **Headers**:
-  ```http
-  Content-Type: application/json
-  X-Client-Type: mobile_app
-  ```
+#### 2.2 Restaurant Owner Login (`Restaurant Owner Portal`)
+* **Endpoint**: `POST http://localhost:8080/api/v1/auth/login`
 * **Body**:
   ```json
   {
@@ -335,177 +325,159 @@ Open Postman (or use cURL in a second terminal) with `Content-Type: application/
     "password": "Password@123"
   }
   ```
-* **Action**: Copy the `accessToken` from the response JSON and save it as your `OWNER_TOKEN`.
 
 ---
 
-### Step 3: Add Menu Item to Cart (Customer)
+### Step 3: Add Menu Item to Cart & Preview Checkout (Customer)
 
-Add *Shahi Gulab Jamun (2 Pcs)* from *Haldiram's Planet Food* to the customer's cart.
+#### 3.1 Add Items to Cart
+In the **Customer Portal** collection, open `Shopping Cart → Add Item to Cart` (`POST /api/v1/customer/cart/items`) and add items to your cart as a customer:
 
-* **Method**: `POST`
-* **URL**: `http://localhost:8080/api/v1/customer/cart/items`
-* **Headers**:
-  ```http
-  Content-Type: application/json
-  Authorization: Bearer <CUSTOMER_TOKEN>
-  ```
-* **Body**:
-  ```json
-  {
-    "menuItemId": "01a12644-4cf3-79a9-9908-278c7018020f",
-    "quantity": 2
-  }
-  ```
-* **Expected Response (`200 OK`)**:
-  ```json
-  {
-    "restaurantId": "01a12520-fb45-781c-a3e5-27d7ad889ea3",
-    "restaurantName": "Haldiram's Planet Food - Dharampeth",
-    "items": [
-      {
-        "menuItemId": "01a12644-4cf3-79a9-9908-278c7018020f",
-        "menuItemName": "Shahi Gulab Jamun (2 Pcs)",
-        "quantity": 2,
-        "unitPrice": 75.00,
-        "subTotal": 150.00
-      }
-    ]
-  }
-  ```
+![1. Add Items to Cart](./docs/images/order-placement-demo-guide/1-add-to-cart.jpeg)
+
+#### 3.2 Get Checkout Preview (Auto-Sets `total_order_amount`)
+Call `Shopping Cart → Get Checkout Preview` (`GET /api/v1/customer/cart/checkout-preview?addressId={{address_id}}&tipAmount={{tip_amount}}`). The Postman test script automatically saves `priceBreakdown.totalAmount` into the `total_order_amount` collection variable so you don't need to copy-paste the final price manually:
+
+![2. Checkout Preview](./docs/images/order-placement-demo-guide/2-checkout-preview.jpeg)
 
 ---
 
-### Step 4: Place Order via Cash on Delivery (Customer)
-
-Place the order using the customer's saved address and `COD` payment method. For Cash on Delivery, QuickBite immediately confirms payment and transitions the order directly to `PLACED`.
-
-* **Method**: `POST`
-* **URL**: `http://localhost:8080/api/v1/customer/orders`
-* **Headers**:
-  ```http
-  Content-Type: application/json
-  Authorization: Bearer <CUSTOMER_TOKEN>
-  ```
-* **Body**:
-  ```json
-  {
-    "addressId": "01a12aaf-4f26-7df3-a6f2-45ffec06dbfb",
-    "paymentMethod": "COD",
-    "tipAmount": 20.00
-  }
-  ```
-* **Expected Response (`201 Created`)**:
-  ```json
-  {
-    "orderId": "0195f000-xxxx-7000-xxxx-xxxxxxxxxxxx",
-    "status": "PLACED",
-    "type": "COD",
-    "totalAmount": 222.50
-  }
-  ```
-* **Action**: Copy the `orderId` value (e.g., `0195f000-...`). The 2-minute restaurant acceptance deadline countdown is now ticking in Redisson!
-
----
-
-### Step 5: Restaurant Owner Accepts Order (Triggers Dispatch)
-
-The restaurant owner accepts the order within the 2-minute deadline.
-
-* **Method**: `POST`
-* **URL**: `http://localhost:8080/api/v1/restaurant-owner/orders/<orderId>/accept?restaurantId=01a12520-fb45-781c-a3e5-27d7ad889ea3`
-* **Headers**:
-  ```http
-  Authorization: Bearer <OWNER_TOKEN>
-  ```
-* **Expected Response (`200 OK`)**:
-  ```json
-  {
-    "id": "<orderId>",
-    "currentStatus": "ACCEPTED",
-    "restaurantId": "01a12520-fb45-781c-a3e5-27d7ad889ea3"
-  }
-  ```
+### Step 4: Place Order — Cash on Delivery (COD) or Online Payment (Razorpay)
 
 > [!IMPORTANT]
-> **Dispatch Event Choreography**: Accepting the order publishes an `OrderAcceptedEvent` to Kafka. QuickBite's dispatch engine immediately calculates nearby candidate drivers in Redis GEO (Round 1: 3 km radius) and generates an offer in PostgreSQL with a 45-second expiration timer.
+> Make sure `address_id` and `tip_amount` are configured in your **Customer Portal** collection/environment variables before placing an order.
+
+You can place an order using either **Option A (Cash on Delivery)** for instant placement, or **Option B (Online Payment via Razorpay)** to test the full gateway checkout and signature verification lifecycle.
+
+#### Option A: Place Cash on Delivery (`COD`) Order
+Open `Order Placement & Tracking → Place Order from Cart` (`POST /api/v1/customer/orders`) with `"paymentMethod": "COD"`. For COD, the order immediately transitions to `PLACED`:
+
+![3. Place COD Order](./docs/images/order-placement-demo-guide/3-place-cod-order.jpeg)
 
 ---
 
-### Step 6: Accept Offer in the Python CLI Tracker
+#### Option B: Place Online Order (`UPI` / `NET_BANKING`) & Complete Razorpay Checkout
 
-Switch back to the terminal running [`track_delivery_offers.py`](./scripts/track_delivery_offers.py). Within 1–2 seconds, an audible terminal bell will ring and the offer card will render:
+1. **Place Online Order (`UPI` or `NET_BANKING`)**:
+   In `Place Order from Cart`, change `paymentMethod` from `COD` to `UPI` or `NET_BANKING` and send the request. The order is created in `AWAITING_PAYMENT` status and returns a Razorpay gateway order payload:
 
-```text
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 ACTIVE DELIVERY OFFER  (Round #1, Radius 3.0 km) | Queue Empty (0 waiting)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  👤 Delivery Agent : Aarav Sharma (aarav.sharma@example.com | +919876543210)
-  🛵 Vehicle / ID   : MOTORCYCLE (MH-31-AB-1234)  [agentId: 0195e...]
-  ────────────────────────────────────────────────────────────────────────────────────
-  📦 Order ID       : 0195f000-...  [Status: ACCEPTED]
-  🧑 Customer       : Eshant Sonune (+919876543210)  |  Order Bill: ₹222.50
-  🍽️  Order Items    :
-                      • 2 × Shahi Gulab Jamun (2 Pcs) (₹150.00)
-  ────────────────────────────────────────────────────────────────────────────────────
-  🏪 Restaurant     : Haldiram's Planet Food - Dharampeth
-                      Dharampeth, Nagpur, Maharashtra
-  📍 Drop Address   : Dharampeth Home Address, Nagpur
-  🛣️  Distance / ETA : 1.85 km  |  ~320 sec (5m 20s)
-  💰 Agent Payout   : ₹48.50 (Guaranteed: ₹28.50 + Tip: ₹20.00)
-  ⏳ Expires In     : 43 seconds (at 18:25:10)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👉 Action for Aarav Sharma [1=Accept, 2=Reject, 3=Skip, r=Refresh, s=Agents, q=Quit]: 
-```
+   ![3.1 Place Online Order](./docs/images/order-placement-demo-guide/3.1-place-online-order.jpeg)
 
-#### Choose Your Action:
-* **Press `1` + Enter &rarr; Accept Offer**:
-  Assigns the order to Aarav Sharma (`POST /api/v1/delivery-agent/orders/{orderId}/accept`).
-  Terminal prints: `✅ ACCEPTED! Aarav Sharma is now assigned to Order <orderId>.`
-* **Press `2` + Enter &rarr; Reject Offer**:
-  Declines the offer (`POST /api/v1/delivery-agent/orders/{orderId}/reject`). QuickBite automatically escalates and offers the order to the next closest driver (e.g. Vikram Singh or Pooja Patel)!
-* **Press `3` + Enter &rarr; Skip**:
-  Leaves the offer untouched in `PENDING` state to let its natural 45-second timer expire.
+2. **Copy Placed Order Response JSON**:
+   Copy the entire JSON response returned from placing the online order:
+
+   ![3.2 Copy Placed Order JSON Data](./docs/images/order-placement-demo-guide/3.2-copy-placed-order-json-data.jpeg)
+
+3. **Paste JSON into Local Checkout Page**:
+   Open `http://localhost:8080/checkout.html` in your browser, paste the copied JSON response data, and click **Next** to review the payment details:
+
+   ![3.3 Paste Placed Order JSON Data](./docs/images/order-placement-demo-guide/3.3-paste-placed-order-json-data.jpeg)
+
+4. **Preview Payment Details & Launch Razorpay**:
+   Review the parsed order and payment breakdown on the preview screen, then click **Pay Now with Razorpay**:
+
+   ![3.4 Payment Preview](./docs/images/order-placement-demo-guide/3.4-payment-preview.jpeg)
+
+5. **Select Netbanking in Razorpay Checkout Popup**:
+   In the Razorpay checkout popup, enter the required contact information, select **Netbanking**, and choose any bank for the demo *(note: UPI will not work in the local demo popup)*:
+
+   ![3.5 Razorpay Checkout Modal](./docs/images/order-placement-demo-guide/3.5-razorpay.jpeg)
+
+6. **Simulate Payment Success**:
+   On the Razorpay mock bank verification page, click the **Success** button:
+
+   ![3.6 Razorpay Success / Failure Prompt](./docs/images/order-placement-demo-guide/3.6-razorpay-success-failure.jpeg)
+
+7. **Razorpay Payment Transition**:
+   Wait a moment while Razorpay completes the payment transition callback:
+
+   ![3.7 Razorpay Payment Transition](./docs/images/order-placement-demo-guide/3.7-razorpay-payment-transition.jpeg)
+
+8. **Copy Online Payment Result JSON**:
+   Once payment succeeds, `checkout.html` displays the cryptographic payment result (`gatewayOrderId`, `gatewayPaymentId`, `gatewaySignature`). Copy the JSON data:
+
+   ![3.8 Online Payment Result](./docs/images/order-placement-demo-guide/3.8-online-payment-result.jpeg)
+
+9. **Verify Online Payment in Postman**:
+   Open `Online Payment Verification → Verify Online Payment Signature` (`POST /api/v1/customer/payments/verify`) in Postman, paste the payment result JSON into the request body, and send it to verify the payment and transition the order to `PLACED`:
+
+   ![3.9 Verify Online Payment in Postman](./docs/images/order-placement-demo-guide/3.9-verify-online-payment.jpeg)
 
 ---
 
-### Step 7: Complete Kitchen Prep & Delivery (Optional)
+### Step 5: Restaurant Owner Accepts & Prepares Order (Triggers Dispatch)
 
-Once the agent has accepted, you can step through the remaining kitchen and delivery states:
+#### 5.1 Restaurant Accepts Incoming Order
+Once the order is in `PLACED` status (either via `COD` or verified online payment), switch to the **Restaurant Owner Portal** collection (`Kitchen Order Fulfillment → Accept Incoming Order`, `POST /api/v1/restaurant-owner/orders/{{order_id}}/accept?restaurantId={{restaurant_id}}`) and accept the incoming order within the 2-minute acceptance deadline. This transitions the order to `ACCEPTED` and triggers asynchronous radial delivery dispatch:
 
-```mermaid
-flowchart LR
-    A["PLACED"] -->|Restaurant Accept| B["ACCEPTED"]
-    B -->|Agent Accept| C["ASSIGNED"]
-    C -->|mark-preparing| D["PREPARING"]
-    D -->|mark-ready| E["READY_FOR_PICKUP"]
-    E -->|agent pickup| F["OUT_FOR_DELIVERY"]
-    F -->|agent delivered| G["DELIVERED"]
-```
+![4. Restaurant Accepts Incoming Order](./docs/images/order-placement-demo-guide/4-restaurant-accept-incoming-order.jpeg)
 
-1. **Kitchen Starts Cooking (`ACCEPTED` &rarr; `PREPARING`)**:
-   ```bash
-   curl -X POST "http://localhost:8080/api/v1/restaurant-owner/orders/<orderId>/mark-preparing?restaurantId=01a12520-fb45-781c-a3e5-27d7ad889ea3" \
-     -H "Authorization: Bearer <OWNER_TOKEN>"
-   ```
-2. **Food Ready for Pickup (`PREPARING` &rarr; `READY_FOR_PICKUP`)**:
-   ```bash
-   curl -X POST "http://localhost:8080/api/v1/restaurant-owner/orders/<orderId>/mark-ready?restaurantId=01a12520-fb45-781c-a3e5-27d7ad889ea3" \
-     -H "Authorization: Bearer <OWNER_TOKEN>"
-   ```
-3. **Driver Picks Up Food (`READY_FOR_PICKUP` &rarr; `OUT_FOR_DELIVERY`)**:
-   *Log in as the assigned driver (e.g. `aarav.sharma@example.com` / `Password@123`) to get `AGENT_TOKEN`:*
-   ```bash
-   curl -X POST "http://localhost:8080/api/v1/delivery-agent/orders/<orderId>/pickup" \
-     -H "Authorization: Bearer <AGENT_TOKEN>"
-   ```
-4. **Driver Confirms Delivery (`OUT_FOR_DELIVERY` &rarr; `DELIVERED`)**:
-   ```bash
-   curl -X POST "http://localhost:8080/api/v1/delivery-agent/orders/<orderId>/delivered" \
-     -H "Authorization: Bearer <AGENT_TOKEN>"
-   ```
+#### 5.2 Restaurant Marks Order as Preparing
+Next, call `Kitchen Order Fulfillment → Mark Order as Preparing` (`POST /api/v1/restaurant-owner/orders/{{order_id}}/mark-preparing?restaurantId={{restaurant_id}}`) to transition the order to `PREPARING`:
 
-The order is now in its terminal state: `DELIVERED`! 🎉
+![5. Restaurant Marks Order Preparing](./docs/images/order-placement-demo-guide/5-restaurant-preparing-order.jpeg)
+
+---
+
+### Step 6: Accept Dispatch Offer in Python CLI & Mark Order Ready
+
+#### 6.1 Inspect Incoming Offer in the Delivery Tracker CLI
+Switch to the terminal running [`track_delivery_offers.py`](./scripts/track_delivery_offers.py). The live delivery offer card appears automatically for the nearest logged-in delivery agent with full allotment, restaurant pickup, customer drop-off, distance, and payout details:
+
+![6. Incoming Offer in Delivery Tracker Script](./docs/images/order-placement-demo-guide/6-incoming-offer-delivery-script.jpeg)
+
+#### 6.2 Accept the Offer & Copy Delivery Agent Email
+Enter `1` in the terminal prompt to accept the incoming delivery offer, and **copy the email address** of the assigned delivery agent shown in the terminal output:
+
+![7. Accept Incoming Offer in Delivery Tracker Script](./docs/images/order-placement-demo-guide/7-accept-incoming-offer-delivery-script.jpeg)
+
+#### 6.3 Restaurant Marks Order Ready for Pickup
+Back in the **Restaurant Owner Portal** collection, call `Kitchen Order Fulfillment → Mark Order Ready for Pickup` (`POST /api/v1/restaurant-owner/orders/{{order_id}}/mark-ready?restaurantId={{restaurant_id}}`) to advance the order to `READY_FOR_PICKUP`:
+
+![8. Restaurant Marks Order Ready for Pickup](./docs/images/order-placement-demo-guide/8-restaurant-mark-order-ready.jpeg)
+
+---
+
+### Step 7: Delivery Agent Login, Session Challenge & Order Delivery
+
+Now switch to the **Delivery Agent Portal** collection in Postman to log in as the assigned courier, resolve a concurrent device session challenge (`409 Conflict`) if needed, and complete the pickup and delivery.
+
+#### 7.1 Login as Assigned Delivery Agent (`409 Conflict` Session Limit Challenge)
+Open `Auth & Session Management → Login & Token Refresh → Login with Email & Password`, paste the assigned delivery agent's email address (the password remains `Password@123`), and send the request.
+* If the agent has reached the maximum concurrent device session limit, the server returns **`409 Conflict`** with `"error": "session_limit_exceeded"`.
+* The Postman test script **automatically captures `challengeToken`** into the `challenge_token` collection variable — simply proceed to **7.2** below to evict an old session and claim the login:
+
+![9. Delivery Agent Login & Session Challenge](./docs/images/order-placement-demo-guide/9-delivery-agent-login.jpeg)
+
+#### 7.2 List Active Device Sessions
+Open `Auth & Session Management → Device Session Management → List Active Device Sessions` (`GET /api/v1/auth/sessions`, which automatically uses `Bearer {{challenge_token}}`). Send the request and **copy the first `sessionId`** from the response list:
+
+![10. Delivery Agent List Active Device Sessions](./docs/images/order-placement-demo-guide/10-delivery-agent-list-active-device-session.jpeg)
+
+#### 7.3 Revoke an Existing Device Session
+Open `Device Session Management → Revoke Device Session` (`DELETE /api/v1/auth/sessions/{{session_id}}`), paste the copied `sessionId` into the URL/variable as shown, and send the request (`204 No Content`) to free a session slot:
+
+![11. Delivery Agent Revoke Device Session](./docs/images/order-placement-demo-guide/11-delivery-agent-revoke-device-session.jpeg)
+
+#### 7.4 Claim Challenged Session
+Open `Device Session Management → Claim Challenged Session` (`POST /api/v1/auth/claim-session`) and send the request. Your new device session is now active and the Postman test script automatically saves your fresh `access_token` and `refresh_token` into the collection variables:
+
+![12. Delivery Agent Claim Challenged Session](./docs/images/order-placement-demo-guide/12-delivery-agent-claim-challenged-session.jpeg)
+
+#### 7.5 Set `order_id` in Delivery Agent Collection Variables
+Open the **Delivery Agent Portal** collection variables tab and paste the active `order_id`:
+
+![13. Delivery Agent Add Order ID to Collection Variable](./docs/images/order-placement-demo-guide/13-deliver-agent-add-order-id.jpeg)
+
+#### 7.6 Mark Order Picked Up (`OUT_FOR_DELIVERY`)
+Call `Order Dispatch & Last-Mile Delivery → Mark Order Picked Up (Out for Delivery)` (`POST /api/v1/delivery-agent/orders/{{order_id}}/pickup`). This confirms restaurant package handoff and transitions the order to `OUT_FOR_DELIVERY`:
+
+![14. Delivery Agent Marks Order Out for Delivery](./docs/images/order-placement-demo-guide/14-delivery-agent-mark-out-for-delivery.jpeg)
+
+#### 7.7 Mark Order Delivered (`DELIVERED`)
+Finally, call `Order Dispatch & Last-Mile Delivery → Mark Order Delivered` (`POST /api/v1/delivery-agent/orders/{{order_id}}/delivered`) to confirm customer handoff. The order is now in its terminal `DELIVERED` state! 🎉
+
+![15. Delivery Agent Marks Order Delivered](./docs/images/order-placement-demo-guide/15-delivery-agent-mark-order-delivered.jpeg)
 
 ---
 

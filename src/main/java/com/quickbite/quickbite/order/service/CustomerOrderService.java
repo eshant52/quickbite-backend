@@ -1,6 +1,7 @@
 package com.quickbite.quickbite.order.service;
 
 import com.quickbite.quickbite.common.dto.CursorPage;
+import com.quickbite.quickbite.order.dto.AssignedDeliveryAgentResponse;
 import com.quickbite.quickbite.order.dto.OrderResponse;
 import com.quickbite.quickbite.order.dto.OrderSummaryResponse;
 import com.quickbite.quickbite.order.dto.PlaceOrderRequest;
@@ -42,5 +43,5 @@ public interface CustomerOrderService {
     OrderResponse getMyOrder(UUID customerId, UUID orderId);
     CursorPage<OrderSummaryResponse> listMyOrders(UUID customerId, UUID cursor, int size);
     void cancelOrder(UUID customerId, UUID orderId);
-    com.quickbite.quickbite.order.dto.AssignedDeliveryAgentResponse getAssignedDeliveryAgent(UUID customerId, UUID orderId);
+    AssignedDeliveryAgentResponse getAssignedDeliveryAgent(UUID customerId, UUID orderId);
 }

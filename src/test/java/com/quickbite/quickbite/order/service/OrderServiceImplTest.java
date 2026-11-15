@@ -400,4 +400,40 @@ class OrderServiceImplTest {
                     .hasMessageContaining("No delivery agent assigned");
         }
     }
+
+    @Nested
+    @DisplayName("getEarnings")
+    class GetEarningsTests {
+
+        @Test
+        @DisplayName("aggregates delivered orders for restaurant and maps earnings response")
+        void getEarnings_success() {
+            UUID ownerId = UUID.randomUUID();
+            User owner = new User();
+            owner.setId(ownerId);
+
+            when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+            when(restaurantRepository.findByIdAndOwner(restaurant.getId(), owner)).thenReturn(Optional.of(restaurant));
+
+            Object[] row = new Object[]{
+                    5L,
+                    new BigDecimal("1250.00"),
+                    new BigDecimal("1100.00"),
+                    new BigDecimal("50.00"),
+                    new BigDecimal("55.00")
+            };
+            when(orderRepository.aggregateDeliveredEarningsByRestaurant(restaurant.getId(), OrderStatus.DELIVERED))
+                    .thenReturn(List.<Object[]>of(row));
+
+            var response = orderService.getEarnings(restaurant.getId(), ownerId);
+
+            assertThat(response.restaurantId()).isEqualTo(restaurant.getId());
+            assertThat(response.deliveredOrdersCount()).isEqualTo(5L);
+            assertThat(response.totalGrossSales()).isEqualByComparingTo("1250.00");
+            assertThat(response.totalFoodSubtotal()).isEqualByComparingTo("1100.00");
+            assertThat(response.totalPlatformFees()).isEqualByComparingTo("50.00");
+            assertThat(response.totalTaxesCollected()).isEqualByComparingTo("55.00");
+            verify(orderRepository).aggregateDeliveredEarningsByRestaurant(restaurant.getId(), OrderStatus.DELIVERED);
+        }
+    }
 }
