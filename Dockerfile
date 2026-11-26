@@ -15,7 +15,7 @@ COPY src/ src/
 RUN ./mvnw clean package -DskipTests -B
 
 # Extract layered JAR for efficient caching
-RUN java -Djarmode=layertools -jar target/QuickBite-0.0.1-SNAPSHOT.jar extract --destination target/extracted
+RUN java -Djarmode=tools -jar target/QuickBite-0.0.1-SNAPSHOT.jar extract --layers --launcher --destination target/extracted
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM eclipse-temurin:25-jre
