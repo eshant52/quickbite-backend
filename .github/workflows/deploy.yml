@@ -159,6 +159,7 @@ jobs:
 
           aws ecs update-express-gateway-service \
             --service-arn "$ECS_EXPRESS_SERVICE_ARN" \
+            --cpu-architecture ARM64 \
             --primary-container "$PRIMARY_CONTAINER"
 
       - name: Wait for ECS service stability
