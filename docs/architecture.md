@@ -187,7 +187,7 @@ The complete order lifecycle encompasses price-drift-protected checkout (`AWAITI
 ```mermaid
 stateDiagram-v2
     [*] --> AWAITING_PAYMENT: TX 1 Order created from Cart
-    AWAITING_PAYMENT --> PLACED: COD immediate success or Online PaymentSucceededEvent
+    AWAITING_PAYMENT --> PLACED: COD CodPaymentInitiatedEvent (Payment stays PENDING) or Online PaymentSucceededEvent
     AWAITING_PAYMENT --> PAYMENT_FAILED: PaymentFailedEvent or PaymentCancelledEvent
     AWAITING_PAYMENT --> ABANDONED: 15m payment timeout via Redisson Queue or Reaper
     AWAITING_PAYMENT --> CANCELLED: Customer cancels before payment - CUSTOMER_CANCELLED
@@ -198,7 +198,7 @@ stateDiagram-v2
     
     PLACED --> ACCEPTED: Restaurant accepts within 2m deadline
     PLACED --> DECLINED: Restaurant declines order with Auto-Refund
-    PLACED --> CANCELLED: 2m acceptance timeout - RESTAURANT_UNRESPONSIVE
+    PLACED --> CANCELLED: 2m acceptance timeout (RESTAURANT_UNRESPONSIVE) or Customer cancels
     
     ACCEPTED --> PREPARING: Kitchen marks food preparing
     ACCEPTED --> CANCELLED: Dispatch exhausted after Round 3 - NO_AGENT_FOUND
@@ -269,11 +269,11 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING: Payment record created
-    PENDING --> SUCCESS: COD confirmed or Razorpay signature and Webhook captured
+    PENDING --> SUCCESS: COD collected on delivery (collectCodPayment) or Razorpay verify / webhook captured
     PENDING --> FAILED: Gateway payment failure received
-    PENDING --> CANCELLED: Order abandoned or cancelled before payment
+    PENDING --> CANCELLED: Order abandoned or cancelled before payment / COD delivery
     
-    SUCCESS --> REFUNDED: Kafka PaymentRefundListener processes gateway refund
+    SUCCESS --> REFUNDED: Kafka PaymentRefundListener (Online) or direct markRefunded (COD post-delivery)
     SUCCESS --> REFUND_FAILED: Gateway refund error flagged for admin audit
     
     FAILED --> [*]
@@ -295,7 +295,7 @@ Distributed coordination across nodes is powered by Redisson:
 - **Session Concurrency & Token Rotation**: Per-user lock (`quickbite:session-lock:{userId}`) during login/claim and per-token-hash lock (`quickbite:refresh-lock:{hash}`) during refresh rotation.
 
 ### 5.2 PostgreSQL Optimistic Locking (`@Version`)
-Aggregates subject to concurrent modifications (e.g., `Order`, `Payment`, `DeliveryAgent`, `DeliveryOffer`, `Cart`) feature integer `@Version` columns. If an outdated process attempts a write, Hibernate throws an `OptimisticLockException`, protecting authoritative data from lost updates.
+Aggregates subject to concurrent modifications (`Order`, `Payment`, `OrderDispatch`, `AdminAllotment`) feature integer `@Version` columns. If an outdated process attempts a write, Hibernate throws an `OptimisticLockException`, protecting authoritative data from lost updates.
 
 ### 5.3 Authoritative Session Enforcement & Redis Grace Cache
 - Active user sessions and concurrent session limits (`max-concurrent-sessions = 3`) are authoritatively stored and validated against **PostgreSQL**.
@@ -308,12 +308,12 @@ Aggregates subject to concurrent modifications (e.g., `Order`, `Payment`, `Deliv
 ### 6.1 PostGIS Spatial Storage
 - Geolocation coordinates are stored using JTS (Java Topology Suite) `Point` objects mapped to SRID **4326** (WGS 84).
 - Column definition: `GEOMETRY(POINT, 4326)`.
-- Spatial indices are created using PostgreSQL `GIST` indexes for fast bounding box and radius queries (`ST_DWithin`, `ST_DistanceSphere`).
+- Spatial indices are created using PostgreSQL **GiST** (*Generalized Search Tree*) indexes (`USING GIST`) for fast bounding box and radius queries (`ST_DWithin`, `ST_DistanceSphere`).
 
 ### 6.2 Redis GEO Real-Time Tracking
-- Driver GPS pings are updated in Redis using `GEOADD quickbite:delivery:agent:locations <longitude> <latitude> <agentId>`.
-- Nearby candidate drivers within dispatch radius are queried in sub-millisecond time using `GEORADIUSBYMEMBER`.
-- Driver location is backed by a 60-second Redis TTL heartbeat.
+- Driver GPS pings are updated in Redis using `GEOADD quickbite:delivery:geo:locations <longitude> <latitude> <agentId>`.
+- Nearby candidate drivers within the dispatch radius are queried in sub-millisecond time using `GEOSEARCH` (`FROMLONLAT ... BYRADIUS`).
+- Driver location is backed by a 60-second Redis TTL heartbeat (`quickbite:delivery:geo:heartbeat:<agentId>`).
 - A background scheduler (`DeliveryLocationSyncScheduler`) synchronizes active driver locations from Redis into PostgreSQL every 30 seconds for audit and tracking persistence.
 
 ### 6.3 3-Tier Composite Routing Gateway

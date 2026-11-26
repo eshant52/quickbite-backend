@@ -10,7 +10,7 @@
 1. [Workspace Overview](#workspace-overview)
 2. [Getting Started](#getting-started)
 3. [Authentication & Session Challenge Flow](#authentication--session-challenge-flow)
-4. [Environments](#environments)
+4. [Environments & Collection Variables](#environments--collection-variables)
 5. [Collections](#collections)
 6. [API Surface Summary](#api-surface-summary)
 7. [Key Variables Reference](#key-variables-reference)
@@ -22,14 +22,14 @@
 
 ## Workspace Overview
 
-This `postman/` directory contains the Postman Local View setup for the **QuickBite** food delivery platform. It is organized into **4 role-specific portal collections**, each paired with a dedicated local environment and isolated collection-level authentication tokens:
+This `postman/` directory contains the complete Postman setup for the **QuickBite** food delivery platform. It is organized into **4 role-specific portal collections** paired with a single shared environment (**`Quickbite Local Dev`**), while authentication tokens and resource IDs are stored in isolated **collection variables** per portal:
 
-| Collection | Role | Matching Environment | Requests |
+| Collection | Role | Shared Environment | Requests |
 |---|---|---|---|
-| **Customer Portal** | `ROLE_CUSTOMER` *(+ unauthenticated Public Catalog & Webhooks)* | `Customer Portal - Local Dev` | 51 |
-| **Restaurant Owner Portal** | `ROLE_RESTAURANT_OWNER` | `Restaurant Owner Portal - Local Dev` | 51 |
-| **Delivery Agent Portal** | `ROLE_DELIVERY_AGENT` | `Delivery Agent Portal - Local Dev` | 46 |
-| **Admin Portal** | `ROLE_ADMIN` | `Admin Portal - Local Dev` | 40 |
+| **Customer Portal** | `ROLE_CUSTOMER` *(+ unauthenticated Public Catalog & Webhooks)* | `Quickbite Local Dev` | 51 |
+| **Restaurant Owner Portal** | `ROLE_RESTAURANT_OWNER` | `Quickbite Local Dev` | 51 |
+| **Delivery Agent Portal** | `ROLE_DELIVERY_AGENT` | `Quickbite Local Dev` | 46 |
+| **Admin Portal** | `ROLE_ADMIN` | `Quickbite Local Dev` | 40 |
 
 ---
 
@@ -65,17 +65,13 @@ All exported collections (`postman/exports/collections/`) and environment files 
 
    ![4. Preview and Import Collections & Environment](../../docs/images/postman-import-preview.jpeg)
 
-### 3. Select the matching environment
+### 3. Select the `Quickbite Local Dev` environment
 
-Open the environment selector (top-right in Postman) and select the environment matching the portal collection you are testing:
-- **Customer Portal - Local Dev** → `Customer Portal`
-- **Restaurant Owner Portal - Local Dev** → `Restaurant Owner Portal`
-- **Delivery Agent Portal - Local Dev** → `Delivery Agent Portal`
-- **Admin Portal - Local Dev** → `Admin Portal`
+Open the environment selector (top-right in Postman) and select **`Quickbite Local Dev`**. This shared environment defines `base_url` across all 4 collections, while role-specific tokens and resource UUIDs live in each collection's own **Variables** tab.
 
 ### 4. Register & Login
 
-1. *(Optional — non-admin roles)* Run `Auth & Session Management → User Registration → Register ...` (`201 Created`). Registration creates the Argon2-hashed user account without starting a device session.
+1. *(Optional — non-admin roles)* Run `Auth & Session Management → User Registration → Register ...` (`201 Created`). Registration creates the `Argon2id`-hashed user account without starting a device session.
 2. Run `Auth & Session Management → Login & Token Refresh → Login with Email & Password`.
    - Every collection root defines `Bearer {{access_token}}` inheritance, while `User Registration`, `Login & Token Refresh`, `Public Catalog`, and `Payment Gateway Webhooks` override auth with `No Auth`.
    - The `afterResponse` script automatically captures `access_token`, `refresh_token`, `challenge_token`, and `session_id` into **collection variables** (`pm.collectionVariables`), keeping each portal's active session isolated when switching tabs across roles.
@@ -84,7 +80,7 @@ Open the environment selector (top-right in Postman) and select the environment 
 
 ## Authentication & Session Challenge Flow
 
-QuickBite uses an **RSA-signed (`RS256`) Dual-JWT** architecture combined with **SHA-256 hashed refresh token rotation** and **hybrid client transport**:
+QuickBite uses an **`RS256` (RSASSA-PKCS1-v1_5 using SHA-256) Dual-JWT** architecture combined with **SHA-256 hashed refresh token rotation** and **hybrid client transport**:
 
 | Token | Audience (`aud`) | Authorities | TTL | Transport |
 |---|---|---|---|---|
@@ -100,11 +96,11 @@ All session-issuing endpoints (`POST /api/v1/auth/login`, `POST /api/v1/auth/ref
 
 ### Concurrent Device Limit (`409 Conflict`) Resolution
 
-Each user is capped at `max-sessions-per-user` concurrent active sessions (default `2`). Logging in from an additional device returns **`409 Conflict`** (`SessionLimitErrorResponse`) containing a 5-minute `challengeToken`:
+Each user is capped at `max-sessions-per-user` concurrent active sessions. Logging in from an additional device returns **`409 Conflict`** (`SessionLimitErrorResponse`) containing a 5-minute `challengeToken`:
 
 ```text
 1. POST /api/v1/auth/login (X-Client-Type: web_browser | mobile_app)
-   └─► 409 Conflict → { error, challengeToken, maxSessions: 2 }
+   └─► 409 Conflict → { error: "session_limit_exceeded", challengeToken, maxSessions }
 
 2. GET /api/v1/auth/sessions (Authorization: Bearer {{challenge_token}})
    └─► 200 OK → Inspect active devices & copy a sessionId to evict
@@ -118,67 +114,56 @@ Each user is capped at `max-sessions-per-user` concurrent active sessions (defau
 
 ---
 
-## Environments
+## Environments & Collection Variables
 
-Each `.environment.yaml` file in `postman/environments/` scopes default credentials and resource UUIDs to one portal role, while active tokens (`access_token`, `refresh_token`, `challenge_token`, `session_id`) are written to **collection variables** by test scripts so all 4 portals can stay logged in simultaneously.
+QuickBite uses a single shared Postman environment (**`Quickbite Local Dev`**, located at `postman/environments/Quickbite Local Dev.environment.yaml` and `postman/exports/environments/Quickbite Local Dev.postman_environment.json`) for the API host URL, while all authentication tokens and domain resource UUIDs are scoped as **collection variables** on each of the 4 portal collections so all 4 roles can remain logged in simultaneously without variable collisions.
 
-### Shared Variables (All Portals)
+### Shared Variables (Environment + All Collections)
 
 | Variable | Scope | Description |
 |---|---|---|
-| `base_url` | Environment | `http://localhost:8080` |
-| `access_token` | Collection *(auto-set)* | `SCOPE_API` RSA JWT (`15m` TTL) |
+| `base_url` | Environment (`Quickbite Local Dev`) | QuickBite backend base URL (e.g., `http://localhost:8080` or `http://localhost:8001`) |
+| `access_token` | Collection *(auto-set)* | `SCOPE_API` `RS256` JWT (`15m` TTL) |
 | `refresh_token` | Collection *(auto-set)* | Opaque refresh token (`mobile_app` body or cookie reference) |
-| `challenge_token` | Collection *(auto-set)* | `SCOPE_AUTH` RSA JWT (`5m` TTL) from `409 Conflict` login response |
+| `challenge_token` | Collection *(auto-set)* | `SCOPE_AUTH` `RS256` JWT (`5m` TTL) from `409 Conflict` login response |
 | `session_id` | Collection *(auto-set)* | Active or target device session UUID |
-| `notification_id` | Environment | UUID of an in-app notification |
 
-### Customer Portal - Local Dev
+### Customer Portal Collection Variables
 
 | Variable | Description |
 |---|---|
-| `customer_email` / `customer_password` | Default customer login credentials |
+| `total_order_amount` | *(Auto-set by **Get Checkout Preview**)* Final order total passed as `expectedTotal` |
+| `menu_item_id` / `cuisine_id` / `restaurant_id` | Catalog discovery & cart item UUIDs |
 | `address_id` | UUID of a saved customer delivery address |
-| `cuisine_id` / `restaurant_id` / `menu_item_id` | Catalog discovery & cart item UUIDs |
-| `cart_item_id` | UUID of a line item inside the active cart |
 | `tip_amount` | Courier tip in INR (default `0`) |
-| `total_order_amount` | *(Collection variable)* Auto-captured by **Get Checkout Preview** for `expectedTotal` |
-| `order_id` / `payment_id` / `transaction_id` | Placed order, payment record, and stub webhook transaction IDs |
-| `review_id` | UUID of a submitted customer review |
+| `order_id` | UUID of a placed order |
+| `razorpay_order_id` / `razorpay_payment_id` / `razorpay_signature` | Gateway verification fields returned by Razorpay checkout |
 
-### Restaurant Owner Portal - Local Dev
+### Restaurant Owner Portal Collection Variables
 
 | Variable | Description |
 |---|---|
-| `owner_email` / `owner_password` | Default merchant login credentials |
-| `restaurant_application_id` | UUID of the merchant's restaurant onboarding application |
 | `restaurant_id` | UUID of an approved restaurant owned by the merchant |
-| `cuisine_id` / `cuisine_request_id` | Approved cuisine UUID / proposed cuisine moderation UUID |
-| `menu_item_id` / `image_id` | Menu dish UUID / gallery or dish image UUID |
 | `order_id` | UUID of an incoming or historical kitchen order |
+| `restaurant_application_id` | UUID of the merchant's restaurant onboarding application |
+| `cuisine_id` / `menu_item_id` / `image_id` | Approved cuisine UUID, menu dish UUID, and gallery/dish image UUID |
 
-### Delivery Agent Portal - Local Dev
-
-| Variable | Description |
-|---|---|
-| `agent_email` / `agent_password` | Default courier login credentials |
-| `agent_application_id` | UUID of the courier KYC onboarding application |
-| `vehicle_application_id` | UUID of a standalone or embedded vehicle application |
-| `ownership_id` / `vehicle_id` | UUID of an approved `VehicleOwnership` record |
-| `order_id` / `order_dispatch_id` | UUID of an order / active delivery dispatch offer |
-| `latitude` / `longitude` | Live courier GPS coordinates (Bengaluru defaults: `12.9716`, `77.5946`) |
-
-### Admin Portal - Local Dev
+### Delivery Agent Portal Collection Variables
 
 | Variable | Description |
 |---|---|
-| `admin_email` / `admin_password` | Default administrator login credentials |
+| `order_id` | UUID of an assigned order or active delivery dispatch offer |
+| `agent_application_id` / `vehicle_application_id` | Courier KYC application UUID / vehicle onboarding application UUID |
+| `ownership_id` | UUID of an approved `VehicleOwnership` record |
+
+### Admin Portal Collection Variables
+
+| Variable | Description |
+|---|---|
 | `allotment_id` | UUID of a pending onboarding review allotment |
 | `restaurant_application_id` / `agent_application_id` / `vehicle_application_id` | Onboarding applications under review |
-| `agent_id` / `delivery_agent_id` | Delivery agent UUID for fleet inspection, suspension, or reinstatement |
-| `cuisine_id` / `cuisine_request_id` | Proposed cuisine UUID under moderation |
-| `order_id` / `review_id` / `user_id` | Order refund target, moderated review UUID, and user UUID |
-| `rejection_reason` | Default rejection remarks payload |
+| `agent_id` | Delivery agent UUID for fleet inspection, suspension, or reinstatement |
+| `cuisine_id` / `order_id` / `review_id` | Proposed cuisine UUID, order refund target, and moderated review UUID |
 
 ---
 
@@ -317,10 +302,10 @@ QuickBite enforces a strict **11-state `OrderStatus` state machine** (`OrderStat
 ```text
   [Place Order: Online (UPI / CARD / NET_BANKING / WALLET)]      [Place Order: COD]
                         │                                                │
-                        ▼                                                │
-               AWAITING_PAYMENT ◄──(retry-payment within 10m)──┐         │
+                        ▼                                                │ (CodPaymentInitiatedEvent;
+               AWAITING_PAYMENT ◄──(retry-payment within 15m)──┐         │  Payment stays PENDING)
                  │          │                                  │         │
-  (10m TTL exp.) │          ├──(gateway failure)──► PAYMENT_FAILED       │
+  (15m TTL exp.) │          ├──(gateway failure)──► PAYMENT_FAILED       │
                  ▼          │                                            │
              ABANDONED      └──(verify / webhook)──► PLACED ◄────────────┘
                                                        │
@@ -339,17 +324,19 @@ QuickBite enforces a strict **11-state `OrderStatus` state machine** (`OrderStat
                                                        ▼
                                                OUT_FOR_DELIVERY
                                                        │
-                                         (courier delivery confirmed)
+                                         (courier delivery confirmed;
+                                          COD Payment: PENDING → SUCCESS)
                                                        ▼
                                                    DELIVERED
 ```
 
 - **Price-Drift Guard (`expectedTotal`):** `POST /api/v1/customer/orders` compares `expectedTotal` (from `GET /api/v1/customer/cart/checkout-preview`) against live menu prices and road-distance fees, returning `409 Conflict` if totals drifted.
-- **Customer Cancellation (`DELETE /api/v1/customer/orders/{orderId}/cancel`):** Allowed in `AWAITING_PAYMENT`, `PAYMENT_FAILED`, and `PLACED` (`CUSTOMER_REQUESTED`). Blocked once the restaurant marks the order `ACCEPTED`.
+- **Cash on Delivery (`COD`) Settlement:** Placing a `COD` order creates a `PENDING` payment and fires `CodPaymentInitiatedEvent` (`BEFORE_COMMIT`) to move the order to `PLACED`; `PaymentStatus` remains `PENDING` until doorstep cash collection (`POST /api/v1/delivery-agent/orders/{orderId}/delivered` → `collectCodPayment()`).
+- **Customer Cancellation (`DELETE /api/v1/customer/orders/{orderId}/cancel`):** Allowed in `AWAITING_PAYMENT`, `PAYMENT_FAILED`, and `PLACED` (`CUSTOMER_CANCELLED`). Blocked once the restaurant marks the order `ACCEPTED`.
 - **Automated Timeouts (Redisson Delayed Queues):**
-  - Unpaid online orders expire after **`10m`** (`AWAITING_PAYMENT` / `PAYMENT_FAILED` → `ABANDONED`).
+  - Unpaid online orders expire after **`15m`** (`AWAITING_PAYMENT` / `PAYMENT_FAILED` → `ABANDONED`).
   - Unaccepted `PLACED` orders auto-cancel after **`2m`** (`CANCELLED` with `RESTAURANT_UNRESPONSIVE` + automatic refund).
-  - Radial courier dispatch runs up to 3 expanding Redis Geo waves (`3km` → `5km` → `8km`); if no courier accepts, the order transitions to `CANCELLED` (`NO_AGENT_FOUND`) with an automatic refund.
+  - Radial courier dispatch runs up to 3 expanding Redis Geo waves (`3km` → `6km` → `10km`); if no courier accepts, the order transitions to `CANCELLED` (`NO_AGENT_FOUND`) with an automatic refund.
 - **Post-Delivery Admin Refunds (`POST /api/v1/admin/orders/{orderId}/refund`):** Transitions `PaymentStatus` to `REFUNDED` while `OrderStatus` remains `DELIVERED`.
 
 ---
@@ -399,11 +386,11 @@ Configured via `.env` / `src/main/resources/application.properties` (and `applic
 
 | Service | Local Endpoint | Purpose |
 |---|---|---|
-| **PostgreSQL 16 + PostGIS** | `localhost:5430/quickbite` | Primary relational & spatial datastore (`ST_DWithin` restaurant search, Flyway migrations, Hibernate Envers audit tables) |
-| **Redis + Redisson** | `localhost:6377` | Active session cache, `24h` shopping carts, `delivery:agents:locations` Geo index, distributed dispatch locks, and delayed timeout queues |
+| **PostgreSQL 18 + PostGIS** | `localhost:5430/quickbite` | Primary relational & spatial datastore (`ST_DWithin` GiST restaurant search, Flyway `V1`–`V35` migrations, Hibernate Envers audit tables) |
+| **Redis 8 + Redisson** | `localhost:6377` | Active session cache, `24h` shopping carts, `quickbite:delivery:geo:locations` GEO index (`GEOADD` / `GEOSEARCH`), distributed dispatch locks, and delayed timeout queues |
 | **Apache Kafka** | `localhost:9092` | Asynchronous domain event bus (orders, payments, dispatch, onboarding allotments, notifications, emails) |
 | **OSRM / Mapbox** | `localhost:5001` *(or Mapbox API)* | Road-network distance & driving ETA engine with automatic Haversine fallback |
-| **Razorpay** *(or `dev` Stub)* | `api.razorpay.com` | Online payment order creation, HMAC signature verification, webhooks, and refunds |
+| **Razorpay** *(or `dev` Stub)* | `api.razorpay.com` | Online payment order creation, HMAC-SHA256 signature verification, webhooks, and refunds |
 | **AWS S3** | Configured bucket | Direct client uploads via short-lived presigned `PUT` URLs |
 
 ```bash

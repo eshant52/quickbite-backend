@@ -1,5 +1,5 @@
 $kind: collection
-description: "Argon2 credential login and silent refresh token rotation (`noauth`). Requires `X-Client-Type: web_browser | mobile_app` and automatically populates `access_token`, `refresh_token`, `challenge_token`, and `session_id` via Postman test scripts."
+description: "Argon2id credential login and silent refresh token rotation (`noauth`). Requires `X-Client-Type: web_browser | mobile_app` and automatically populates `access_token`, `refresh_token`, `challenge_token`, and `session_id` via Postman test scripts."
 auth:
   - id: ""
     type: noauth

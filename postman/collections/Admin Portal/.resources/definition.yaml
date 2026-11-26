@@ -1,6 +1,6 @@
 $kind: collection
 name: Admin Portal
-description: "End-to-end `ROLE_ADMIN` governance collection: onboarding review allotments, restaurant/courier/vehicle application approvals & ownership expiration, cuisine & review moderation, courier suspension/reinstatement, post-delivery order refunds & payment audits, internal admin provisioning, notifications, and presigned S3 uploads. Pair with the `Admin Portal - Local Dev` environment."
+description: "End-to-end `ROLE_ADMIN` governance collection: onboarding review allotments, restaurant/courier/vehicle application approvals & ownership expiration, cuisine & review moderation, courier suspension/reinstatement, post-delivery order refunds & payment audits, internal admin provisioning, notifications, and presigned S3 uploads. Pair with the `Quickbite Local Dev` environment."
 auth:
   - id: c1a72410-1bde-4e97-859b-8152a68eb004
     type: bearer

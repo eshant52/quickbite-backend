@@ -22,7 +22,7 @@ flowchart TB
     end
 
     subgraph CandidateSelection["Candidate Selection & Offers"]
-        Round1 & Round2 & Round3 --> CandidateSelector["RedisDeliveryCandidateSelector<br/>(GEORADIUSBYMEMBER)"]
+        Round1 & Round2 & Round3 --> CandidateSelector["RedisDeliveryCandidateSelector<br/>(GEOSEARCH)"]
         CandidateSelector --> AssignStrategy["FairNearestDeliveryAssignmentStrategy"]
         AssignStrategy --> OfferCreated["Create DeliveryOffer (45s Timer)"]
         OfferCreated --> DriverNotification["Kafka: quickbite.delivery.events"]
@@ -77,9 +77,9 @@ sequenceDiagram
     participant DB as PostgreSQL (PostGIS)
 
     loop Every 5-10 Seconds
-        Driver->>Controller: POST /api/v1/delivery-agent/location (lat, lng)
-        Controller->>Redis: GEOADD quickbite:delivery:agent:locations lng lat agentId
-        Controller->>Redis: SETEX quickbite:delivery:agent:heartbeat:{id} 60s ACTIVE
+        Driver->>Controller: PUT /api/v1/delivery-agent/location (lat, lng)
+        Controller->>Redis: GEOADD quickbite:delivery:geo:locations lng lat agentId
+        Controller->>Redis: SETEX quickbite:delivery:geo:heartbeat:{id} 60s "1"
         Controller-->>Driver: 200 OK
     end
 
@@ -90,9 +90,9 @@ sequenceDiagram
 ```
 
 ### 3.1 Redis GEO Storage Patterns
-- **Spatial Hash Set**: Key `quickbite:delivery:agent:locations` stores driver longitude and latitude coordinates using Redis native geospatial indexing.
-- **Liveness Heartbeat**: Key `quickbite:delivery:agent:heartbeat:<agentId>` is set with a **60-second TTL**. If a driver loses connectivity or closes the app, their heartbeat expires, immediately excluding them from dispatch queries.
-- **Candidate Lookup**: `RedisDeliveryCandidateSelector` invokes `GEORADIUSBYMEMBER` around the restaurant's coordinate to retrieve active drivers within the current round's radius.
+- **Spatial Sorted Set**: Key `quickbite:delivery:geo:locations` stores driver longitude and latitude coordinates using Redis native Geohash-backed sorted set indexing (`GEOADD`).
+- **Liveness Heartbeat**: Key `quickbite:delivery:geo:heartbeat:<agentId>` is set with a **60-second TTL**. If a driver loses connectivity or closes the app, their heartbeat expires, immediately excluding them from dispatch queries.
+- **Candidate Lookup**: `RedisDeliveryCandidateSelector` invokes `GEOSEARCH` (`FROMLONLAT ... BYRADIUS`) around the restaurant's coordinate to retrieve active drivers within the current round's radius (with automatic PostGIS `ST_DWithin` GiST fallback).
 
 ### 3.2 Persistent Sync Scheduler (`DeliveryLocationSyncScheduler`)
 Every 30 seconds (`quickbite.delivery.geo.sync-interval-ms = 30000`), a background cron job syncs the coordinates of all active drivers from Redis into the PostgreSQL `delivery_agents` table, persisting spatial `Point(4326)` geometries for audit trails and customer tracking.
@@ -128,7 +128,7 @@ flowchart TD
 ### 4.3 Tier 3: Haversine Fallback Adapter (`HaversineFallbackAdapter`)
 * **Mechanism**: Great-circle formula calculating spherical distance:
   $$\Delta\sigma = 2 \arcsin \sqrt{\sin^2\left(\frac{\Delta\phi}{2}\right) + \cos\phi_1\cos\phi_2\sin^2\left(\frac{\Delta\lambda}{2}\right)}$$
-* **Assumed Urban Velocity**: Standardized at 25 km/h (with a 1.25x road curvature factor) to calculate an estimated travel duration when all routing engines are unavailable. Guarantees that checkout and dispatch never throw critical errors due to routing provider failure.
+* **Assumed Urban Velocity**: Standardized at 25 km/h (with a 1.35x urban road factor) to calculate an estimated travel duration when all routing engines are unavailable. Guarantees that checkout and dispatch never throw critical errors due to routing provider failure.
 
 ---
 
@@ -147,7 +147,7 @@ $$\text{Delivery Fee} = \text{clamp}\Big(\text{Base Fee} + (\text{Distance km} \
 | **Minimum Fee** | `quickbite.fee.min-fee` | ₹20.00 | Minimum delivery charge floor |
 | **Maximum Fee** | `quickbite.fee.max-fee` | ₹80.00 | Maximum fee cap for long distances |
 | **Platform Fee** | `quickbite.pricing.platform-fee` | ₹5.00 | Flat platform maintenance fee |
-| **GST Rate** | `quickbite.pricing.gst-rate` | 0.05 (5%) | Government tax applied to cart subtotal + fees |
+| **GST Rate** | `quickbite.pricing.gst-rate` | 0.05 (5%) | Government tax applied to cart subtotal |
 
 ### 5.2 Driver Earnings Calculation (`DeliveryEarningsCalculator`)
 

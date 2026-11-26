@@ -2,9 +2,9 @@
 
 ## Project Snapshot
 - **Framework**: Spring Boot 4.1.0 on Java 25 (`pom.xml`).
-- **Entry Point**: `QuickBiteApplication.java` — enables JPA auditing, caching, and `@ConfigurationPropertiesScan`.
-- **Architecture**: Domain-driven vertical slice. Each bounded context (`auth`, `user`, `restaurant`, `order`, etc.) owns its own `controller/`, `service/`, `dto/`, `model/`, `repository/`, and `exception/` packages.
-- **State**: Auth, User, and Onboarding modules have controllers/services/repositories implemented. Other domains (`order`, `payment`, `delivery`, `cart`, `menu`, `review`, `vehicle`, `notification`) are currently **model-only** — entities and enums exist but no controllers, services, or repositories yet.
+- **Entry Point**: `QuickBiteApplication.java` — enables JPA auditing, caching, scheduling, and `@ConfigurationPropertiesScan`.
+- **Architecture**: Domain-driven vertical slice. Each bounded context (`allotment`, `auth`, `cart`, `common`, `delivery`, `menu`, `notification`, `onboarding`, `order`, `payment`, `restaurant`, `review`, `user`, `vehicle`) owns its own `controller/`, `service/`, `dto/`, `model/`, `repository/`, and `exception/` packages.
+- **State**: All 14 domain bounded contexts are fully implemented across 35 REST controllers (`156` total endpoints including Actuator probes), service/strategy layers, repositories, Redisson distributed locks/delayed queues, Kafka event choreography, and 102 test classes (`574` unit, slice, and integration tests).
 
 ---
 
@@ -47,8 +47,8 @@ com.quickbite.quickbite.common/
 - Use Lombok `@Getter` / `@Setter` on entities; fields are package-private via Lombok rather than explicit accessors.
 - Bidirectional relationships: `@ManyToOne` / `@OneToOne` on the owning side, `@OneToMany(mappedBy = "...")` on the collection side.
 - Enum columns use `@Enumerated(EnumType.STRING)` plus `@JdbcType(PostgreSQLEnumJdbcType.class)` for PostgreSQL native enums. Keep enum names stable and update Flyway migration when adding new values.
-- `Notification` is a joined inheritance root (`@Inheritance(strategy = JOINED)`), with subtype tables `OrderNotification` and `PaymentNotification`.
-- Spatial data uses JTS `Point` types with `@JdbcTypeCode(SqlTypes.GEOMETRY)` and `columnDefinition = "GEOMETRY(POINT, 4326)"`.
+- `Notification` is a joined inheritance root (`@Inheritance(strategy = JOINED)`), with 6 subtype tables: `OrderNotification`, `PaymentNotification`, `RestaurantApplicationNotification`, `DeliveryAgentApplicationNotification`, `VehicleApplicationNotification`, and `CuisineNotification`.
+- Spatial data uses JTS `Point` types with `@JdbcTypeCode(SqlTypes.GEOMETRY)` and `columnDefinition = "GEOMETRY(POINT, 4326)"` (WGS 84), indexed with PostGIS functional geography **GiST** (*Generalized Search Tree*) indexes.
 - Hibernate Envers `@Audited` is applied to key aggregates (`User`, `Restaurant`, `Order`, `DeliveryAgent`, `Payment`, `MenuItem`). Non-audited relations must use `@NotAudited` or `@Audited(targetAuditMode = NOT_AUDITED)`.
 
 ---
@@ -56,17 +56,17 @@ com.quickbite.quickbite.common/
 ## Schema & Migrations
 - Hibernate DDL is set to `validate` — schema changes **must** be expressed as Flyway migrations.
 - Flyway is enabled at `classpath:db/migration` with `baseline-on-migrate=true`.
-- Existing migrations: `V1` through `V7`. New migrations must follow the naming convention: `V<next>__<snake_case_description>.sql`.
+- Existing migrations: `V1` through `V35`. New migrations must follow the naming convention: `V<next>__<snake_case_description>.sql`.
 - When adding or changing entities, keep the Java model and Flyway schema strictly aligned.
 
 ---
 
 ## Security Architecture
-- **Dual JWT Tokens**: Access Tokens (`aud: quickbite-api`, 15min) carry `SCOPE_API` + `ROLE_*`. Challenge Tokens (`aud: quickbite-auth`, 5min) carry `SCOPE_AUTH` only.
-- **Refresh Tokens**: Opaque SHA-256 hashed strings stored in PostgreSQL with family-based rotation and reuse breach detection. Transported via `HttpOnly`, `Secure`, `SameSite=Strict` cookies.
-- **Spring Security**: Stateless sessions, RSA-signed JWTs via Nimbus, audience-based authority mapping in `JwtAuthenticationConverter`.
+- **Dual JWT Tokens (`RS256`)**: Asymmetric `RS256` (RSASSA-PKCS1-v1_5 using SHA-256) signed JWTs. Access Tokens (`aud: quickbite-api`, 15min) carry `SCOPE_API` + `ROLE_*`. Challenge Tokens (`aud: quickbite-auth`, 5min) carry `SCOPE_AUTH` only (returned on `409 Conflict` when concurrent device session limits are exceeded).
+- **Refresh Tokens & Hybrid Client Transport (`X-Client-Type`)**: Opaque 64-byte tokens stored as SHA-256 hashes in PostgreSQL with generation-tracked family rotation, a 2-second Redis grace window, and reuse breach detection. Transported via `HttpOnly`, `Secure`, `SameSite=Strict` cookies for `X-Client-Type: web_browser` or via JSON request/response bodies for `X-Client-Type: mobile_app`.
+- **Spring Security**: Stateless sessions, `RS256`-signed JWTs via Nimbus JOSE+JWT, audience-based authority mapping in `JwtAuthenticationConverter`.
 - **Defense in Depth**: URL path matchers in `SecurityFilterChain` as outer perimeter + `@PreAuthorize` on controller/service methods as inner guard.
-- **Password Hashing**: `Argon2PasswordEncoder` (OWASP gold standard).
+- **Password Hashing**: `Argon2PasswordEncoder` (`Argon2id`, RFC 9106 OWASP gold standard).
 - **Actuator**: `/actuator/health` and `/actuator/info` are public. All other actuator endpoints require `ROLE_ADMIN`.
 
 ---

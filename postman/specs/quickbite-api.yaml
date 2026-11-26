@@ -759,7 +759,7 @@ paths:
     post:
       tags: [Auth]
       summary: Register Customer
-      description: Creates a new `ROLE_CUSTOMER` account with Argon2 password hashing. Does not start a session; call `POST /api/v1/auth/login` next.
+      description: Creates a new `ROLE_CUSTOMER` account with Argon2id password hashing. Does not start a session; call `POST /api/v1/auth/login` next.
       security: []
       requestBody:
         required: true
@@ -813,7 +813,7 @@ paths:
     post:
       tags: [Auth]
       summary: Login with Email & Password
-      description: Verifies Argon2 credentials and issues an RSA access token (`15m`) plus a refresh token (`HttpOnly` cookie for `web_browser`, JSON body for `mobile_app`). Returns `409 Conflict` with a 5-minute `challengeToken` if concurrent session limits are exceeded.
+      description: Verifies Argon2id credentials and issues an RSA access token (`15m`) plus a refresh token (`HttpOnly` cookie for `web_browser`, JSON body for `mobile_app`). Returns `409 Conflict` with a 5-minute `challengeToken` if concurrent session limits are exceeded.
       security: []
       parameters:
         - $ref: '#/components/parameters/ClientTypeHeader'
@@ -2545,7 +2545,7 @@ paths:
     put:
       tags: [Delivery Agent — Shift]
       summary: Update Live GPS Location
-      description: Updates the courier's live coordinates in PostGIS and Redis Geo (`delivery:agents:locations` with 5-minute heartbeat TTL).
+      description: Updates the courier's live coordinates in PostGIS and Redis Geo (`quickbite:delivery:geo:locations` with 60-second heartbeat TTL).
       requestBody:
         required: true
         content:

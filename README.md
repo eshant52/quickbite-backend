@@ -113,7 +113,7 @@ flowchart TB
 ## Key Features & Domain Capabilities
 
 ### 1. Security, Identity & Stateful Sessions (`auth`)
-* **Dual-JWT Token Architecture**: Asymmetric RSA256 tokens separating business API access (`aud: quickbite-api`, `type: access`, 15m) from session challenge tasks (`aud: quickbite-auth`, `type: session-limit`, 5m).
+* **Dual-JWT Token Architecture**: Asymmetric `RS256` (RSASSA-PKCS1-v1_5 using SHA-256) tokens separating business API access (`aud: quickbite-api`, `type: access`, 15m) from session challenge tasks (`aud: quickbite-auth`, `type: session-limit`, 5m).
 * **Client-Aware Hybrid Refresh Token Transport (`X-Client-Type`)**:
   - **`WEB_BROWSER` (`web_browser`)**: Refresh tokens are delivered exclusively via `HttpOnly`, `Secure`, `SameSite=Strict` cookies (`qb_refresh_token`) and stripped (`null`) from JSON bodies.
   - **`MOBILE_APP` (`mobile_app`)**: Refresh tokens are returned directly in the `AuthResponse` JSON payload and accepted via `RefreshRequest` JSON bodies for native Keychain/Keystore storage.
@@ -127,7 +127,7 @@ flowchart TB
   - **Round 2**: 6 km radius (3-minute window)
   - **Round 3**: 10 km radius (5-minute window)
 * **Driver Offer Timeout**: 45-second timer per candidate driver with automated failover to the next best driver.
-* **Redis GEO Real-Time Tracking**: Drivers transmit live GPS coordinates stored in Redis using `GEOADD`. Proximity candidate searches execute in sub-millisecond time via `GEORADIUSBYMEMBER`.
+* **Redis GEO Real-Time Tracking**: Drivers transmit live GPS coordinates stored in Redis using `GEOADD`. Proximity candidate searches execute in sub-millisecond time via `GEOSEARCH`.
 * **Heartbeat & DB Sync**: Active drivers maintain a 60-second Redis heartbeat TTL. A background scheduler syncs coordinates into PostgreSQL every 30 seconds.
 * **Fair Driver Assignment**: `FairNearestDeliveryAssignmentStrategy` optimizes for distance while preventing driver starvation.
 
@@ -141,7 +141,7 @@ flowchart TB
 * **Strategy Pattern**: Pluggable strategies for online methods (`UPI`, `CARD`, `NET_BANKING`, `WALLET` via `OnlinePaymentStrategy`), `COD` (`CodPaymentStrategy`), and `StubOnlinePaymentStrategy`.
 * **HMAC-SHA256 Signature Verification**: Cryptographic validation for both frontend checkout signatures and backend webhooks.
 * **Multi-Attempt Reconciliation (`First-Success-Wins`)**: Reconciles all payment attempts on poll or retry, auto-refunding duplicate captures or late captures on abandoned/cancelled orders.
-* **Kafka-Driven Automated Refunds**: Event listeners automatically issue Razorpay refunds when orders are cancelled, declined, or refunded post-delivery by an admin.
+* **Automated Refunds & COD Lifecycle**: Event listeners automatically issue Razorpay refunds when paid online orders are cancelled, declined, or refunded post-delivery by an admin, while COD payments stay `PENDING` until doorstep delivery collection (cancelled directly if canceled pre-delivery, or marked `REFUNDED` if refunded post-delivery).
 
 ### 5. Multi-Tier Composite Routing Gateway (`common/routing`)
 * **Tier 1 (OSRM)**: Local native high-performance OpenStreetMap routing machine on port `5001`.
@@ -160,7 +160,7 @@ flowchart TB
 
 ### 8. Reviews & Rating Recalculation (`review`)
 * **Verified Customer Feedback**: Reviews restricted to completed orders.
-* **Kafka Event Recalculation**: Submitting or deleting a review publishes a `ReviewChangedEvent`, automatically recalculating the restaurant's average rating and total review count.
+* **Event-Driven Rating Recalculation**: Submitting or deleting a review publishes a `ReviewChangedEvent` (handled via Spring `@EventListener`), automatically recalculating the restaurant's average rating and total review count and evicting cached summaries.
 
 ### 9. Joined-Inheritance Notification Center (`notification`)
 * **Single Root Aggregate**: Joined-table inheritance (`Notification`) with specialized subclasses: `OrderNotification`, `PaymentNotification`, `RestaurantApplicationNotification`, `DeliveryAgentApplicationNotification`, `VehicleApplicationNotification`, `CuisineNotification`.
@@ -181,7 +181,7 @@ flowchart TB
 | **Cloud Storage** | AWS SDK for Java v2 (S3 Presigned URLs) |
 | **Routing Engines** | OSRM (Open Source Routing Machine), Mapbox Directions API, Haversine Math Fallback |
 | **Payment Gateway** | Razorpay Java SDK 1.4.10 (UPI, NetBanking, Cards, Webhooks) |
-| **Security & Tokens** | Nimbus JOSE+JWT, Argon2 Password Encoder, BouncyCastle, Yauaa (User-Agent Analyzer) |
+| **Security & Tokens** | Nimbus JOSE+JWT (`RS256`), Argon2id Password Encoder, BouncyCastle, Yauaa (User-Agent Analyzer) |
 
 ---
 
@@ -274,8 +274,37 @@ To import and use the collections in Postman:
 ## 🎬 End-to-End Demo Guide: Placing an Order & Delivery Offer Tracking
 
 This step-by-step walkthrough demonstrates QuickBite's complete reactive order-to-delivery lifecycle:
-1. **Interactive Delivery Agent Offer Tracker CLI** (`track_delivery_offers.py`): Logs in and tracks up to 10 delivery agents simultaneously, continuously pushes live Redis GEO heartbeats, polls for incoming offers, and renders real-time offer cards with countdown timers.
-2. **Postman / cURL API Flow**: Customer places an order, Restaurant Owner accepts the order within the 2-minute deadline (triggering 3-round parallel dispatch), and the Delivery Agent accepts the offer with single-key prompt (`1`).
+1. **Automated Demo Data Seeder (`setup_demo_data.py`)**: 100% REST API-driven onboarding script that seeds **6 delivery agents** (with vehicles, KYC docs, admin approval, and live GPS), **6 restaurants across 6 diverse cuisines** (24 menu items total), and a **demo customer** with a default delivery address.
+2. **Interactive Delivery Agent Offer Tracker CLI (`track_delivery_offers.py`)**: Logs in and tracks up to 10 delivery agents simultaneously, continuously pushes live Redis GEO heartbeats, polls `GET /api/v1/delivery-agent/offers/active`, and renders real-time offer cards with countdown timers.
+3. **Postman / cURL API Flow**: Customer places an order, Restaurant Owner accepts the order within the 2-minute deadline (triggering 3-round parallel dispatch), and the Delivery Agent accepts the offer with single-key prompt (`1`).
+
+---
+
+### Step 0: Seed Complete Demo Data (Fresh Local or Deployed Backend)
+
+Run [`scripts/setup_demo_data.py`](./scripts/setup_demo_data.py) once to register, onboard, and approve all demo accounts, vehicles, restaurants, cuisines, and menu items via QuickBite's official REST APIs (idempotent — safe to re-run at any time):
+
+```bash
+# Local backend (default: http://localhost:8080)
+python3 scripts/setup_demo_data.py
+
+# Or seed a deployed QuickBite backend URL (no direct DB access needed!)
+python3 scripts/setup_demo_data.py --base-url https://api.your-domain.com
+```
+
+#### Seeded Restaurants & Cuisines (Password for all owners: `Password@123`)
+
+| # | Restaurant Name | Cuisine | Owner Email | Sample Menu Items (4 per Restaurant) |
+| :- | :--- | :--- | :--- | :--- |
+| **1** | **Haldiram's Planet Food - Dharampeth** | North Indian & Sweets | `rakesh.agarwal@haldiramsnagpur.com` | Shahi Gulab Jamun, Kaju Katli, Royal Raj Kachori, Pindi Chole Bhature |
+| **2** | **La Pino'z Woodfired Pizzeria - Sitabuldi** | Italian & Pizza | `marco.rossi@lapinoznagpur.com` | Classic Margherita Woodfired Pizza, Farmhouse Overload Pizza, Smoked Peri-Peri Paneer Pizza, Cheesy Garlic Breadsticks |
+| **3** | **Burger Barn & Grill - Sadar** | Burgers & American | `jason.miller@burgerbarnnagpur.com` | Double Smash Cheese Burger, Crispy Fiery Peri-Peri Chicken Burger, Crunchy Paneer Zinger Burger, Loaded Cheesy Peri-Peri Fries |
+| **4** | **Brewberrys Artisanal Cafe - Civil Lines** | Cafe & Bakery | `ananya.deshmukh@brewberryscafe.com` | Hazelnut Cold Frappe, Belgian Dark Chocolate Waffle, Grilled Pesto Panini Sandwich, Classic New York Baked Cheesecake |
+| **5** | **Sip & Chill Beverage Lounge - Bajaj Nagar** | Beverages & Shakes | `kabir.mehta@sipandchill.com` | Alphonso Mango Thick Shake, Oreo Belgian Mudshake, Virgin Mojito Mint Cooler, Roasted Almond Kesar Badam Milk |
+| **6** | **Dakshin Spice & Biryani House - Pratap Nagar** | South Indian & Biryani | `venkatesh.iyer@dakshinspice.com` | Hyderabadi Chicken Dum Biryani, Mysore Masala Dosa, Ghee Podi Thatte Idli, Traditional Kumbakonam Filter Kaapi |
+
+> [!TIP]
+> After running `setup_demo_data.py`, all generated UUIDs (`restaurantId`, `menuItemId`, `addressId`, `agentId`) are automatically saved to `scripts/demo_ids.json` and printed in a copy-paste summary table in your terminal.
 
 ---
 
@@ -355,7 +384,7 @@ Call `Shopping Cart → Get Checkout Preview` (`GET /api/v1/customer/cart/checko
 You can place an order using either **Option A (Cash on Delivery)** for instant placement, or **Option B (Online Payment via Razorpay)** to test the full gateway checkout and signature verification lifecycle.
 
 #### Option A: Place Cash on Delivery (`COD`) Order
-Open `Order Placement & Tracking → Place Order from Cart` (`POST /api/v1/customer/orders`) with `"paymentMethod": "COD"`. For COD, the order immediately transitions to `PLACED`:
+Open `Order Placement & Tracking → Place Order from Cart` (`POST /api/v1/customer/orders`) with `"paymentMethod": "COD"`. For COD, the order immediately transitions to `PLACED` while the COD payment remains `PENDING` until doorstep cash collection:
 
 ![3. Place COD Order](./docs/images/order-placement-demo-guide/3-place-cod-order.jpeg)
 
@@ -480,7 +509,7 @@ Call `Order Dispatch & Last-Mile Delivery → Mark Order Picked Up (Out for Deli
 ![14. Delivery Agent Marks Order Out for Delivery](./docs/images/order-placement-demo-guide/14-delivery-agent-mark-out-for-delivery.jpeg)
 
 #### 7.7 Mark Order Delivered (`DELIVERED`)
-Finally, call `Order Dispatch & Last-Mile Delivery → Mark Order Delivered` (`POST /api/v1/delivery-agent/orders/{{order_id}}/delivered`) to confirm customer handoff. The order is now in its terminal `DELIVERED` state! 🎉
+Finally, call `Order Dispatch & Last-Mile Delivery → Mark Order Delivered` (`POST /api/v1/delivery-agent/orders/{{order_id}}/delivered`) to confirm customer handoff. The order is now in its terminal `DELIVERED` state (and for COD orders, the `PENDING` payment transitions synchronously to `SUCCESS` upon delivery)! 🎉
 
 ![15. Delivery Agent Marks Order Delivered](./docs/images/order-placement-demo-guide/15-delivery-agent-mark-order-delivered.jpeg)
 
@@ -505,8 +534,8 @@ For in-depth architectural guides and developer specifications, consult the [`do
 ## Project Status & Milestone Checklist
 
 - [x] **Core Architecture & Framework Setup** (Spring Boot 4.1.0 on Java 25, Flyway V1–V35, Envers Auditing)
-- [x] **Dual-JWT & Stateful Session Engine** (Self-issued RSA256, Refresh Token Family Rotation, 409 Session Challenge)
-- [x] **PostgreSQL & Spatial Foundation** (PostGIS 18.1, JTS geometries, GIST indexing, spatial `/nearby` search with multi-criteria filtering)
+- [x] **Dual-JWT & Stateful Session Engine** (Self-issued `RS256`, Refresh Token Family Rotation, 409 Session Challenge)
+- [x] **PostgreSQL & Spatial Foundation** (PostGIS 18.1, JTS geometries, GiST indexing, spatial `/nearby` search with multi-criteria filtering)
 - [x] **Redis & Distributed Concurrency** (Redisson locks for orders/payments/dispatch, Redis GEO real-time driver tracking)
 - [x] **Kafka Event-Driven Messaging** (7 aggregate event streams, Jackson inferred polymorphic conversion, `.DLT` error handling)
 - [x] **Multi-Step Onboarding & Allotment** (Restaurant, Driver, and Vehicle pipelines with Workload-Balanced Admin Allotment)

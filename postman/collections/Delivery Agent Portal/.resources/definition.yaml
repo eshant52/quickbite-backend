@@ -1,5 +1,6 @@
 $kind: collection
-description: "End-to-end `ROLE_DELIVERY_AGENT` API collection: courier KYC & embedded vehicle onboarding, standalone vehicle applications, approved fleet & active vehicle selection, shift availability & Redis Geo live GPS streaming, radial order dispatch & last-mile delivery handoff, notifications, and presigned S3 uploads. Pair with the `Delivery Agent Portal - Local Dev` environment."
+name: Delivery Agent Portal
+description: "End-to-end `ROLE_DELIVERY_AGENT` API collection: courier KYC & embedded vehicle onboarding, standalone vehicle applications, approved fleet & active vehicle selection, shift availability & Redis Geo live GPS streaming, radial order dispatch & last-mile delivery handoff, notifications, and presigned S3 uploads. Pair with the `Quickbite Local Dev` environment."
 auth:
   - id: c1a72410-1bde-4e97-859b-8152a68eb003
     type: bearer
@@ -17,9 +18,6 @@ variables:
     value: ""
     disabled: false
   - key: session_id
-    value: ""
-    disabled: false
-  - key: order_id
     value: ""
     disabled: false
   - key: order_id

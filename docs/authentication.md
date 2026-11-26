@@ -224,7 +224,7 @@ flowchart TD
 
 1. **Sanitization**: `RegisterRequest` escapes JSON/XSS control characters across `name`, `email`, `phoneNumber`, and `password`.
 2. **Conflict Checks**: `UserRegistrationServiceImpl` verifies neither `email` nor `phoneNumber` is already registered (throwing `409 Conflict` via `ResourceConflictException` if found).
-3. **Password Hashing**: Encodes the password using `Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()` and persists the active `User`.
+3. **Password Hashing**: Encodes the password using `Argon2PasswordEncoder` configured per OWASP Argon2id guidelines (19 MiB memory, 2 iterations, 1 degree of parallelism, 16-byte salt, 32-byte hash) and persists the active `User`.
 4. **Admin Provisioning**: Initial super-admin is seeded at boot by `AdminBootstrapRunner` (`quickbite.bootstrap.admin.*`), and subsequent admins are created via `POST /api/v1/admin/users/admins`.
 
 ---

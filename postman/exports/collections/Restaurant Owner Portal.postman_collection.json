@@ -1,1633 +1,1633 @@
 {
-  "info": {
-    "_postman_id": "71a2f13e-83eb-48b4-81a4-bcefb1855dfe",
-    "name": "Restaurant Owner Portal",
-    "description": "End-to-end `ROLE_RESTAURANT_OWNER` API collection: multi-step restaurant onboarding, cuisine category proposals, storefront & schedule operations, menu & dish image management, kitchen order fulfillment & earnings analytics, notifications, and presigned S3 uploads. Pair with the `Restaurant Owner Portal - Local Dev` environment.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "22557011",
-    "_collection_link": "https://go.postman.co/collection/22557011-71a2f13e-83eb-48b4-81a4-bcefb1855dfe?source=collection_link"
-  },
-  "item": [
-    {
-      "name": "Auth & Session Management",
-      "item": [
-        {
-          "name": "User Registration",
-          "item": [
-            {
-              "name": "Register Restaurant Owner",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"name\": \"Aarav Sharma\",\n    \"email\": \"aarav.sharma@quickbite.com\",\n    \"phoneNumber\": \"+919876543210\",\n    \"password\": \"Password@123\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/register/restaurant-owner",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "register",
-                    "restaurant-owner"
-                  ]
-                }
-              },
-              "response": []
-            }
-          ],
-          "description": "Public self-registration endpoint (`noauth`) that creates a `ROLE_RESTAURANT_OWNER` account with Argon2 password hashing (`201 Created`). Follow with `POST /api/v1/auth/login` to start a device session.",
-          "auth": {
-            "type": "noauth"
-          }
-        },
-        {
-          "name": "Login & Token Refresh",
-          "item": [
-            {
-              "name": "Login with Email & Password",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json(); \npm.collectionVariables.set(\"challenge_token\", response.challengeToken); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
-                    ]
-                  }
-                },
-                {
-                  "listen": "prerequest",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.collectionVariables.set(\"access_token\", \"\")"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Client-Type",
-                    "value": "mobile_app"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"email\": \"rakesh.agarwal@haldiramsnagpur.com\",\n    \"password\": \"Password@123\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/login",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "login"
-                  ]
-                }
-              },
-              "response": [
-                {
-                  "name": "Haldiram login",
-                  "originalRequest": {
-                    "method": "POST",
-                    "header": [
-                      {
-                        "key": "Content-Type",
-                        "value": "application/json"
-                      },
-                      {
-                        "key": "X-Client-Type",
-                        "value": "web_browser"
-                      }
-                    ],
-                    "body": {
-                      "mode": "raw",
-                      "raw": "{\n    \"email\": \"rakesh.agarwal@haldiramsnagpur.com\",\n    \"password\": \"Password@123\"\n}",
-                      "options": {
-                        "raw": {
-                          "language": "json"
-                        }
-                      }
-                    },
-                    "url": {
-                      "raw": "{{base_url}}/api/v1/auth/login",
-                      "host": [
-                        "{{base_url}}"
-                      ],
-                      "path": [
-                        "api",
-                        "v1",
-                        "auth",
-                        "login"
-                      ]
-                    }
-                  },
-                  "status": "OK",
-                  "code": 200,
-                  "_postman_previewlanguage": "text",
-                  "header": null,
-                  "cookie": [],
-                  "body": ""
-                }
-              ]
-            },
-            {
-              "name": "Refresh Access Token",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
-                    ]
-                  }
-                },
-                {
-                  "listen": "prerequest",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.collectionVariables.set(\"access_token\", \"\");\nconst refreshToken = pm.collectionVariables.get(\"refresh_token\");\n\nif (refreshToken) {\n    console.log(refreshToken)\n    pm.request.body.raw = JSON.stringify({\n       \"refreshToken\": refreshToken \n    });\n}"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Client-Type",
-                    "value": "mobile_app"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{}",
-                  "options": {
-                    "raw": {
-                      "language": "text"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/refresh-token",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "refresh-token"
-                  ]
-                }
-              },
-              "response": []
-            }
-          ],
-          "description": "Argon2 credential login and silent refresh token rotation (`noauth`). Requires `X-Client-Type: web_browser | mobile_app` and automatically populates `access_token`, `refresh_token`, `challenge_token`, and `session_id` via Postman test scripts.",
-          "auth": {
-            "type": "noauth"
-          }
-        },
-        {
-          "name": "Device Session Management",
-          "item": [
-            {
-              "name": "List Active Device Sessions",
-              "request": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/sessions",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "sessions"
-                  ]
-                }
-              },
-              "response": []
-            },
-            {
-              "name": "Claim Challenged Session",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "X-Client-Type",
-                    "value": "mobile_app"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/claim-session",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "claim-session"
-                  ]
-                }
-              },
-              "response": []
-            },
-            {
-              "name": "Revoke Device Session",
-              "request": {
-                "method": "DELETE",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/sessions/{{session_id}}",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "sessions",
-                    "{{session_id}}"
-                  ]
-                }
-              },
-              "response": []
-            }
-          ],
-          "description": "Resolves `409 Conflict` concurrent session limit challenges using `Authorization: Bearer {{challenge_token}}` (`SCOPE_AUTH`): list active sessions (`GET /sessions`), revoke an old device (`DELETE /sessions/{sessionId}`), and claim the new session (`POST /claim-session`).",
-          "auth": {
-            "type": "bearer",
-            "bearer": [
-              {
-                "key": "token",
-                "value": "{{challenge_token}}",
-                "type": "string"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Logout",
-          "item": [
-            {
-              "name": "Logout Current Device",
-              "request": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/logout",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "logout"
-                  ]
-                }
-              },
-              "response": []
-            },
-            {
-              "name": "Logout All Devices",
-              "request": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/logout-all",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "logout-all"
-                  ]
-                }
-              },
-              "response": []
-            }
-          ],
-          "description": "Single-device (`/logout`) and global all-device (`/logout-all`) session revocation in PostgreSQL and Redis (`SCOPE_API`), clearing the `refreshToken` cookie."
-        }
-      ],
-      "description": "Authentication and session lifecycle: Argon2 self-registration, dual-audience RSA JWT issuance (`quickbite-api` 15m + `quickbite-auth` 5m), `X-Client-Type`-aware SHA-256 refresh token rotation (`HttpOnly` cookie for `web_browser`, JSON body for `mobile_app`), and Yauaa device session tracking."
-    },
-    {
-      "name": "Restaurant Onboarding Application",
-      "item": [
-        {
-          "name": "Start Restaurant Onboarding Application",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/start",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "start"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Current Restaurant Application",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/current",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "current"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Restaurant Application by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Restaurant Basic Details",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/details",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "details"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Save Restaurant Basic Details",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"name\":\"Spice Symphony Kitchen\",\"description\":\"Authentic North Indian & Mughlai delicacies.\"}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/details",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "details"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Restaurant Location & Address",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/address",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "address"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Save Restaurant Location & Address",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"street\":\"100 Feet Road, Indiranagar\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"country\":\"India\",\"postalCode\":\"560038\",\"houseNumber\":\"Plot 42\",\"buildingName\":\"Symphony Plaza\",\"landmark\":\"Opposite Indiranagar Club\",\"latitude\":12.9718,\"longitude\":77.6412}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/address",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "address"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Weekly Operating Hours",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/hours",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "hours"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Save Weekly Operating Hours",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"hours\":[{\"dayOfWeek\":\"MONDAY\",\"openTime\":\"09:00:00\",\"closeTime\":\"23:00:00\"},{\"dayOfWeek\":\"TUESDAY\",\"openTime\":\"09:00:00\",\"closeTime\":\"23:00:00\"}]}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/hours",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "hours"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List Application Images",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/images",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "images"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Add Storefront / Kitchen Image",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"imageUrl\":\"https://cdn.quickbite.com/onboarding/restaurants/kitchen-1.jpg\",\"displayOrder\":1}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/images",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "images"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Remove Application Image",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/images/{{image_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "images",
-                "{{image_id}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List Attached Verification Documents",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/documents",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "documents"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Attach Verification Document",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"type\":\"FSSAI_LICENSE\",\"url\":\"https://cdn.quickbite.com/onboarding/restaurants/fssai.pdf\"}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/documents",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "documents"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Remove Verification Document",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/documents/FSSAI_LICENSE",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "documents",
-                "FSSAI_LICENSE"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Submit Application for Admin Review",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/submit",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "submit"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Reopen Rejected Application",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/reopen",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "applications",
-                "{{restaurant_application_id}}",
-                "reopen"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Step-by-step merchant onboarding workflow (`DRAFT` → `SUBMITTED`, plus `reopen` when `REJECTED`): basic details, street address & PostGIS coordinates, weekly operating hours, gallery images, and `FSSAI_LICENSE` / `GST` / `PAN` / `BANK_PROOF` / `BUSINESS_LICENSE` verification documents."
-    },
-    {
-      "name": "Cuisine Proposals",
-      "item": [
-        {
-          "name": "Request New Cuisine Category",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\\n    \\\"name\\\": \\\"Indian\\\"\\n}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/cuisines",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "cuisines"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Propose new cuisine categories (`PENDING`) for Admin moderation before attaching them to menu items."
-    },
-    {
-      "name": "Restaurant Operations & Schedule",
-      "item": [
-        {
-          "name": "List My Approved Restaurants",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants?size=20",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants"
-              ],
-              "query": [
-                {
-                  "key": "size",
-                  "value": "20"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get My Restaurant Details",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Update Restaurant Info",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\\n    \\\"name\\\": \\\"Spice Symphony Kitchen\\\",\\n    \\\"description\\\": \\\"Authentic North Indian & Mughlai delicacies cooked in clay ovens.\\\"\\n}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Update Restaurant Operating Hours",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "[\\n    {\\n        \\\"dayOfWeek\\\": \\\"MONDAY\\\",\\n        \\\"openTime\\\": \\\"09:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:00:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"TUESDAY\\\",\\n        \\\"openTime\\\": \\\"09:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:00:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"WEDNESDAY\\\",\\n        \\\"openTime\\\": \\\"09:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:00:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"THURSDAY\\\",\\n        \\\"openTime\\\": \\\"09:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:00:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"FRIDAY\\\",\\n        \\\"openTime\\\": \\\"09:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:30:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"SATURDAY\\\",\\n        \\\"openTime\\\": \\\"10:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:30:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"SUNDAY\\\",\\n        \\\"openTime\\\": \\\"10:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:00:00\\\"\\n    }\\n]",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/hours",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}",
-                "hours"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Add Restaurant Gallery Image",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\\n    \\\"imageUrl\\\": \\\"https://cdn.quickbite.com/restaurants/storefront-1.jpg\\\",\\n    \\\"displayOrder\\\": 1\\n}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/images",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}",
-                "images"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Remove Restaurant Gallery Image",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/images/{{image_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}",
-                "images",
-                "{{image_id}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Toggle Restaurant Open / Closed Status",
-          "request": {
-            "method": "PATCH",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/toggle-closed",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}",
-                "toggle-closed"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Manage approved restaurants owned by the merchant: update restaurant profile, replace weekly operating hours, manage gallery images, and toggle temporary open/closed status."
-    },
-    {
-      "name": "Menu & Dish Management",
-      "item": [
-        {
-          "name": "Create Menu Item",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\\n    \\\"name\\\": \\\"Shahi Gulab Jamun (2 Pcs)\\\",\\n    \\\"description\\\": \\\"Fresh mawa and chenna dumplings deep-fried to deep golden and steeped in rose-saffron cardamom syrup.\\\",\\n    \\\"cuisineId\\\": \\\"{{cuisine_id}}\\\",\\n    \\\"price\\\": 75.00,\\n    \\\"category\\\": \\\"Mithai & Sweets\\\",\\n    \\\"isAvailable\\\": true\\n}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}",
-                "menu-items"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Update Menu Item",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\\n    \\\"name\\\": \\\"Shahi Gulab Jamun (2 Pcs)\\\",\\n    \\\"description\\\": \\\"Fresh mawa and chenna dumplings deep-fried to deep golden and steeped in rose-saffron cardamom syrup.\\\",\\n    \\\"cuisineId\\\": \\\"{{cuisine_id}}\\\",\\n    \\\"price\\\": 90.00,\\n    \\\"category\\\": \\\"Mithai & Sweets\\\",\\n    \\\"isAvailable\\\": true\\n}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}",
-                "menu-items",
-                "{{menu_item_id}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Delete Menu Item",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}",
-                "menu-items",
-                "{{menu_item_id}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Add Menu Item Image",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\\n    \\\"imageUrl\\\": \\\"https://cdn.quickbite.com/menu-items/orange-barfi-2.jpg\\\",\\n    \\\"displayOrder\\\": 2\\n}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}/images",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}",
-                "menu-items",
-                "{{menu_item_id}}",
-                "images"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Remove Menu Item Image",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}/images/{{image_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "restaurants",
-                "{{restaurant_id}}",
-                "menu-items",
-                "{{menu_item_id}}",
-                "images",
-                "{{image_id}}"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Create, update, or delete menu items (`cuisineId`, `price`, `category`, `isAvailable`) and manage dish gallery images for an owned restaurant."
-    },
-    {
-      "name": "Kitchen Order Fulfillment",
-      "item": [
-        {
-          "name": "List Incoming & Past Restaurant Orders",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/orders?restaurantId={{restaurant_id}}&size=20",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "orders"
-              ],
-              "query": [
-                {
-                  "key": "restaurantId",
-                  "value": "{{restaurant_id}}"
-                },
-                {
-                  "key": "size",
-                  "value": "20"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Restaurant Order Details",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}?restaurantId={{restaurant_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "orders",
-                "{{order_id}}"
-              ],
-              "query": [
-                {
-                  "key": "restaurantId",
-                  "value": "{{restaurant_id}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Accept Incoming Order",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}/accept?restaurantId={{restaurant_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "orders",
-                "{{order_id}}",
-                "accept"
-              ],
-              "query": [
-                {
-                  "key": "restaurantId",
-                  "value": "{{restaurant_id}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Decline Incoming Order",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}/decline?restaurantId={{restaurant_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "orders",
-                "{{order_id}}",
-                "decline"
-              ],
-              "query": [
-                {
-                  "key": "restaurantId",
-                  "value": "{{restaurant_id}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Mark Order as Preparing",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}/mark-preparing?restaurantId={{restaurant_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "orders",
-                "{{order_id}}",
-                "mark-preparing"
-              ],
-              "query": [
-                {
-                  "key": "restaurantId",
-                  "value": "{{restaurant_id}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Mark Order Ready for Pickup",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}/mark-ready?restaurantId={{restaurant_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "orders",
-                "{{order_id}}",
-                "mark-ready"
-              ],
-              "query": [
-                {
-                  "key": "restaurantId",
-                  "value": "{{restaurant_id}}"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Kitchen Order Delivery Agent Details",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}/delivery-agent?restaurantId={{restaurant_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "orders",
-                "{{order_id}}",
-                "delivery-agent"
-              ],
-              "query": [
-                {
-                  "key": "restaurantId",
-                  "value": "{{restaurant_id}}"
-                }
-              ]
-            },
-            "description": "Fetches details and live coordinates of the delivery partner assigned for order pickup from the restaurant. (RestaurantOrderController#getAssignedDeliveryAgent | ROLE_RESTAURANT_OWNER)"
-          },
-          "response": []
-        },
-        {
-          "name": "Get Restaurant Sales & Earnings Summary",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/restaurant-owner/orders/earnings?restaurantId={{restaurant_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "restaurant-owner",
-                "orders",
-                "earnings"
-              ],
-              "query": [
-                {
-                  "key": "restaurantId",
-                  "value": "{{restaurant_id}}"
-                }
-              ]
-            },
-            "description": "Aggregates delivered order metrics, gross sales, platform commission deductions, food subtotal, and net payout for an owned restaurant. (RestaurantOrderController#getEarnings | ROLE_RESTAURANT_OWNER)"
-          },
-          "response": []
-        }
-      ],
-      "description": "List and inspect restaurant orders (filterable by `OrderStatus`), accept or decline incoming `PLACED` orders within the 2-minute window, advance kitchen preparation (`ACCEPTED` → `PREPARING` → `READY_FOR_PICKUP`), view assigned courier details, and query delivered sales & earnings summaries (`/orders/earnings`)."
-    },
-    {
-      "name": "In-App Notifications",
-      "item": [
-        {
-          "name": "List My Notifications",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/notifications?unread=true&size=20",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications"
-              ],
-              "query": [
-                {
-                  "key": "unread",
-                  "value": "true"
-                },
-                {
-                  "key": "size",
-                  "value": "20"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Unread Notification Count",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/notifications/unread-count",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "unread-count"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Mark Notification as Read",
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/notifications/{{notification_id}}/read",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "{{notification_id}}",
-                "read"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Mark All Notifications as Read",
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/notifications/read-all",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "read-all"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Fetch, count unread, and mark polymorphic joined-inheritance in-app notifications as read (`OrderNotification`, `PaymentNotification`, `RestaurantApplicationNotification`, `DeliveryAgentApplicationNotification`, `VehicleApplicationNotification`, `CuisineNotification`)."
-    },
-    {
-      "name": "Presigned S3 File Uploads",
-      "item": [
-        {
-          "name": "Generate Presigned S3 Upload URL",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"context\":\"RESTAURANT_IMAGE\",\"applicationId\":\"{{restaurant_application_id}}\",\"contentType\":\"image/jpeg\",\"fileName\":\"storefront.jpg\"}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/files/upload-url",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "files",
-                "upload-url"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Generate short-lived presigned AWS S3 `PUT` URLs (`uploadUrl` + `fileUrl`) for direct client uploads (`RESTAURANT_IMAGE`, `RESTAURANT_DOCUMENT`)."
-    }
-  ],
-  "auth": {
-    "type": "bearer",
-    "bearer": [
-      {
-        "key": "token",
-        "value": "{{access_token}}",
-        "type": "string"
-      }
-    ]
-  },
-  "variable": [
-    {
-      "key": "access_token",
-      "value": ""
-    },
-    {
-      "key": "refresh_token",
-      "value": ""
-    },
-    {
-      "key": "challenge_token",
-      "value": ""
-    },
-    {
-      "key": "session_id",
-      "value": ""
-    },
-    {
-      "key": "restaurant_id",
-      "value": ""
-    },
-    {
-      "key": "order_id",
-      "value": ""
-    }
-  ]
+	"info": {
+		"_postman_id": "71a2f13e-83eb-48b4-81a4-bcefb1855dfe",
+		"name": "Restaurant Owner Portal",
+		"description": "End-to-end `ROLE_RESTAURANT_OWNER` API collection: multi-step restaurant onboarding, cuisine category proposals, storefront & schedule operations, menu & dish image management, kitchen order fulfillment & earnings analytics, notifications, and presigned S3 uploads. Pair with the `Quickbite Local Dev` environment.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "22557011",
+		"_collection_link": "https://go.postman.co/collection/22557011-71a2f13e-83eb-48b4-81a4-bcefb1855dfe?source=collection_link"
+	},
+	"item": [
+		{
+			"name": "Auth & Session Management",
+			"item": [
+				{
+					"name": "User Registration",
+					"item": [
+						{
+							"name": "Register Restaurant Owner",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Aarav Sharma\",\n    \"email\": \"aarav.sharma@quickbite.com\",\n    \"phoneNumber\": \"+919876543210\",\n    \"password\": \"Password@123\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/register/restaurant-owner",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"register",
+										"restaurant-owner"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"description": "Public self-registration endpoint (`noauth`) that creates a `ROLE_RESTAURANT_OWNER` account with Argon2 password hashing (`201 Created`). Follow with `POST /api/v1/auth/login` to start a device session.",
+					"auth": {
+						"type": "noauth"
+					}
+				},
+				{
+					"name": "Login & Token Refresh",
+					"item": [
+						{
+							"name": "Login with Email & Password",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"const response = pm.response.json(); \npm.collectionVariables.set(\"challenge_token\", response.challengeToken); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+										]
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.collectionVariables.set(\"access_token\", \"\")"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Client-Type",
+										"value": "mobile_app"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"rakesh.agarwal@haldiramsnagpur.com\",\n    \"password\": \"Password@123\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/login",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"login"
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "Haldiram login",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "X-Client-Type",
+												"value": "web_browser"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"email\": \"rakesh.agarwal@haldiramsnagpur.com\",\n    \"password\": \"Password@123\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{base_url}}/api/v1/auth/login",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"auth",
+												"login"
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "text",
+									"header": null,
+									"cookie": [],
+									"body": ""
+								}
+							]
+						},
+						{
+							"name": "Refresh Access Token",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+										]
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.collectionVariables.set(\"access_token\", \"\");\nconst refreshToken = pm.collectionVariables.get(\"refresh_token\");\n\nif (refreshToken) {\n    console.log(refreshToken)\n    pm.request.body.raw = JSON.stringify({\n       \"refreshToken\": refreshToken \n    });\n}"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Client-Type",
+										"value": "mobile_app"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "text"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/refresh-token",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"refresh-token"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"description": "Argon2 credential login and silent refresh token rotation (`noauth`). Requires `X-Client-Type: web_browser | mobile_app` and automatically populates `access_token`, `refresh_token`, `challenge_token`, and `session_id` via Postman test scripts.",
+					"auth": {
+						"type": "noauth"
+					}
+				},
+				{
+					"name": "Device Session Management",
+					"item": [
+						{
+							"name": "List Active Device Sessions",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/sessions",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"sessions"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Claim Challenged Session",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Client-Type",
+										"value": "mobile_app"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/claim-session",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"claim-session"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Revoke Device Session",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/sessions/{{session_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"sessions",
+										"{{session_id}}"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"description": "Resolves `409 Conflict` concurrent session limit challenges using `Authorization: Bearer {{challenge_token}}` (`SCOPE_AUTH`): list active sessions (`GET /sessions`), revoke an old device (`DELETE /sessions/{sessionId}`), and claim the new session (`POST /claim-session`).",
+					"auth": {
+						"type": "bearer",
+						"bearer": [
+							{
+								"key": "token",
+								"value": "{{challenge_token}}",
+								"type": "string"
+							}
+						]
+					}
+				},
+				{
+					"name": "Logout",
+					"item": [
+						{
+							"name": "Logout Current Device",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/logout",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"logout"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Logout All Devices",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/logout-all",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"logout-all"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"description": "Single-device (`/logout`) and global all-device (`/logout-all`) session revocation in PostgreSQL and Redis (`SCOPE_API`), clearing the `refreshToken` cookie."
+				}
+			],
+			"description": "Authentication and session lifecycle: Argon2 self-registration, dual-audience RSA JWT issuance (`quickbite-api` 15m + `quickbite-auth` 5m), `X-Client-Type`-aware SHA-256 refresh token rotation (`HttpOnly` cookie for `web_browser`, JSON body for `mobile_app`), and Yauaa device session tracking."
+		},
+		{
+			"name": "Restaurant Onboarding Application",
+			"item": [
+				{
+					"name": "Start Restaurant Onboarding Application",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/start",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current Restaurant Application",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/current",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"current"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Restaurant Application by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Restaurant Basic Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/details",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"details"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Save Restaurant Basic Details",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"name\":\"Spice Symphony Kitchen\",\"description\":\"Authentic North Indian & Mughlai delicacies.\"}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/details",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"details"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Restaurant Location & Address",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/address",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"address"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Save Restaurant Location & Address",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"street\":\"100 Feet Road, Indiranagar\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"country\":\"India\",\"postalCode\":\"560038\",\"houseNumber\":\"Plot 42\",\"buildingName\":\"Symphony Plaza\",\"landmark\":\"Opposite Indiranagar Club\",\"latitude\":12.9718,\"longitude\":77.6412}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/address",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"address"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Weekly Operating Hours",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/hours",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"hours"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Save Weekly Operating Hours",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"hours\":[{\"dayOfWeek\":\"MONDAY\",\"openTime\":\"09:00:00\",\"closeTime\":\"23:00:00\"},{\"dayOfWeek\":\"TUESDAY\",\"openTime\":\"09:00:00\",\"closeTime\":\"23:00:00\"}]}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/hours",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"hours"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Application Images",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/images",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"images"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Storefront / Kitchen Image",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"imageUrl\":\"https://cdn.quickbite.com/onboarding/restaurants/kitchen-1.jpg\",\"displayOrder\":1}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/images",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"images"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Application Image",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/images/{{image_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"images",
+								"{{image_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Attached Verification Documents",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/documents",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"documents"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Attach Verification Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"type\":\"FSSAI_LICENSE\",\"url\":\"https://cdn.quickbite.com/onboarding/restaurants/fssai.pdf\"}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/documents",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"documents"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Verification Document",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/documents/FSSAI_LICENSE",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"documents",
+								"FSSAI_LICENSE"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Submit Application for Admin Review",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/submit",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"submit"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reopen Rejected Application",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/applications/{{restaurant_application_id}}/reopen",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"applications",
+								"{{restaurant_application_id}}",
+								"reopen"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Step-by-step merchant onboarding workflow (`DRAFT` \u2192 `SUBMITTED`, plus `reopen` when `REJECTED`): basic details, street address & PostGIS coordinates, weekly operating hours, gallery images, and `FSSAI_LICENSE` / `GST` / `PAN` / `BANK_PROOF` / `BUSINESS_LICENSE` verification documents."
+		},
+		{
+			"name": "Cuisine Proposals",
+			"item": [
+				{
+					"name": "Request New Cuisine Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\\n    \\\"name\\\": \\\"Indian\\\"\\n}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/cuisines",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"cuisines"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Propose new cuisine categories (`PENDING`) for Admin moderation before attaching them to menu items."
+		},
+		{
+			"name": "Restaurant Operations & Schedule",
+			"item": [
+				{
+					"name": "List My Approved Restaurants",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants?size=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants"
+							],
+							"query": [
+								{
+									"key": "size",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Restaurant Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Restaurant Info",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\\n    \\\"name\\\": \\\"Spice Symphony Kitchen\\\",\\n    \\\"description\\\": \\\"Authentic North Indian & Mughlai delicacies cooked in clay ovens.\\\"\\n}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Restaurant Operating Hours",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[\\n    {\\n        \\\"dayOfWeek\\\": \\\"MONDAY\\\",\\n        \\\"openTime\\\": \\\"09:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:00:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"TUESDAY\\\",\\n        \\\"openTime\\\": \\\"09:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:00:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"WEDNESDAY\\\",\\n        \\\"openTime\\\": \\\"09:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:00:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"THURSDAY\\\",\\n        \\\"openTime\\\": \\\"09:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:00:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"FRIDAY\\\",\\n        \\\"openTime\\\": \\\"09:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:30:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"SATURDAY\\\",\\n        \\\"openTime\\\": \\\"10:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:30:00\\\"\\n    },\\n    {\\n        \\\"dayOfWeek\\\": \\\"SUNDAY\\\",\\n        \\\"openTime\\\": \\\"10:00:00\\\",\\n        \\\"closeTime\\\": \\\"23:00:00\\\"\\n    }\\n]",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/hours",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}",
+								"hours"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Restaurant Gallery Image",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\\n    \\\"imageUrl\\\": \\\"https://cdn.quickbite.com/restaurants/storefront-1.jpg\\\",\\n    \\\"displayOrder\\\": 1\\n}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/images",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}",
+								"images"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Restaurant Gallery Image",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/images/{{image_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}",
+								"images",
+								"{{image_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Restaurant Open / Closed Status",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/toggle-closed",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}",
+								"toggle-closed"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Manage approved restaurants owned by the merchant: update restaurant profile, replace weekly operating hours, manage gallery images, and toggle temporary open/closed status."
+		},
+		{
+			"name": "Menu & Dish Management",
+			"item": [
+				{
+					"name": "Create Menu Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\\n    \\\"name\\\": \\\"Shahi Gulab Jamun (2 Pcs)\\\",\\n    \\\"description\\\": \\\"Fresh mawa and chenna dumplings deep-fried to deep golden and steeped in rose-saffron cardamom syrup.\\\",\\n    \\\"cuisineId\\\": \\\"{{cuisine_id}}\\\",\\n    \\\"price\\\": 75.00,\\n    \\\"category\\\": \\\"Mithai & Sweets\\\",\\n    \\\"isAvailable\\\": true\\n}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}",
+								"menu-items"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Menu Item",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\\n    \\\"name\\\": \\\"Shahi Gulab Jamun (2 Pcs)\\\",\\n    \\\"description\\\": \\\"Fresh mawa and chenna dumplings deep-fried to deep golden and steeped in rose-saffron cardamom syrup.\\\",\\n    \\\"cuisineId\\\": \\\"{{cuisine_id}}\\\",\\n    \\\"price\\\": 90.00,\\n    \\\"category\\\": \\\"Mithai & Sweets\\\",\\n    \\\"isAvailable\\\": true\\n}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}",
+								"menu-items",
+								"{{menu_item_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Menu Item",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}",
+								"menu-items",
+								"{{menu_item_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Menu Item Image",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\\n    \\\"imageUrl\\\": \\\"https://cdn.quickbite.com/menu-items/orange-barfi-2.jpg\\\",\\n    \\\"displayOrder\\\": 2\\n}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}/images",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}",
+								"menu-items",
+								"{{menu_item_id}}",
+								"images"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Menu Item Image",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}/images/{{image_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"restaurants",
+								"{{restaurant_id}}",
+								"menu-items",
+								"{{menu_item_id}}",
+								"images",
+								"{{image_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Create, update, or delete menu items (`cuisineId`, `price`, `category`, `isAvailable`) and manage dish gallery images for an owned restaurant."
+		},
+		{
+			"name": "Kitchen Order Fulfillment",
+			"item": [
+				{
+					"name": "List Incoming & Past Restaurant Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/orders?restaurantId={{restaurant_id}}&size=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"orders"
+							],
+							"query": [
+								{
+									"key": "restaurantId",
+									"value": "{{restaurant_id}}"
+								},
+								{
+									"key": "size",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Restaurant Order Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}?restaurantId={{restaurant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"orders",
+								"{{order_id}}"
+							],
+							"query": [
+								{
+									"key": "restaurantId",
+									"value": "{{restaurant_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Accept Incoming Order",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}/accept?restaurantId={{restaurant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"orders",
+								"{{order_id}}",
+								"accept"
+							],
+							"query": [
+								{
+									"key": "restaurantId",
+									"value": "{{restaurant_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Decline Incoming Order",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}/decline?restaurantId={{restaurant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"orders",
+								"{{order_id}}",
+								"decline"
+							],
+							"query": [
+								{
+									"key": "restaurantId",
+									"value": "{{restaurant_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Order as Preparing",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}/mark-preparing?restaurantId={{restaurant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"orders",
+								"{{order_id}}",
+								"mark-preparing"
+							],
+							"query": [
+								{
+									"key": "restaurantId",
+									"value": "{{restaurant_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Order Ready for Pickup",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}/mark-ready?restaurantId={{restaurant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"orders",
+								"{{order_id}}",
+								"mark-ready"
+							],
+							"query": [
+								{
+									"key": "restaurantId",
+									"value": "{{restaurant_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Kitchen Order Delivery Agent Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/orders/{{order_id}}/delivery-agent?restaurantId={{restaurant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"orders",
+								"{{order_id}}",
+								"delivery-agent"
+							],
+							"query": [
+								{
+									"key": "restaurantId",
+									"value": "{{restaurant_id}}"
+								}
+							]
+						},
+						"description": "Fetches details and live coordinates of the delivery partner assigned for order pickup from the restaurant. (RestaurantOrderController#getAssignedDeliveryAgent | ROLE_RESTAURANT_OWNER)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Restaurant Sales & Earnings Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/restaurant-owner/orders/earnings?restaurantId={{restaurant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"restaurant-owner",
+								"orders",
+								"earnings"
+							],
+							"query": [
+								{
+									"key": "restaurantId",
+									"value": "{{restaurant_id}}"
+								}
+							]
+						},
+						"description": "Aggregates delivered order metrics, gross sales, platform commission deductions, food subtotal, and net payout for an owned restaurant. (RestaurantOrderController#getEarnings | ROLE_RESTAURANT_OWNER)"
+					},
+					"response": []
+				}
+			],
+			"description": "List and inspect restaurant orders (filterable by `OrderStatus`), accept or decline incoming `PLACED` orders within the 2-minute window, advance kitchen preparation (`ACCEPTED` \u2192 `PREPARING` \u2192 `READY_FOR_PICKUP`), view assigned courier details, and query delivered sales & earnings summaries (`/orders/earnings`)."
+		},
+		{
+			"name": "In-App Notifications",
+			"item": [
+				{
+					"name": "List My Notifications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/notifications?unread=true&size=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "unread",
+									"value": "true"
+								},
+								{
+									"key": "size",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Unread Notification Count",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/notifications/unread-count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"notifications",
+								"unread-count"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Notification as Read",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/notifications/{{notification_id}}/read",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"notifications",
+								"{{notification_id}}",
+								"read"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark All Notifications as Read",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/notifications/read-all",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"notifications",
+								"read-all"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Fetch, count unread, and mark polymorphic joined-inheritance in-app notifications as read (`OrderNotification`, `PaymentNotification`, `RestaurantApplicationNotification`, `DeliveryAgentApplicationNotification`, `VehicleApplicationNotification`, `CuisineNotification`)."
+		},
+		{
+			"name": "Presigned S3 File Uploads",
+			"item": [
+				{
+					"name": "Generate Presigned S3 Upload URL",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"context\":\"RESTAURANT_IMAGE\",\"applicationId\":\"{{restaurant_application_id}}\",\"contentType\":\"image/jpeg\",\"fileName\":\"storefront.jpg\"}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/files/upload-url",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"files",
+								"upload-url"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Generate short-lived presigned AWS S3 `PUT` URLs (`uploadUrl` + `fileUrl`) for direct client uploads (`RESTAURANT_IMAGE`, `RESTAURANT_DOCUMENT`)."
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "access_token",
+			"value": ""
+		},
+		{
+			"key": "refresh_token",
+			"value": ""
+		},
+		{
+			"key": "challenge_token",
+			"value": ""
+		},
+		{
+			"key": "session_id",
+			"value": ""
+		},
+		{
+			"key": "restaurant_id",
+			"value": ""
+		},
+		{
+			"key": "order_id",
+			"value": ""
+		}
+	]
 }

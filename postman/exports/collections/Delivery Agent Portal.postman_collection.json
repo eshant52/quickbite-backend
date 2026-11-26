@@ -1,1381 +1,1377 @@
 {
-  "info": {
-    "_postman_id": "356ad099-89c8-4e7b-aea5-8366b797a8ee",
-    "name": "Delivery Agent Portal",
-    "description": "End-to-end `ROLE_DELIVERY_AGENT` API collection: courier KYC & embedded vehicle onboarding, standalone vehicle applications, approved fleet & active vehicle selection, shift availability & Redis Geo live GPS streaming, radial order dispatch & last-mile delivery handoff, notifications, and presigned S3 uploads. Pair with the `Delivery Agent Portal - Local Dev` environment.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "22557011",
-    "_collection_link": "https://go.postman.co/collection/22557011-356ad099-89c8-4e7b-aea5-8366b797a8ee?source=collection_link"
-  },
-  "item": [
-    {
-      "name": "Auth & Session Management",
-      "item": [
-        {
-          "name": "User Registration",
-          "item": [
-            {
-              "name": "Register Delivery Agent",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"name\": \"Rajesh Kumar\",\n    \"email\": \"rajesh.kumar@example.com\",\n    \"phoneNumber\": \"+919820334455\",\n    \"password\": \"Password@123\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/register/delivery-agent",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "register",
-                    "delivery-agent"
-                  ]
-                }
-              },
-              "response": []
-            }
-          ],
-          "description": "Public self-registration endpoint (`noauth`) that creates a `ROLE_DELIVERY_AGENT` account with Argon2 password hashing (`201 Created`). Follow with `POST /api/v1/auth/login` to start a device session.",
-          "auth": {
-            "type": "noauth"
-          }
-        },
-        {
-          "name": "Login & Token Refresh",
-          "item": [
-            {
-              "name": "Login with Email & Password",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json(); \npm.collectionVariables.set(\"challenge_token\", response.challengeToken); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
-                    ]
-                  }
-                },
-                {
-                  "listen": "prerequest",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.collectionVariables.set(\"access_token\", \"\")"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Client-Type",
-                    "value": "mobile_app"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"email\": \"pooja.patel@example.com\",\n    \"password\": \"Password@123\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/login",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "login"
-                  ]
-                }
-              },
-              "response": [
-                {
-                  "name": "Aarav Sharma Delivery Agent",
-                  "originalRequest": {
-                    "method": "POST",
-                    "header": [
-                      {
-                        "key": "Content-Type",
-                        "value": "application/json"
-                      },
-                      {
-                        "key": "X-Client-Type",
-                        "value": "web_browser"
-                      }
-                    ],
-                    "body": {
-                      "mode": "raw",
-                      "raw": "{\n    \"email\": \"aarav.sharma@example.com\",\n    \"password\": \"Password@123\"\n}",
-                      "options": {
-                        "raw": {
-                          "language": "json"
-                        }
-                      }
-                    },
-                    "url": {
-                      "raw": "{{base_url}}/api/v1/auth/login",
-                      "host": [
-                        "{{base_url}}"
-                      ],
-                      "path": [
-                        "api",
-                        "v1",
-                        "auth",
-                        "login"
-                      ]
-                    }
-                  },
-                  "status": "OK",
-                  "code": 200,
-                  "_postman_previewlanguage": "text",
-                  "header": null,
-                  "cookie": [],
-                  "body": ""
-                }
-              ]
-            },
-            {
-              "name": "Refresh Access Token",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
-                    ]
-                  }
-                },
-                {
-                  "listen": "prerequest",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.collectionVariables.set(\"access_token\", \"\");\nconst refreshToken = pm.collectionVariables.get(\"refresh_token\");\n\nif (refreshToken) {\n    console.log(refreshToken)\n    pm.request.body.raw = JSON.stringify({\n       \"refreshToken\": refreshToken \n    });\n}"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Client-Type",
-                    "value": "mobile_app"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{}",
-                  "options": {
-                    "raw": {
-                      "language": "text"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/refresh-token",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "refresh-token"
-                  ]
-                }
-              },
-              "response": []
-            }
-          ],
-          "description": "Argon2 credential login and silent refresh token rotation (`noauth`). Requires `X-Client-Type: web_browser | mobile_app` and automatically populates `access_token`, `refresh_token`, `challenge_token`, and `session_id` via Postman test scripts.",
-          "auth": {
-            "type": "noauth"
-          }
-        },
-        {
-          "name": "Device Session Management",
-          "item": [
-            {
-              "name": "List Active Device Sessions",
-              "request": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/sessions",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "sessions"
-                  ]
-                }
-              },
-              "response": []
-            },
-            {
-              "name": "Claim Challenged Session",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "X-Client-Type",
-                    "value": "mobile_app"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/claim-session",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "claim-session"
-                  ]
-                }
-              },
-              "response": []
-            },
-            {
-              "name": "Revoke Device Session",
-              "request": {
-                "method": "DELETE",
-                "header": [],
-                "body": {
-                  "mode": "raw",
-                  "raw": "",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/sessions/{{session_id}}",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "sessions",
-                    "{{session_id}}"
-                  ]
-                }
-              },
-              "response": []
-            }
-          ],
-          "description": "Resolves `409 Conflict` concurrent session limit challenges using `Authorization: Bearer {{challenge_token}}` (`SCOPE_AUTH`): list active sessions (`GET /sessions`), revoke an old device (`DELETE /sessions/{sessionId}`), and claim the new session (`POST /claim-session`).",
-          "auth": {
-            "type": "bearer",
-            "bearer": [
-              {
-                "key": "token",
-                "value": "{{challenge_token}}",
-                "type": "string"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Logout",
-          "item": [
-            {
-              "name": "Logout Current Device",
-              "request": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/logout",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "logout"
-                  ]
-                }
-              },
-              "response": []
-            },
-            {
-              "name": "Logout All Devices",
-              "request": {
-                "method": "POST",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/logout-all",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "logout-all"
-                  ]
-                }
-              },
-              "response": []
-            }
-          ],
-          "description": "Single-device (`/logout`) and global all-device (`/logout-all`) session revocation in PostgreSQL and Redis (`SCOPE_API`), clearing the `refreshToken` cookie."
-        }
-      ],
-      "description": "Authentication and session lifecycle: Argon2 self-registration, dual-audience RSA JWT issuance (`quickbite-api` 15m + `quickbite-auth` 5m), `X-Client-Type`-aware SHA-256 refresh token rotation (`HttpOnly` cookie for `web_browser`, JSON body for `mobile_app`), and Yauaa device session tracking."
-    },
-    {
-      "name": "Agent KYC Onboarding",
-      "item": [
-        {
-          "name": "Start Delivery Agent Application",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/applications/start",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "applications",
-                "start"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Current Agent Application",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/applications/current",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "applications",
-                "current"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Agent Application by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "applications",
-                "{{agent_application_id}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List Attached Agent Documents",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/documents",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "applications",
-                "{{agent_application_id}}",
-                "documents"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Attach Identity / License Document",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\\n    \\\"type\\\": \\\"DRIVING_LICENSE\\\",\\n    \\\"url\\\": \\\"https://storage.quickbite.com/documents/agents/aarav-sharma-dl.pdf\\\"\\n}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/documents",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "applications",
-                "{{agent_application_id}}",
-                "documents"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Remove Attached Agent Document",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/documents/DRIVING_LICENSE",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "applications",
-                "{{agent_application_id}}",
-                "documents",
-                "DRIVING_LICENSE"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Start Embedded Vehicle Application",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/vehicles/start",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "applications",
-                "{{agent_application_id}}",
-                "vehicles",
-                "start"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Embedded Vehicle Application",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/vehicles/current",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "applications",
-                "{{agent_application_id}}",
-                "vehicles",
-                "current"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Submit Agent Application for Review",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/submit",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "applications",
-                "{{agent_application_id}}",
-                "submit"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Reopen Rejected Agent Application",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/reopen",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "applications",
-                "{{agent_application_id}}",
-                "reopen"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Delivery partner KYC onboarding workflow (`DRAFT` → `SUBMITTED`, plus `reopen` when `REJECTED`) including `AADHAR` / `DRIVING_LICENSE` document attachments and embedded initial vehicle onboarding."
-    },
-    {
-      "name": "Vehicle Onboarding Application",
-      "item": [
-        {
-          "name": "Check Vehicle VIN Availability",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/check-vin?vin=MA3EJKD1S00123456",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications",
-                "check-vin"
-              ],
-              "query": [
-                {
-                  "key": "vin",
-                  "value": "MA3EJKD1S00123456"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List My Vehicle Applications",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Vehicle Application Details",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications",
-                "{{vehicle_application_id}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Start Standalone Vehicle Application",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/start",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications",
-                "start"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Vehicle Specifications",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/details",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications",
-                "{{vehicle_application_id}}",
-                "details"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Save Vehicle Specifications & Plate",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\\n    \\\"vinNumber\\\": \\\"MBHJA06EYM1234567\\\",\\n    \\\"numberPlate\\\": \\\"KA01AB1234\\\",\\n    \\\"vehicleType\\\": \\\"BIKE\\\",\\n    \\\"brand\\\": \\\"Hero\\\",\\n    \\\"model\\\": \\\"Splendor Plus\\\",\\n    \\\"isOwnershipTransferred\\\": false\\n}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/details",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications",
-                "{{vehicle_application_id}}",
-                "details"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List Attached Vehicle Documents",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/documents",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications",
-                "{{vehicle_application_id}}",
-                "documents"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Attach Vehicle RC / Insurance Document",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\\n    \\\"type\\\": \\\"RC\\\",\\n    \\\"url\\\": \\\"https://storage.quickbite.com/documents/vehicles/ka01ab1234-rc.pdf\\\"\\n}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/documents",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications",
-                "{{vehicle_application_id}}",
-                "documents"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Remove Vehicle Document",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/documents/RC",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications",
-                "{{vehicle_application_id}}",
-                "documents",
-                "RC"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Submit Vehicle Application",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/submit",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications",
-                "{{vehicle_application_id}}",
-                "submit"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Reopen Rejected Vehicle Application",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/reopen",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "applications",
-                "{{vehicle_application_id}}",
-                "reopen"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Standalone vehicle onboarding applications (`BIKE`, `SCOOTER`, `BICYCLE`, `CAR`): check VIN availability & ownership transfer eligibility, save plate/model specs, and attach `RC`, `INSURANCE`, or `TRANSFER_NOC` documents."
-    },
-    {
-      "name": "Approved Fleet & Active Vehicle",
-      "item": [
-        {
-          "name": "List My Approved Vehicles",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Approved Vehicle Details",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/{{ownership_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "{{ownership_id}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Select Active Delivery Vehicle",
-          "request": {
-            "method": "PATCH",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/{{ownership_id}}/select",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "{{ownership_id}}",
-                "select"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Deactivate Approved Vehicle",
-          "request": {
-            "method": "PATCH",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/vehicles/{{ownership_id}}/deactivate",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "vehicles",
-                "{{ownership_id}}",
-                "deactivate"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Inspect approved `VehicleOwnership` records and select or deactivate the active delivery vehicle required before going online for shifts."
-    },
-    {
-      "name": "Shift Availability & Live GPS",
-      "item": [
-        {
-          "name": "Get Delivery Agent Profile & Status",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/profile",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "profile"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Toggle Online / Offline Availability",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"available\": true\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/availability",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "availability"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Update Live GPS Location",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"latitude\":12.9721,\"longitude\":77.595}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/location",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "location"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Inspect courier profile, toggle online/offline shift availability (`available`), and stream real-time GPS coordinates (`latitude`, `longitude`) to PostGIS and Redis Geo (`delivery:agents:locations`)."
-    },
-    {
-      "name": "Order Dispatch & Last-Mile Delivery",
-      "item": [
-        {
-          "name": "Mark Order Picked Up (Out for Delivery)",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/pickup",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "orders",
-                "{{order_id}}",
-                "pickup"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Mark Order Delivered",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/delivered",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "orders",
-                "{{order_id}}",
-                "delivered"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Delivery Offer Summary",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/offer-summary",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "orders",
-                "{{order_id}}",
-                "offer-summary"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Accept Delivery Dispatch Offer",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/accept",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "orders",
-                "{{order_id}}",
-                "accept"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Reject Delivery Dispatch Offer",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/reject",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "delivery-agent",
-                "orders",
-                "{{order_id}}",
-                "reject"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Inspect radial dispatch offers (`GET /offers/active`, `GET /orders/{orderId}/offer-summary`), atomically accept or reject order assignments, confirm restaurant package pickup (`OUT_FOR_DELIVERY`), and complete customer handoff (`DELIVERED`)."
-    },
-    {
-      "name": "In-App Notifications",
-      "item": [
-        {
-          "name": "List My Notifications",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/notifications?unread=true&size=20",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications"
-              ],
-              "query": [
-                {
-                  "key": "unread",
-                  "value": "true"
-                },
-                {
-                  "key": "size",
-                  "value": "20"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Unread Notification Count",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/notifications/unread-count",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "unread-count"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Mark Notification as Read",
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/notifications/{{notification_id}}/read",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "{{notification_id}}",
-                "read"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Mark All Notifications as Read",
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/notifications/read-all",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "read-all"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Fetch, count unread, and mark polymorphic joined-inheritance in-app notifications as read (`OrderNotification`, `PaymentNotification`, `RestaurantApplicationNotification`, `DeliveryAgentApplicationNotification`, `VehicleApplicationNotification`, `CuisineNotification`)."
-    },
-    {
-      "name": "Presigned S3 File Uploads",
-      "item": [
-        {
-          "name": "Generate Presigned S3 Upload URL",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"context\":\"RESTAURANT_IMAGE\",\"applicationId\":\"{{restaurant_application_id}}\",\"contentType\":\"image/jpeg\",\"fileName\":\"storefront.jpg\"}",
-              "options": {
-                "raw": {
-                  "language": "text"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/files/upload-url",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "files",
-                "upload-url"
-              ]
-            }
-          },
-          "response": []
-        }
-      ],
-      "description": "Generate short-lived presigned AWS S3 `PUT` URLs (`uploadUrl` + `fileUrl`) for direct client uploads (`RESTAURANT_IMAGE`, `RESTAURANT_DOCUMENT`)."
-    }
-  ],
-  "auth": {
-    "type": "bearer",
-    "bearer": [
-      {
-        "key": "token",
-        "value": "{{access_token}}",
-        "type": "string"
-      }
-    ]
-  },
-  "variable": [
-    {
-      "key": "access_token",
-      "value": ""
-    },
-    {
-      "key": "refresh_token",
-      "value": ""
-    },
-    {
-      "key": "challenge_token",
-      "value": ""
-    },
-    {
-      "key": "session_id",
-      "value": ""
-    },
-    {
-      "key": "order_id",
-      "value": ""
-    },
-    {
-      "key": "order_id",
-      "value": ""
-    }
-  ]
+	"info": {
+		"_postman_id": "356ad099-89c8-4e7b-aea5-8366b797a8ee",
+		"name": "Delivery Agent Portal",
+		"description": "End-to-end `ROLE_DELIVERY_AGENT` API collection: courier KYC & embedded vehicle onboarding, standalone vehicle applications, approved fleet & active vehicle selection, shift availability & Redis Geo live GPS streaming, radial order dispatch & last-mile delivery handoff, notifications, and presigned S3 uploads. Pair with the `Quickbite Local Dev` environment.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "22557011",
+		"_collection_link": "https://go.postman.co/collection/22557011-356ad099-89c8-4e7b-aea5-8366b797a8ee?source=collection_link"
+	},
+	"item": [
+		{
+			"name": "Auth & Session Management",
+			"item": [
+				{
+					"name": "User Registration",
+					"item": [
+						{
+							"name": "Register Delivery Agent",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Rajesh Kumar\",\n    \"email\": \"rajesh.kumar@example.com\",\n    \"phoneNumber\": \"+919820334455\",\n    \"password\": \"Password@123\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/register/delivery-agent",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"register",
+										"delivery-agent"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"description": "Public self-registration endpoint (`noauth`) that creates a `ROLE_DELIVERY_AGENT` account with Argon2 password hashing (`201 Created`). Follow with `POST /api/v1/auth/login` to start a device session.",
+					"auth": {
+						"type": "noauth"
+					}
+				},
+				{
+					"name": "Login & Token Refresh",
+					"item": [
+						{
+							"name": "Login with Email & Password",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"const response = pm.response.json(); \npm.collectionVariables.set(\"challenge_token\", response.challengeToken); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+										]
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.collectionVariables.set(\"access_token\", \"\")"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Client-Type",
+										"value": "mobile_app"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"pooja.patel@example.com\",\n    \"password\": \"Password@123\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/login",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"login"
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "Aarav Sharma Delivery Agent",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "X-Client-Type",
+												"value": "web_browser"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"email\": \"aarav.sharma@example.com\",\n    \"password\": \"Password@123\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{base_url}}/api/v1/auth/login",
+											"host": [
+												"{{base_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"auth",
+												"login"
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "text",
+									"header": null,
+									"cookie": [],
+									"body": ""
+								}
+							]
+						},
+						{
+							"name": "Refresh Access Token",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+										]
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.collectionVariables.set(\"access_token\", \"\");\nconst refreshToken = pm.collectionVariables.get(\"refresh_token\");\n\nif (refreshToken) {\n    console.log(refreshToken)\n    pm.request.body.raw = JSON.stringify({\n       \"refreshToken\": refreshToken \n    });\n}"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Client-Type",
+										"value": "mobile_app"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "text"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/refresh-token",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"refresh-token"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"description": "Argon2 credential login and silent refresh token rotation (`noauth`). Requires `X-Client-Type: web_browser | mobile_app` and automatically populates `access_token`, `refresh_token`, `challenge_token`, and `session_id` via Postman test scripts.",
+					"auth": {
+						"type": "noauth"
+					}
+				},
+				{
+					"name": "Device Session Management",
+					"item": [
+						{
+							"name": "List Active Device Sessions",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/sessions",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"sessions"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Claim Challenged Session",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"const response = pm.response.json(); \npm.collectionVariables.set(\"access_token\", response.accessToken); \npm.collectionVariables.set(\"refresh_token\", response.refreshToken); \npm.collectionVariables.set(\"session_id\", response.sessionId);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Client-Type",
+										"value": "mobile_app"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/claim-session",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"claim-session"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Revoke Device Session",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/sessions/{{session_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"sessions",
+										"{{session_id}}"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"description": "Resolves `409 Conflict` concurrent session limit challenges using `Authorization: Bearer {{challenge_token}}` (`SCOPE_AUTH`): list active sessions (`GET /sessions`), revoke an old device (`DELETE /sessions/{sessionId}`), and claim the new session (`POST /claim-session`).",
+					"auth": {
+						"type": "bearer",
+						"bearer": [
+							{
+								"key": "token",
+								"value": "{{challenge_token}}",
+								"type": "string"
+							}
+						]
+					}
+				},
+				{
+					"name": "Logout",
+					"item": [
+						{
+							"name": "Logout Current Device",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/logout",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"logout"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Logout All Devices",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/auth/logout-all",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"auth",
+										"logout-all"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"description": "Single-device (`/logout`) and global all-device (`/logout-all`) session revocation in PostgreSQL and Redis (`SCOPE_API`), clearing the `refreshToken` cookie."
+				}
+			],
+			"description": "Authentication and session lifecycle: Argon2 self-registration, dual-audience RSA JWT issuance (`quickbite-api` 15m + `quickbite-auth` 5m), `X-Client-Type`-aware SHA-256 refresh token rotation (`HttpOnly` cookie for `web_browser`, JSON body for `mobile_app`), and Yauaa device session tracking."
+		},
+		{
+			"name": "Agent KYC Onboarding",
+			"item": [
+				{
+					"name": "Start Delivery Agent Application",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/applications/start",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"applications",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current Agent Application",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/applications/current",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"applications",
+								"current"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Agent Application by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"applications",
+								"{{agent_application_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Attached Agent Documents",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/documents",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"applications",
+								"{{agent_application_id}}",
+								"documents"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Attach Identity / License Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\\n    \\\"type\\\": \\\"DRIVING_LICENSE\\\",\\n    \\\"url\\\": \\\"https://storage.quickbite.com/documents/agents/aarav-sharma-dl.pdf\\\"\\n}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/documents",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"applications",
+								"{{agent_application_id}}",
+								"documents"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Attached Agent Document",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/documents/DRIVING_LICENSE",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"applications",
+								"{{agent_application_id}}",
+								"documents",
+								"DRIVING_LICENSE"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Start Embedded Vehicle Application",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/vehicles/start",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"applications",
+								"{{agent_application_id}}",
+								"vehicles",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Embedded Vehicle Application",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/vehicles/current",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"applications",
+								"{{agent_application_id}}",
+								"vehicles",
+								"current"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Submit Agent Application for Review",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/submit",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"applications",
+								"{{agent_application_id}}",
+								"submit"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reopen Rejected Agent Application",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/applications/{{agent_application_id}}/reopen",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"applications",
+								"{{agent_application_id}}",
+								"reopen"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Delivery partner KYC onboarding workflow (`DRAFT` \u2192 `SUBMITTED`, plus `reopen` when `REJECTED`) including `AADHAR` / `DRIVING_LICENSE` document attachments and embedded initial vehicle onboarding."
+		},
+		{
+			"name": "Vehicle Onboarding Application",
+			"item": [
+				{
+					"name": "Check Vehicle VIN Availability",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/check-vin?vin=MA3EJKD1S00123456",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications",
+								"check-vin"
+							],
+							"query": [
+								{
+									"key": "vin",
+									"value": "MA3EJKD1S00123456"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List My Vehicle Applications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Vehicle Application Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications",
+								"{{vehicle_application_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Start Standalone Vehicle Application",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/start",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Vehicle Specifications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/details",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications",
+								"{{vehicle_application_id}}",
+								"details"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Save Vehicle Specifications & Plate",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\\n    \\\"vinNumber\\\": \\\"MBHJA06EYM1234567\\\",\\n    \\\"numberPlate\\\": \\\"KA01AB1234\\\",\\n    \\\"vehicleType\\\": \\\"BIKE\\\",\\n    \\\"brand\\\": \\\"Hero\\\",\\n    \\\"model\\\": \\\"Splendor Plus\\\",\\n    \\\"isOwnershipTransferred\\\": false\\n}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/details",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications",
+								"{{vehicle_application_id}}",
+								"details"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Attached Vehicle Documents",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/documents",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications",
+								"{{vehicle_application_id}}",
+								"documents"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Attach Vehicle RC / Insurance Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\\n    \\\"type\\\": \\\"RC\\\",\\n    \\\"url\\\": \\\"https://storage.quickbite.com/documents/vehicles/ka01ab1234-rc.pdf\\\"\\n}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/documents",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications",
+								"{{vehicle_application_id}}",
+								"documents"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Vehicle Document",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/documents/RC",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications",
+								"{{vehicle_application_id}}",
+								"documents",
+								"RC"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Submit Vehicle Application",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/submit",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications",
+								"{{vehicle_application_id}}",
+								"submit"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reopen Rejected Vehicle Application",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/applications/{{vehicle_application_id}}/reopen",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"applications",
+								"{{vehicle_application_id}}",
+								"reopen"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Standalone vehicle onboarding applications (`BIKE`, `SCOOTER`, `BICYCLE`, `CAR`): check VIN availability & ownership transfer eligibility, save plate/model specs, and attach `RC`, `INSURANCE`, or `TRANSFER_NOC` documents."
+		},
+		{
+			"name": "Approved Fleet & Active Vehicle",
+			"item": [
+				{
+					"name": "List My Approved Vehicles",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Approved Vehicle Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/{{ownership_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"{{ownership_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Select Active Delivery Vehicle",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/{{ownership_id}}/select",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"{{ownership_id}}",
+								"select"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Deactivate Approved Vehicle",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/vehicles/{{ownership_id}}/deactivate",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"vehicles",
+								"{{ownership_id}}",
+								"deactivate"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Inspect approved `VehicleOwnership` records and select or deactivate the active delivery vehicle required before going online for shifts."
+		},
+		{
+			"name": "Shift Availability & Live GPS",
+			"item": [
+				{
+					"name": "Get Delivery Agent Profile & Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/profile",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Online / Offline Availability",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"available\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/availability",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"availability"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Live GPS Location",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"latitude\":12.9721,\"longitude\":77.595}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/location",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"location"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Inspect courier profile, toggle online/offline shift availability (`available`), and stream real-time GPS coordinates (`latitude`, `longitude`) to PostGIS and Redis Geo (`delivery:agents:locations`)."
+		},
+		{
+			"name": "Order Dispatch & Last-Mile Delivery",
+			"item": [
+				{
+					"name": "Mark Order Picked Up (Out for Delivery)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/pickup",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"orders",
+								"{{order_id}}",
+								"pickup"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Order Delivered",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/delivered",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"orders",
+								"{{order_id}}",
+								"delivered"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Delivery Offer Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/offer-summary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"orders",
+								"{{order_id}}",
+								"offer-summary"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Accept Delivery Dispatch Offer",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/accept",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"orders",
+								"{{order_id}}",
+								"accept"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reject Delivery Dispatch Offer",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/delivery-agent/orders/{{order_id}}/reject",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"delivery-agent",
+								"orders",
+								"{{order_id}}",
+								"reject"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Inspect radial dispatch offers (`GET /offers/active`, `GET /orders/{orderId}/offer-summary`), atomically accept or reject order assignments, confirm restaurant package pickup (`OUT_FOR_DELIVERY`), and complete customer handoff (`DELIVERED`)."
+		},
+		{
+			"name": "In-App Notifications",
+			"item": [
+				{
+					"name": "List My Notifications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/notifications?unread=true&size=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "unread",
+									"value": "true"
+								},
+								{
+									"key": "size",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Unread Notification Count",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/notifications/unread-count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"notifications",
+								"unread-count"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Notification as Read",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/notifications/{{notification_id}}/read",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"notifications",
+								"{{notification_id}}",
+								"read"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark All Notifications as Read",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/notifications/read-all",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"notifications",
+								"read-all"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Fetch, count unread, and mark polymorphic joined-inheritance in-app notifications as read (`OrderNotification`, `PaymentNotification`, `RestaurantApplicationNotification`, `DeliveryAgentApplicationNotification`, `VehicleApplicationNotification`, `CuisineNotification`)."
+		},
+		{
+			"name": "Presigned S3 File Uploads",
+			"item": [
+				{
+					"name": "Generate Presigned S3 Upload URL",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"context\":\"RESTAURANT_IMAGE\",\"applicationId\":\"{{restaurant_application_id}}\",\"contentType\":\"image/jpeg\",\"fileName\":\"storefront.jpg\"}",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/files/upload-url",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"files",
+								"upload-url"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Generate short-lived presigned AWS S3 `PUT` URLs (`uploadUrl` + `fileUrl`) for direct client uploads (`RESTAURANT_IMAGE`, `RESTAURANT_DOCUMENT`)."
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "access_token",
+			"value": ""
+		},
+		{
+			"key": "refresh_token",
+			"value": ""
+		},
+		{
+			"key": "challenge_token",
+			"value": ""
+		},
+		{
+			"key": "session_id",
+			"value": ""
+		},
+		{
+			"key": "order_id",
+			"value": ""
+		}
+	]
 }

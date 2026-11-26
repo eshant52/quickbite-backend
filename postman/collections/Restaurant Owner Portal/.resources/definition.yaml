@@ -1,5 +1,6 @@
 $kind: collection
-description: "End-to-end `ROLE_RESTAURANT_OWNER` API collection: multi-step restaurant onboarding, cuisine category proposals, storefront & schedule operations, menu & dish image management, kitchen order fulfillment & earnings analytics, notifications, and presigned S3 uploads. Pair with the `Restaurant Owner Portal - Local Dev` environment."
+name: Restaurant Owner Portal
+description: "End-to-end `ROLE_RESTAURANT_OWNER` API collection: multi-step restaurant onboarding, cuisine category proposals, storefront & schedule operations, menu & dish image management, kitchen order fulfillment & earnings analytics, notifications, and presigned S3 uploads. Pair with the `Quickbite Local Dev` environment."
 auth:
   - id: c1a72410-1bde-4e97-859b-8152a68eb002
     type: bearer
@@ -7,9 +8,21 @@ auth:
     credentials:
       token: "{{access_token}}"
 variables:
-  access_token: ""
-  refresh_token: ""
-  challenge_token: ""
-  session_id: ""
-  restaurant_id: ""
-  order_id: ""
+  - key: access_token
+    value: ""
+    disabled: false
+  - key: refresh_token
+    value: ""
+    disabled: false
+  - key: challenge_token
+    value: ""
+    disabled: false
+  - key: session_id
+    value: ""
+    disabled: false
+  - key: restaurant_id
+    value: ""
+    disabled: false
+  - key: order_id
+    value: ""
+    disabled: false

@@ -1,32 +1,98 @@
 [
   {
+    "name": "Aarav Sharma",
     "email": "aarav.sharma@example.com",
+    "phoneNumber": "+919810000001",
     "password": "Password@123",
-    "enabled": true
+    "enabled": true,
+    "latitude": 21.1412,
+    "longitude": 79.0625,
+    "vehicle": {
+      "vinNumber": "MA3EJKD1S00100001",
+      "numberPlate": "MH-31-AB-1001",
+      "vehicleType": "BIKE",
+      "brand": "Bajaj",
+      "model": "Pulsar 150"
+    }
   },
   {
+    "name": "Vikram Singh",
     "email": "vikram.singh@example.com",
+    "phoneNumber": "+919810000002",
     "password": "Password@123",
-    "enabled": true
+    "enabled": true,
+    "latitude": 21.1438,
+    "longitude": 79.0680,
+    "vehicle": {
+      "vinNumber": "MA3EJKD1S00100002",
+      "numberPlate": "MH-31-CD-1002",
+      "vehicleType": "SCOOTER",
+      "brand": "Honda",
+      "model": "Activa 6G"
+    }
   },
   {
+    "name": "Pooja Patel",
     "email": "pooja.patel@example.com",
+    "phoneNumber": "+919810000003",
     "password": "Password@123",
-    "enabled": true
+    "enabled": true,
+    "latitude": 21.1375,
+    "longitude": 79.0590,
+    "vehicle": {
+      "vinNumber": "MA3EJKD1S00100003",
+      "numberPlate": "MH-31-EF-1003",
+      "vehicleType": "SCOOTER",
+      "brand": "TVS",
+      "model": "Jupiter 125"
+    }
   },
   {
+    "name": "Mohammed Rizwan",
     "email": "mohammed.rizwan@example.com",
+    "phoneNumber": "+919810000004",
     "password": "Password@123",
-    "enabled": true
+    "enabled": true,
+    "latitude": 21.1485,
+    "longitude": 79.0740,
+    "vehicle": {
+      "vinNumber": "MA3EJKD1S00100004",
+      "numberPlate": "MH-31-GH-1004",
+      "vehicleType": "BIKE",
+      "brand": "Hero",
+      "model": "Splendor Plus"
+    }
   },
   {
+    "name": "Sneha Mukherjee",
     "email": "sneha.mukherjee@example.com",
+    "phoneNumber": "+919810000005",
     "password": "Password@123",
-    "enabled": true
+    "enabled": true,
+    "latitude": 21.1290,
+    "longitude": 79.0510,
+    "vehicle": {
+      "vinNumber": "MA3EJKD1S00100005",
+      "numberPlate": "MH-31-IJ-1005",
+      "vehicleType": "SCOOTER",
+      "brand": "Suzuki",
+      "model": "Access 125"
+    }
   },
   {
+    "name": "Rajesh Kumar",
     "email": "rajesh.kumar@example.com",
+    "phoneNumber": "+919810000006",
     "password": "Password@123",
-    "enabled": true
+    "enabled": true,
+    "latitude": 21.1540,
+    "longitude": 79.0815,
+    "vehicle": {
+      "vinNumber": "MA3EJKD1S00100006",
+      "numberPlate": "MH-31-KL-1006",
+      "vehicleType": "BIKE",
+      "brand": "TVS",
+      "model": "Apache RTR 160"
+    }
   }
 ]

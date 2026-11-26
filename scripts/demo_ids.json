@@ -1,0 +1,277 @@
+{
+  "baseUrl": "http://localhost:8080",
+  "customer": {
+    "name": "Eshant Sonune",
+    "email": "eshantsonune52@gmail.com",
+    "password": "Password@123",
+    "addressId": "01a1f8d7-1c02-76e9-a968-b36a67817017"
+  },
+  "restaurants": [
+    {
+      "restaurantId": "01a1f8d7-1343-70ed-8c4e-538f5e650d60",
+      "name": "Haldiram's Planet Food - Dharampeth",
+      "cuisine": "North Indian & Sweets",
+      "cuisineId": "01a1f8d7-1297-7aed-81d1-6c072a5a795d",
+      "ownerEmail": "rakesh.agarwal@haldiramsnagpur.com",
+      "ownerPassword": "Password@123",
+      "menuItems": [
+        {
+          "id": "01a1f8d7-1370-705a-acd5-1647a4ab357d",
+          "name": "Shahi Gulab Jamun (2 Pcs)",
+          "price": 75.0,
+          "category": "Desserts & Sweets"
+        },
+        {
+          "id": "01a1f8d7-137d-71df-97f5-0c9824353ce1",
+          "name": "Kaju Katli (250g)",
+          "price": 260.0,
+          "category": "Desserts & Sweets"
+        },
+        {
+          "id": "01a1f8d7-1385-712b-a518-ee8bd0ece46f",
+          "name": "Royal Raj Kachori",
+          "price": 140.0,
+          "category": "Chaat"
+        },
+        {
+          "id": "01a1f8d7-138d-73b6-b0ea-23af36cc7c7a",
+          "name": "Pindi Chole Bhature",
+          "price": 165.0,
+          "category": "Main Course"
+        }
+      ]
+    },
+    {
+      "restaurantId": "01a1f8d7-14ae-7af5-b288-f84962ed8885",
+      "name": "La Pino'z Woodfired Pizzeria - Sitabuldi",
+      "cuisine": "Italian & Pizza",
+      "cuisineId": "01a1f8d7-1458-74c4-a5de-dd399fc1f5c4",
+      "ownerEmail": "marco.rossi@lapinoznagpur.com",
+      "ownerPassword": "Password@123",
+      "menuItems": [
+        {
+          "id": "01a1f8d7-14c8-73ba-991e-4c95f8a9506f",
+          "name": "Margherita Woodfired Pizza (Medium)",
+          "price": 249.0,
+          "category": "Pizzas"
+        },
+        {
+          "id": "01a1f8d7-14cf-7476-9c4e-b15f41b8bc22",
+          "name": "Farmhouse Veggie Supreme Pizza",
+          "price": 349.0,
+          "category": "Pizzas"
+        },
+        {
+          "id": "01a1f8d7-14d5-7d74-916e-311549ec6841",
+          "name": "Cheesy Garlic Breadsticks",
+          "price": 139.0,
+          "category": "Sides"
+        },
+        {
+          "id": "01a1f8d7-14dc-7649-9677-b56e86a1bb4f",
+          "name": "Warm Belgian Choco Lava Cake",
+          "price": 109.0,
+          "category": "Desserts"
+        }
+      ]
+    },
+    {
+      "restaurantId": "01a1f8d7-15fe-78f9-afa8-a7fac080435d",
+      "name": "Burger Barn & Grill - Sadar",
+      "cuisine": "Burgers & American",
+      "cuisineId": "01a1f8d7-15a9-74b8-b7b5-684174594b6b",
+      "ownerEmail": "rohan.kapoor@burgerbarn.com",
+      "ownerPassword": "Password@123",
+      "menuItems": [
+        {
+          "id": "01a1f8d7-1616-7af9-b063-804e199c9757",
+          "name": "Classic Crispy Veggie Burger",
+          "price": 149.0,
+          "category": "Burgers"
+        },
+        {
+          "id": "01a1f8d7-161d-79f3-bc1e-733f6a622b17",
+          "name": "Double Peri-Peri Paneer Smash Burger",
+          "price": 219.0,
+          "category": "Burgers"
+        },
+        {
+          "id": "01a1f8d7-1623-7d7c-90f0-f0c6f4a257ce",
+          "name": "Loaded Cheese & Jalapeno Crinkle Fries",
+          "price": 129.0,
+          "category": "Fries & Sides"
+        },
+        {
+          "id": "01a1f8d7-162a-7028-a622-3811985f79ba",
+          "name": "Beer-Battered Crunchy Onion Rings (8 Pcs)",
+          "price": 119.0,
+          "category": "Fries & Sides"
+        }
+      ]
+    },
+    {
+      "restaurantId": "01a1f8d7-1743-7e9f-8828-1e2ae3318758",
+      "name": "Brewberrys Artisanal Cafe - Civil Lines",
+      "cuisine": "Cafe & Bakery",
+      "cuisineId": "01a1f8d7-16ef-7f81-8e3e-a3ef26c9d67d",
+      "ownerEmail": "ananya.deshmukh@brewberryscafe.com",
+      "ownerPassword": "Password@123",
+      "menuItems": [
+        {
+          "id": "01a1f8d7-177e-74e5-b477-75140ebde88f",
+          "name": "Hazelnut Cold Coffee Frappe",
+          "price": 175.0,
+          "category": "Cold Coffee"
+        },
+        {
+          "id": "01a1f8d7-1789-7d8d-895e-000e8bd55df6",
+          "name": "Artisanal Classic Cappuccino",
+          "price": 140.0,
+          "category": "Hot Coffee"
+        },
+        {
+          "id": "01a1f8d7-1792-7343-a0c8-ca80cb7d0055",
+          "name": "Grilled Spinach & Corn Sourdough Sandwich",
+          "price": 195.0,
+          "category": "Sandwiches"
+        },
+        {
+          "id": "01a1f8d7-1799-7d81-830d-d47f02e5e154",
+          "name": "Belgian Dark Chocolate Overload Waffle",
+          "price": 210.0,
+          "category": "Waffles & Bakery"
+        }
+      ]
+    },
+    {
+      "restaurantId": "01a1f8d7-18fb-7185-a9ff-e7f9fc3644ee",
+      "name": "Sip & Chill Beverage Lounge - Bajaj Nagar",
+      "cuisine": "Beverages & Shakes",
+      "cuisineId": "01a1f8d7-1882-7537-a29c-afc0226e7415",
+      "ownerEmail": "kabir.mehta@sipandchill.com",
+      "ownerPassword": "Password@123",
+      "menuItems": [
+        {
+          "id": "01a1f8d7-19ba-7bf3-80a6-5d81fe112787",
+          "name": "Alphonso Mango Thick Shake",
+          "price": 160.0,
+          "category": "Thick Shakes"
+        },
+        {
+          "id": "01a1f8d7-19cd-7a62-a28e-6b0655e6bc4e",
+          "name": "Oreo Belgian Fudge Freakshake",
+          "price": 185.0,
+          "category": "Thick Shakes"
+        },
+        {
+          "id": "01a1f8d7-19e4-7ae1-a888-dbcb8af83318",
+          "name": "Virgin Mint Mojito Sparkler",
+          "price": 130.0,
+          "category": "Mocktails & Coolers"
+        },
+        {
+          "id": "01a1f8d7-19ee-7906-836f-d2669a5aa247",
+          "name": "Watermelon Basil Cold-Pressed Juice",
+          "price": 145.0,
+          "category": "Fresh Juices"
+        }
+      ]
+    },
+    {
+      "restaurantId": "01a1f8d7-1b20-7fd7-a7cd-cd9b9c6fa4d8",
+      "name": "Dakshin Spice & Biryani House - Pratap Nagar",
+      "cuisine": "South Indian & Biryani",
+      "cuisineId": "01a1f8d7-1abc-7276-99bb-0eb645b35c37",
+      "ownerEmail": "venkat.iyer@dakshinbiryani.com",
+      "ownerPassword": "Password@123",
+      "menuItems": [
+        {
+          "id": "01a1f8d7-1b37-77df-ad87-572673754af6",
+          "name": "Mysore Ghee Masala Dosa",
+          "price": 135.0,
+          "category": "South Indian"
+        },
+        {
+          "id": "01a1f8d7-1b3d-7a2d-aad9-0ff2a6f5e070",
+          "name": "Hyderabadi Subz Dum Biryani",
+          "price": 240.0,
+          "category": "Biryani"
+        },
+        {
+          "id": "01a1f8d7-1b44-710e-acaf-13e3b463ef24",
+          "name": "Ghee Podi Thatte Idli (2 Pcs)",
+          "price": 110.0,
+          "category": "South Indian"
+        },
+        {
+          "id": "01a1f8d7-1b49-7d68-9848-e01701cd4585",
+          "name": "Traditional Kumbakonam Filter Kaapi",
+          "price": 65.0,
+          "category": "Beverages"
+        }
+      ]
+    }
+  ],
+  "deliveryAgents": [
+    {
+      "agentId": "01a1f8d7-0ace-736c-88a2-aaa7907bd5ae",
+      "userId": "01a1f8d7-093a-73be-9e66-948cee33196a",
+      "name": "Aarav Sharma",
+      "email": "aarav.sharma@example.com",
+      "password": "Password@123",
+      "vehicle": "Bajaj Pulsar 150 (MH-31-AB-1001)",
+      "latitude": 21.1412,
+      "longitude": 79.0625
+    },
+    {
+      "agentId": "01a1f8d7-0d10-7a62-812d-1f5d6b52f339",
+      "userId": "01a1f8d7-0c48-7316-a1c5-200bc08a8cba",
+      "name": "Vikram Singh",
+      "email": "vikram.singh@example.com",
+      "password": "Password@123",
+      "vehicle": "Honda Activa 6G (MH-31-CD-1002)",
+      "latitude": 21.1438,
+      "longitude": 79.068
+    },
+    {
+      "agentId": "01a1f8d7-0e46-76e1-a7f7-939511f00b8c",
+      "userId": "01a1f8d7-0d7c-7eed-ada4-6c84fe767246",
+      "name": "Pooja Patel",
+      "email": "pooja.patel@example.com",
+      "password": "Password@123",
+      "vehicle": "TVS Jupiter 125 (MH-31-EF-1003)",
+      "latitude": 21.1375,
+      "longitude": 79.059
+    },
+    {
+      "agentId": "01a1f8d7-0f64-7cac-a82b-0dd3813d2238",
+      "userId": "01a1f8d7-0eb2-7db2-8697-db6f214ce776",
+      "name": "Mohammed Rizwan",
+      "email": "mohammed.rizwan@example.com",
+      "password": "Password@123",
+      "vehicle": "Hero Splendor Plus (MH-31-GH-1004)",
+      "latitude": 21.1485,
+      "longitude": 79.074
+    },
+    {
+      "agentId": "01a1f8d7-107e-7eb4-86c5-ce14ca24bcd1",
+      "userId": "01a1f8d7-0fcf-7435-a426-0c69aa6ee82d",
+      "name": "Sneha Mukherjee",
+      "email": "sneha.mukherjee@example.com",
+      "password": "Password@123",
+      "vehicle": "Suzuki Access 125 (MH-31-IJ-1005)",
+      "latitude": 21.129,
+      "longitude": 79.051
+    },
+    {
+      "agentId": "01a1f8d7-1193-7edd-a3bf-4020d92f4fc3",
+      "userId": "01a1f8d7-10e5-7a93-adf1-62d696c09e14",
+      "name": "Rajesh Kumar",
+      "email": "rajesh.kumar@example.com",
+      "password": "Password@123",
+      "vehicle": "TVS Apache RTR 160 (MH-31-KL-1006)",
+      "latitude": 21.154,
+      "longitude": 79.0815
+    }
+  ]
+}

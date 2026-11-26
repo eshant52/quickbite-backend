@@ -1,5 +1,6 @@
 $kind: collection
-description: "End-to-end `ROLE_CUSTOMER` API collection: public restaurant & PostGIS geo-catalog discovery, profile & saved GPS addresses, Redis-backed shopping cart & OSRM/Mapbox checkout preview, order placement & tracking, Razorpay/stub payment verification, reviews, notifications, and presigned S3 uploads. Pair with the `Customer Portal - Local Dev` environment."
+name: Customer Portal
+description: "End-to-end `ROLE_CUSTOMER` API collection: public restaurant & PostGIS geo-catalog discovery, profile & saved GPS addresses, Redis-backed shopping cart & OSRM/Mapbox checkout preview, order placement & tracking, Razorpay/stub payment verification, reviews, notifications, and presigned S3 uploads. Pair with the `Quickbite Local Dev` environment."
 auth:
   - id: c1a72410-1bde-4e97-859b-8152a68eb001
     type: bearer
@@ -35,12 +36,6 @@ variables:
     value: ""
     disabled: false
   - key: tip_amount
-    value: ""
-    disabled: false
-  - key: tip_amount
-    value: ""
-    disabled: false
-  - key: address_id
     value: ""
     disabled: false
   - key: order_id

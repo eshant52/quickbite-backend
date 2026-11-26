@@ -46,7 +46,7 @@ Welcome to the QuickBite Backend technical documentation directory. This collect
 - [**Dispatch Engine & Geospatial Routing (`dispatch-and-routing.md`)**](dispatch-and-routing.md)
   - 3-round expanding radius dispatch algorithm (3km @ 2m &rarr; 6km @ 3m &rarr; 10km @ 5m).
   - 45-second driver offer lifecycle and candidate selection strategies.
-  - Redis geospatial tracking (`GEOADD`, `GEORADIUSBYMEMBER`) with PostgreSQL synchronization.
+  - Redis geospatial tracking (`GEOADD`, `GEOSEARCH`) with PostgreSQL synchronization.
   - 3-tier Composite Routing Gateway (OSRM native routing &rarr; Mapbox API &rarr; Haversine fallback).
   - Dynamic delivery fee and driver earnings calculation engines.
 - [**Payments, Webhooks & Automated Reconciliation (`payments-and-reconciliation.md`)**](payments-and-reconciliation.md)
@@ -56,6 +56,10 @@ Welcome to the QuickBite Backend technical documentation directory. This collect
   - Kafka event-driven payment refund orchestration.
 
 ### Operations & Setup
+- [**AWS Deployment Guide (`deployment.md`)**](deployment.md)
+  - End-to-end ECS Express Mode (Fargate `arm64`) deployment: VPC/security groups, RDS PostGIS, ElastiCache, MSK IAM, S3, ECR, SSM secrets.
+  - Exact IAM roles/policies (task execution, task, infrastructure, GitHub OIDC deploy role).
+  - Field-by-field Express Mode wizard values, environment variables, CI/CD alignment, verification, and troubleshooting.
 - [**End-to-End Demo Guide & Offer Tracker (`../README.md#🎬-end-to-end-demo-guide-placing-an-order--delivery-offer-tracking`)**](../README.md#🎬-end-to-end-demo-guide-placing-an-order--delivery-offer-tracking)
   - Complete copy-paste Postman / cURL walkthrough from order placement to restaurant acceptance.
   - Multi-agent offer tracker CLI (`scripts/track_delivery_offers.py`) with Redis GEO heartbeats and live offer cards.

@@ -10,7 +10,7 @@ The `cart` and `order` bounded contexts are engineered for high concurrency, zer
 
 * **Non-Transactional Checkout Orchestration**: [`OrderServiceImpl.placeOrder`](../src/main/java/com/quickbite/quickbite/order/service/OrderServiceImpl.java), [`retryPayment`](../src/main/java/com/quickbite/quickbite/order/service/OrderServiceImpl.java), and [`CartCheckoutServiceImpl.getCheckoutPreview`](../src/main/java/com/quickbite/quickbite/cart/service/CartCheckoutServiceImpl.java) are intentionally non-`@Transactional` orchestrators. Database mutations are delegated to isolated, short-lived transactions (`OrderCreationServiceImpl`, `OrderLifecycleServiceImpl`, `PaymentLifecycleServiceImpl`) so external HTTP calls to routing engines (OSRM/Mapbox) and payment gateways (Razorpay) **never** hold open PostgreSQL connections or row locks.
 * **Unified Pricing & Price-Drift Protection**: Both checkout preview (`GET /api/v1/customer/cart/checkout-preview`) and order placement (`POST /api/v1/customer/orders`) delegate to [`OrderPricingServiceImpl`](../src/main/java/com/quickbite/quickbite/order/service/OrderPricingServiceImpl.java). If a restaurant changes item prices or delivery fees shift between checkout preview and order placement, `OrderCreationServiceImpl` compares the client's `expectedTotal` against the freshly computed `PriceBreakdown.totalAmount()` and aborts with HTTP `409 Conflict` (`PriceChangedException`), returning the updated breakdown.
-* **Synchronized Cross-Domain State via `BEFORE_COMMIT` Events**: The `payment` domain never imports `order` repositories. Instead, payment state transitions publish Spring application events (`PaymentSucceededEvent`, `PaymentFailedEvent`, `PaymentCancelledEvent`) handled by [`order.listener.PaymentEventListener`](../src/main/java/com/quickbite/quickbite/order/listener/PaymentEventListener.java) in `TransactionPhase.BEFORE_COMMIT` so payment and order updates commit or roll back atomically in the same database transaction.
+* **Synchronized Cross-Domain State via `BEFORE_COMMIT` Events**: The `payment` domain never imports `order` repositories. Instead, payment state transitions publish Spring application events (`CodPaymentInitiatedEvent`, `PaymentSucceededEvent`, `PaymentFailedEvent`, `PaymentCancelledEvent`) handled by [`order.listener.PaymentEventListener`](../src/main/java/com/quickbite/quickbite/order/listener/PaymentEventListener.java) in `TransactionPhase.BEFORE_COMMIT` so payment and order updates commit or roll back atomically in the same database transaction.
 * **Dual-Layer Distributed Timeout Engine**:
   1. **Primary (Real-Time Event-Driven)**: Redisson Delayed Queues (`RDelayedQueue` + `RBlockingQueue`) managed by [`OrderTimeoutQueueService`](../src/main/java/com/quickbite/quickbite/order/service/OrderTimeoutQueueService.java) and consumed via atomic `BLPOP` by [`OrderTimeoutConsumer`](../src/main/java/com/quickbite/quickbite/order/consumer/OrderTimeoutConsumer.java) for both the **15-minute payment abandonment window** and the **2-minute kitchen acceptance deadline**.
   2. **Secondary (Safety-Net Reapers)**: [`OrderAbandonmentScheduler`](../src/main/java/com/quickbite/quickbite/order/scheduler/OrderAbandonmentScheduler.java) and [`RestaurantAcceptanceTimeoutScheduler`](../src/main/java/com/quickbite/quickbite/order/scheduler/RestaurantAcceptanceTimeoutScheduler.java) periodically sweep PostgreSQL under Redisson distributed locks (`RLock`), fetching candidate IDs without batch locks and isolating each cancellation/abandonment in its own `REQUIRES_NEW` transaction.
@@ -37,7 +37,7 @@ com.quickbite.quickbite
 │   ├── listener
 │   │   └── CartEventListener.java                    # Clears customer cart upon OrderPlacedEvent
 │   ├── model
-│   │   ├── Cart.java                                 # Customer cart entity (@Version optimistic lock)
+│   │   ├── Cart.java                                 # Customer cart entity (single-restaurant guard, 24h rolling TTL)
 │   │   └── CartItem.java                             # Snapshot of MenuItem quantity & unitPrice
 │   └── service
 │       ├── CartService.java / CartServiceImpl.java   # CRUD, single-restaurant guard, 24h rolling TTL
@@ -203,7 +203,7 @@ Calling `GET /api/v1/customer/cart/checkout-preview?addressId=<uuid>&tipAmount=2
 flowchart LR
     Start["Cart + Customer Address + Tip"] --> RouteCache{"Redis Route Cache<br/>quickbite:route:restAddrId:custAddrId<br/>(5-min TTL)"}
     RouteCache -->|Cache Hit| Chain["Fee Calculator Chain"]
-    RouteCache -->|Cache Miss| Gateway["RoutingGateway<br/>(OSRM -> Haversine x1.35 Fallback)"]
+    RouteCache -->|Cache Miss| Gateway["RoutingGateway<br/>(OSRM / Mapbox -> Haversine x1.35 Fallback)"]
     Gateway --> SaveCache["Cache RouteResult in Redis (5m)"] --> Chain
 
     subgraph FeeChain["Chain of Responsibility (DeliveryFeeCalculator)"]
@@ -234,7 +234,7 @@ $$\text{Total Amount} = \text{SubTotal} - \text{Discount} + \text{Delivery Fee} 
 stateDiagram-v2
     [*] --> AWAITING_PAYMENT: TX 1 OrderCreationService.createOrderWithItems
 
-    AWAITING_PAYMENT --> PLACED: COD Immediate Success or Online PaymentSucceededEvent
+    AWAITING_PAYMENT --> PLACED: COD CodPaymentInitiatedEvent (Payment stays PENDING) or Online PaymentSucceededEvent
     AWAITING_PAYMENT --> PAYMENT_FAILED: PaymentFailedEvent or PaymentCancelledEvent
     AWAITING_PAYMENT --> ABANDONED: 15m Payment Timeout via Redisson Queue or Reaper
     AWAITING_PAYMENT --> CANCELLED: Customer cancels before paying - CUSTOMER_CANCELLED
@@ -279,11 +279,10 @@ When an order enters `OrderStatus.CANCELLED`, `order.cancellationReason` records
 To prevent double-clicks, price drift, and HikariCP connection pool exhaustion:
 1. **Checkout Preview (`CartCheckoutServiceImpl.getCheckoutPreview`)**: Runs without `@Transactional`. Loads User, Address, and Cart (via `@EntityGraph`), validates item availability, and invokes `OrderPricingServiceImpl.calculatePrice`. This warms the 5-minute Redis route cache (`quickbite:route:<restAddrId>:<custAddrId>`).
 2. **5-Second Cooldown Guard**: `OrderServiceImpl.placeOrder` acquires a Redisson bucket `quickbite:cooldown:place-order:<customerId>` (`SET NX EX 5s`). If order validation fails, the cooldown key is immediately deleted in the `catch` block so the user can fix the issue and retry.
-3. **TX 1 (`OrderCreationServiceImpl.createOrderWithItems`)**:
-   - Validates customer, delivery address, active non-expired cart, and item availability.
-   - Computes `PriceBreakdown` (hitting the warm Redis route cache) and verifies `req.expectedTotal()` (throws `PriceChangedException` on mismatch).
-   - Persists `Order` in `AWAITING_PAYMENT` via `OrderLifecycleService.persistNewOrder`, snapshots `OrderItem` rows, writes initial `OrderStatusHistory`, and **commits TX 1** (releasing the DB connection).
-   - Schedules the 15-minute abandonment timer in Redisson (`OrderTimeoutQueueService.scheduleOrderAbandonment`).
+3. **TX 1 (`OrderCreationServiceImpl.createOrderWithItems` &rarr; `OrderLifecycleService.persistNewOrder`)**:
+   - `OrderCreationServiceImpl.createOrderWithItems` runs non-transactionally to validate the customer, delivery address, active non-expired cart, and item availability, compute `PriceBreakdown` (hitting the warm Redis route cache), and verify `req.expectedTotal()` (throwing `PriceChangedException` on mismatch).
+   - It then invokes `@Transactional` `OrderLifecycleService.persistNewOrder` (**TX 1**) to persist `Order` in `AWAITING_PAYMENT`, snapshot `OrderItem` rows, write initial `OrderStatusHistory`, and commit immediately (releasing the DB connection).
+   - Post-commit, it schedules the 15-minute abandonment timer in Redisson (`OrderTimeoutQueueService.scheduleOrderAbandonment`).
 4. **TX 2 (`PaymentProcessingService.initiatePayment`)**: Branches by `PaymentMethod` (`COD` vs `ONLINE`).
 
 #### Diagram 6.1a: Phase 1 (Checkout Preview) & Phase 2 (TX 1: Order Creation & Price-Drift Guard)
@@ -297,7 +296,7 @@ sequenceDiagram
     participant OrderSvc as OrderServiceImpl
     participant CreateSvc as OrderCreationServiceImpl
     participant PriceSvc as OrderPricingServiceImpl
-    participant OSRM as RoutingGateway (OSRM)
+    participant OSRM as RoutingGateway (OSRM / Mapbox)
     participant LifeSvc as OrderLifecycleServiceImpl
     participant TimeoutQ as OrderTimeoutQueueService
     participant Redis as Redis (Cache / Lock / Queue)
@@ -323,25 +322,26 @@ sequenceDiagram
     OrderCtrl->>OrderSvc: placeOrder(customerId, req)
     OrderSvc->>Redis: RBucket.setIfAbsent("quickbite:cooldown:place-order:" + customerId, 5s)
 
-    rect rgb(240, 248, 255)
-        Note over OrderSvc, DB: Phase 2 (TX 1): Isolated Order Creation & Price-Drift Guard
-        OrderSvc->>CreateSvc: createOrderWithItems(customerId, req)
-        CreateSvc->>DB: Load User, Address, Detailed Cart
-        CreateSvc->>PriceSvc: calculatePrice(cart, customerAddress, tipAmount)
-        PriceSvc->>Redis: GET quickbite:route:{restAddrId}:{custAddrId} (Sub-ms Cache Hit!)
-        PriceSvc-->>CreateSvc: PriceBreakdown
-        alt expectedTotal != null && PriceBreakdown.totalAmount != expectedTotal
-            CreateSvc-->>OrderSvc: throw PriceChangedException (HTTP 409)
-            OrderSvc->>Redis: Delete cooldown key (allow immediate customer retry)
-            OrderSvc-->>Customer: 409 Conflict (ProblemDetail with updated PriceBreakdown)
-        else Price Matches
+    Note over CreateSvc, PriceSvc: Non-@Transactional: Load entities, compute price & verify expectedTotal
+    OrderSvc->>CreateSvc: createOrderWithItems(customerId, req)
+    CreateSvc->>DB: Load User, Address, Detailed Cart
+    CreateSvc->>PriceSvc: calculatePrice(cart, customerAddress, tipAmount)
+    PriceSvc->>Redis: GET quickbite:route:{restAddrId}:{custAddrId} (Warm Redis Cache Hit!)
+    PriceSvc-->>CreateSvc: PriceBreakdown
+    alt expectedTotal != null && PriceBreakdown.totalAmount != expectedTotal
+        CreateSvc-->>OrderSvc: throw PriceChangedException (HTTP 409)
+        OrderSvc->>Redis: Delete cooldown key (allow immediate customer retry)
+        OrderSvc-->>Customer: 409 Conflict (ProblemDetail with updated PriceBreakdown)
+    else Price Matches
+        rect rgb(240, 248, 255)
+            Note over CreateSvc, DB: Phase 2 (TX 1): Isolated Order Persistence Transaction
             CreateSvc->>LifeSvc: persistNewOrder(customer, address, cart, route, pricing, AWAITING_PAYMENT)
             LifeSvc->>DB: INSERT Order (AWAITING_PAYMENT), OrderItems, OrderStatusHistory
             Note over LifeSvc, DB: TX 1 Commits — PostgreSQL Connection Released Immediately
-            CreateSvc->>TimeoutQ: scheduleOrderAbandonment(orderId, 15m)
-            TimeoutQ->>Redis: RDelayedQueue.offer(orderId, 15m)
-            CreateSvc-->>OrderSvc: savedOrder (AWAITING_PAYMENT) -> Proceed to Phase 3 (TX 2)
         end
+        CreateSvc->>TimeoutQ: scheduleOrderAbandonment(orderId, 15m)
+        TimeoutQ->>Redis: RDelayedQueue.offer(orderId, 15m)
+        CreateSvc-->>OrderSvc: savedOrder (AWAITING_PAYMENT) -> Proceed to Phase 3 (TX 2)
     end
 ```
 
@@ -366,19 +366,19 @@ sequenceDiagram
 
     alt PaymentMethod == COD (Cash on Delivery)
         rect rgb(235, 255, 235)
-            Note over OrderSvc, Kafka: Phase 3A (TX 2A): Synchronous COD Confirmation
+            Note over OrderSvc, Kafka: Phase 3A (TX 2A): Synchronous COD Order Confirmation (Payment Stays PENDING)
             OrderSvc->>PaySvc: initiatePayment(savedOrder, COD)
-            PaySvc->>DB: INSERT Payment (PENDING -> SUCCESS)
-            PaySvc->>PayListener: Publish PaymentSucceededEvent (BEFORE_COMMIT)
+            PaySvc->>DB: INSERT Payment (status = PENDING) & PaymentStatusHistory
+            PaySvc->>PayListener: Publish CodPaymentInitiatedEvent (BEFORE_COMMIT)
             PayListener->>DB: UPDATE Order -> PLACED (set 2m acceptance deadline) & INSERT History
             PayListener->>CartListener: Publish OrderPlacedEvent
             CartListener->>DB: clearCart(customerId)
-            Note over PaySvc, DB: TX 2A Commits Atomically (Payment + Order + Cart Clear)
+            Note over PaySvc, DB: TX 2A Commits Atomically (Pending COD Payment + Placed Order + Cart Clear)
             PayListener->>TimeoutListener: onOrderPlaced (AFTER_COMMIT)
             TimeoutListener->>TimeoutQ: scheduleRestaurantAcceptanceTimeout(orderId, 2m)
             TimeoutQ->>Redis: RDelayedQueue.offer(orderId, 2m)
             PayListener-->>Kafka: Publish OrderPlacedEvent to quickbite.order.events (AFTER_COMMIT)
-            PaySvc-->>OrderCtrl: 201 Created (CodPaymentResult)
+            PaySvc-->>OrderCtrl: 201 Created (CodPaymentResult: status = PENDING)
         end
     else PaymentMethod is Online (UPI, CARD, NET_BANKING, WALLET)
         rect rgb(255, 248, 235)
@@ -387,7 +387,7 @@ sequenceDiagram
             PaySvc->>DB: Short TX: INSERT Payment (PENDING)
             PaySvc->>PaySvc: HTTP POST to Razorpay /v1/orders (Outside DB TX!)
             PaySvc->>DB: Short TX: UPDATE Payment with gatewayOrderId
-            PaySvc-->>OrderCtrl: 201 Created (OnlinePaymentResult: gatewayOrderId, providerKeyId)
+            PaySvc-->>OrderCtrl: 201 Created (OnlinePaymentResult: gatewayOrderId, keyId)
             Customer->>PaySvc: Completes checkout -> POST /api/v1/customer/payments/verify (or Webhook)
             PaySvc->>DB: Verify HMAC-SHA256 & UPDATE Payment -> SUCCESS
             PaySvc->>PayListener: Publish PaymentSucceededEvent (BEFORE_COMMIT)
@@ -493,7 +493,7 @@ sequenceDiagram
     participant DispatchSvc as DeliveryDispatchServiceImpl
     participant GeoSelector as RedisDeliveryCandidateSelector
     participant RedisGeo as Redis GEO & Heartbeats
-    participant OSRM as RoutingGateway (OSRM)
+    participant OSRM as RoutingGateway (OSRM / Mapbox)
     participant DB as PostgreSQL
     actor Driver as Delivery Agent
 
@@ -518,7 +518,7 @@ sequenceDiagram
             GeoSelector->>DB: Fallback to PostgisDeliveryCandidateSelector (ST_DWithin geography GiST)
         end
         DispatchSvc->>DB: INSERT delivery_offers (PENDING, 45s TTL — partial unique index)
-        DispatchSvc-->>Driver: Notify DeliveryOfferCreatedEvent
+        DispatchSvc-->>Driver: Publish DeliveryOfferCreatedEvent (Kafka -> In-App / Stub Push)
     end
 
     alt All 3 Rounds Exhausted without Acceptance
@@ -541,7 +541,7 @@ sequenceDiagram
     actor Customer as Customer App
 
     par Track A: Driver Accepts Offer
-        Driver->>DelivCtrl: POST /api/v1/delivery-agent/offers/{offerId}/accept
+        Driver->>DelivCtrl: POST /api/v1/delivery-agent/orders/{orderId}/accept
         DelivCtrl->>DB: Assign driver to Order, lock agent (assigned = true), OrderDispatch = AGENT_ASSIGNED
     and Track B: Kitchen Food Preparation
         Owner->>RestCtrl: POST /api/v1/restaurant-owner/orders/{id}/mark-preparing?restaurantId=...
@@ -552,21 +552,21 @@ sequenceDiagram
         RestCtrl-->>Owner: 200 OK (OrderResponse: READY_FOR_PICKUP)
     end
 
-    Driver->>DelivCtrl: POST /api/v1/delivery-agent/orders/{id}/pickup
+    Driver->>DelivCtrl: POST /api/v1/delivery-agent/orders/{orderId}/pickup
     DelivCtrl->>DB: Verify assigned driver & status == READY_FOR_PICKUP -> OUT_FOR_DELIVERY
     DelivCtrl->>Kafka: Publish OrderStatusChangedEvent (OUT_FOR_DELIVERY)
 
-    Driver->>DelivCtrl: POST /api/v1/delivery-agent/orders/{id}/deliver
-    DelivCtrl->>DB: Transition OUT_FOR_DELIVERY -> DELIVERED, free driver, mark COD payment SUCCESS
+    Driver->>DelivCtrl: POST /api/v1/delivery-agent/orders/{orderId}/delivered
+    DelivCtrl->>DB: Transition OUT_FOR_DELIVERY -> DELIVERED, free driver, paymentService.collectCodPayment() (PENDING -> SUCCESS)
     DelivCtrl->>Kafka: Publish OrderStatusChangedEvent (DELIVERED)
-    Kafka-->>Customer: Push / In-App Order Notification
+    Kafka-->>Customer: Notification Listener -> In-App Alert / Stub Push
 ```
 
 ### Post-Delivery Admin Refunds (`AdminOrderController`)
 If a customer reports a quality or fulfillment issue after an order has reached `OrderStatus.DELIVERED`, an administrator can trigger a post-delivery refund:
 * **Endpoint**: `POST /api/v1/admin/orders/{orderId}/refund` (`ROLE_ADMIN`)
 * **Payload**: `{ "reason": "Missing item reported by customer" }`
-* **Behavior**: `AdminOrderServiceImpl.refundDeliveredOrder` verifies `order.getCurrentStatus() == OrderStatus.DELIVERED` and delegates to `paymentService.refundSuccessfulPayment(orderId, reason)`, which emits `PaymentRefundRequestedEvent` to refund the customer via Razorpay while keeping the historical order status as `DELIVERED`.
+* **Behavior**: `AdminOrderServiceImpl.refundDeliveredOrder` verifies `order.getCurrentStatus() == OrderStatus.DELIVERED` and delegates to `paymentService.refundSuccessfulPayment(orderId, reason)`, which emits `PaymentRefundRequestedEvent` to refund online payments via Razorpay (or transitions collected `SUCCESS` COD payments directly to `REFUNDED`) while keeping the historical order status as `DELIVERED`.
 
 ---
 
@@ -592,10 +592,10 @@ If a customer reports a quality or fulfillment issue after an order has reached 
 ### 9.2 Stampede-Safe Redis Caching & Route Caching
 * **Transaction-Aware Domain Caches (`RedisConfig`)**: Configured with `@Cacheable(..., sync = true)` (preventing cache stampedes under concurrent load) and `.transactionAware()` (delaying `@CacheEvict` until transaction commit):
   * `cuisines` (24h TTL), `restaurant_profile` (30m TTL), `restaurant_rating_summary` (1h TTL), `restaurant_menu` (15m TTL), `user_profile` (15m TTL), `user_addresses` (15m TTL), `notification_unread_count` (5m TTL).
-* **OSRM Route Cache (`OrderPricingServiceImpl`)**: Caches `RouteResult` under `quickbite:route:<restAddrId>:<custAddrId>` for **5 minutes**. Because `GET /checkout-preview` populates this key, the subsequent `POST /orders` call achieves a sub-millisecond Redis hit, completely bypassing external OSRM HTTP latency during order placement.
+* **Route Cache (`OrderPricingServiceImpl`)**: Caches `RouteResult` under `quickbite:route:<restAddrId>:<custAddrId>` for **5 minutes**. Because `GET /checkout-preview` populates this key, the subsequent `POST /orders` call reads the cached route from Redis, completely bypassing external OSRM / Mapbox HTTP latency during order placement.
 
 ### 9.3 Event-Driven Timeouts & In-Memory Geospatial Dispatch
-* **Zero Idle DB Polling**: Replaced 30-second/5-minute DB polling sweeps with Redisson `RDelayedQueue` + `RBlockingQueue` (`BLPOP`), reducing idle timeout polling queries to ~0/hour while delivering sub-second timeout accuracy.
+* **Minimal Idle DB Polling**: Replaced 30-second/5-minute DB polling sweeps with Redisson `RDelayedQueue` + `RBlockingQueue` (`BLPOP`), reducing idle timeout polling from **132 queries/hour** to **3 safety-net polls/hour** (`1/hr` abandonment + `2/hr` acceptance; **97.7% reduction**) while delivering sub-second timeout accuracy.
 * **In-Memory Driver Selection (`RedisDeliveryCandidateSelector`)**: Queries `quickbite:delivery:geo:locations` via Redis `GEOSEARCH` and filters 60-second heartbeat keys (`quickbite:delivery:geo:heartbeat:<agentId>`) in RAM before hydrating only eligible drivers from PostgreSQL.
 
 ---

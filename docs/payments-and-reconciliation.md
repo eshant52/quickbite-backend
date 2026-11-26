@@ -45,7 +45,7 @@ classDiagram
 | Strategy | Active Profiles | Supported `PaymentMethod` Values | Flow Description |
 | :--- | :--- | :--- | :--- |
 | **`OnlinePaymentStrategy`** | `!dev` or `razorpay` | `UPI`, `CARD`, `NET_BANKING`, `WALLET` (`method.isOnline()`) | Creates a `PENDING` payment in TX, calls `PaymentGateway.createOrder` **outside** TX, and updates `gatewayOrderId`. Order stays `AWAITING_PAYMENT` until verified or captured via webhook. |
-| **`CodPaymentStrategy`** | All | `COD` | Creates a `PENDING` payment and immediately marks it `SUCCESS`, firing `PaymentSucceededEvent` (`BEFORE_COMMIT`) so the order transitions to `PLACED` and clears the cart. |
+| **`CodPaymentStrategy`** | All | `COD` | Creates a `PENDING` payment via `PaymentLifecycleService.createPendingPayment()`, firing `CodPaymentInitiatedEvent` (`BEFORE_COMMIT`) so the order transitions to `PLACED` and clears the cart. The COD payment remains `PENDING` until doorstep cash collection (`DeliveryServiceImpl.markDelivered()` &rarr; `paymentService.collectCodPayment()`) transitions it to `SUCCESS`. |
 | **`StubOnlinePaymentStrategy`** | `dev & !razorpay` | `UPI`, `CARD`, `NET_BANKING`, `WALLET` | Development stub that returns a local `paymentUrl` without external Razorpay network calls. |
 
 ---
@@ -72,7 +72,7 @@ sequenceDiagram
     RzGateway->>Razorpay: POST /v1/orders
     Razorpay-->>RzGateway: { id: "order_xyz123", status: "created" }
     RzGateway-->>PayService: GatewayOrder
-    PayService-->>OrderCtrl: OnlinePaymentResult (PENDING, gatewayOrderId, providerKeyId)
+    PayService-->>OrderCtrl: OnlinePaymentResult (PENDING, gatewayOrderId, keyId)
     OrderCtrl-->>App: 201 Created (OnlinePaymentResult)
 
     Customer->>App: Completes payment in Razorpay Checkout modal
@@ -88,6 +88,39 @@ sequenceDiagram
         WebhookCtrl->>PayService: processOnlinePaymentSuccess(gatewayOrderId, gatewayPaymentId)
         PayService->>OrderListener: Idempotent transition to SUCCESS & Order -> PLACED
     end
+```
+
+### 2.1 Cash on Delivery (COD) Payment Lifecycle
+
+Unlike online payments, Cash on Delivery keeps `PaymentStatus` as `PENDING` at checkout while immediately placing the order for kitchen fulfillment, settling `PaymentStatus` to `SUCCESS` only when cash is collected at the customer's doorstep:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer
+    actor Driver as Delivery Agent
+    participant OrderCtrl as CustomerOrderController
+    participant CodStrat as CodPaymentStrategy
+    participant PayLife as PaymentLifecycleServiceImpl
+    participant OrderListener as order.PaymentEventListener
+    participant CartListener as CartEventListener
+    participant DelivCtrl as DeliveryAgentController
+    participant DelivSvc as DeliveryServiceImpl
+
+    Customer->>OrderCtrl: POST /api/v1/customer/orders (paymentMethod = COD)
+    Note over OrderCtrl: TX 1: Order created in AWAITING_PAYMENT
+    OrderCtrl->>CodStrat: initiate(order, COD)
+    CodStrat->>PayLife: createPendingPayment(order, txId, COD)
+    PayLife->>OrderListener: INSERT Payment (PENDING) + Publish CodPaymentInitiatedEvent (BEFORE_COMMIT)
+    OrderListener->>OrderListener: Transition Order AWAITING_PAYMENT -> PLACED & emit OrderPlacedEvent
+    OrderListener->>CartListener: @EventListener (In-TX) -> clearCart(customerId)
+    OrderCtrl-->>Customer: 201 Created (CodPaymentResult: status = PENDING)
+
+    Driver->>DelivCtrl: POST /api/v1/delivery-agent/orders/{orderId}/delivered
+    DelivCtrl->>DelivSvc: markDelivered(orderId, agentUserId)
+    DelivSvc->>DelivSvc: Transition Order OUT_FOR_DELIVERY -> DELIVERED & free agent
+    DelivSvc->>PayLife: paymentService.collectCodPayment(orderId) -> markSuccess()
+    Note over PayLife: Payment transitions PENDING -> SUCCESS + PaymentStatusHistory
 ```
 
 ---
@@ -138,10 +171,13 @@ Incoming webhooks include the header `X-Razorpay-Signature`:
 ## 5. Kafka-Driven Refund Orchestration
 
 When an order is cancelled (by the customer, 2-minute kitchen timeout, or dispatch exhaustion), declined by the restaurant, or refunded post-delivery by an admin:
+* **Online Payments (`SUCCESS`)**: `PaymentServiceImpl.refundSuccessfulPayment()` emits `PaymentRefundRequestedEvent` (`AFTER_COMMIT` via Kafka `quickbite.payment.events`), and `PaymentRefundListener` executes the gateway refund through `PaymentGateway.refund()`.
+* **Pre-Delivery COD Cancellations (`PENDING`)**: Uncollected COD payments are cancelled directly (`PaymentStatus.CANCELLED`) with no gateway refund call.
+* **Post-Delivery COD Refunds (`SUCCESS`)**: Admin post-delivery refunds on collected COD orders transition the `SUCCESS` payment directly to `PaymentStatus.REFUNDED` via `PaymentLifecycleService.markRefunded()`.
 
 ```mermaid
 flowchart TD
-    Trigger["Refund Trigger:<br/>1. Customer Cancel / Kitchen Decline<br/>2. 2m Acceptance Timeout / No Driver Found<br/>3. Late Payment on Abandoned Order<br/>4. Admin Post-Delivery Refund"] --> EmitReq["Publish PaymentRefundRequestedEvent<br/>(AFTER_COMMIT -> Kafka: quickbite.payment.events)"]
+    Trigger["Refund Trigger:<br/>1. Customer Cancel / Kitchen Decline<br/>2. 2m Acceptance Timeout / No Driver Found<br/>3. Late Payment on Abandoned Order<br/>4. Admin Post-Delivery Refund"] --> EmitReq["Publish PaymentRefundRequestedEvent<br/>(Online SUCCESS -> Kafka: quickbite.payment.events)"]
     
     EmitReq --> Listener["payment.listener.PaymentRefundListener"]
     Listener --> GatewayCall["PaymentGateway.refund(gatewayPaymentId, amount)"]

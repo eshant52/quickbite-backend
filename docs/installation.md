@@ -74,7 +74,7 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 ```
 
 ### Step 5: Generate RSA Key Pair for JWT Issuance
-QuickBite self-issues asymmetric RSA256 tokens using a private/public key pair:
+QuickBite self-issues asymmetric `RS256` (RSASSA-PKCS1-v1_5 using SHA-256) tokens using a 2048-bit RSA private/public key pair:
 ```bash
 mkdir -p src/main/resources/certs
 openssl genrsa -out src/main/resources/certs/private.pem 2048
