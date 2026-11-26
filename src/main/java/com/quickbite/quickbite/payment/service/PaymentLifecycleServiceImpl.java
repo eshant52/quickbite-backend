@@ -1,12 +1,12 @@
 package com.quickbite.quickbite.payment.service;
 
+import com.quickbite.quickbite.common.event.payment.CodPaymentInitiatedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentCancelledEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentFailedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentStatusChangedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentSucceededEvent;
 import com.quickbite.quickbite.common.exception.BadRequestException;
 import com.quickbite.quickbite.order.model.Order;
-import com.quickbite.quickbite.order.model.OrderStatus;
 import com.quickbite.quickbite.payment.dto.GatewayOrder;
 import com.quickbite.quickbite.payment.exception.PaymentNotFoundException;
 import com.quickbite.quickbite.payment.model.Payment;
@@ -81,6 +81,14 @@ public class PaymentLifecycleServiceImpl implements PaymentLifecycleService {
         history.setPayment(savedPayment);
         history.setStatus(PaymentStatus.PENDING);
         paymentStatusHistoryRepository.save(history);
+
+        if (paymentMethod == PaymentMethod.COD) {
+            eventPublisher.publishEvent(new CodPaymentInitiatedEvent(
+                    savedPayment.getId(),
+                    order.getId(),
+                    savedPayment.getAmount()
+            ));
+        }
 
         return savedPayment;
     }
@@ -197,17 +205,6 @@ public class PaymentLifecycleServiceImpl implements PaymentLifecycleService {
         applyRefundTerminalTransition(paymentId, PaymentStatus.REFUND_FAILED, reason);
     }
 
-    @Override
-    @Transactional
-    public void refundOrCancelCodPayment(Payment payment, String reason) {
-        OrderStatus orderStatus = payment.getOrder().getCurrentStatus();
-        if (orderStatus == OrderStatus.DELIVERED) {
-            applyRefundTerminalTransition(payment.getId(), PaymentStatus.REFUNDED, reason);
-        } else {
-            applyCancelledTransition(loadPayment(payment.getId()), reason);
-        }
-    }
-
     // ── Private transition methods (SRP-compliant, separated by terminal state) ─
 
     private void applyRefundTerminalTransition(UUID paymentId, PaymentStatus targetStatus, String reason) {
@@ -302,17 +299,8 @@ public class PaymentLifecycleServiceImpl implements PaymentLifecycleService {
             return;
         }
 
-        if (previousStatus == PaymentStatus.FAILED) {
-            log.warn("Ignoring CANCELLED transition for already FAILED payment: {}", payment.getId());
-            return;
-        }
-
-        // Online SUCCESS payments captured money and can only transition to REFUNDED / REFUND_FAILED.
-        // Only COD payments may transition from SUCCESS -> CANCELLED (when canceled prior to delivery).
-        if (previousStatus == PaymentStatus.SUCCESS
-                && payment.getPaymentMethod() != null
-                && payment.getPaymentMethod().isOnline()) {
-            log.warn("Ignoring CANCELLED transition for already SUCCESS online payment: {}", payment.getId());
+        if (previousStatus == PaymentStatus.FAILED || previousStatus == PaymentStatus.SUCCESS) {
+            log.warn("Ignoring CANCELLED transition for already {} payment: {}", previousStatus, payment.getId());
             return;
         }
 

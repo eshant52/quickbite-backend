@@ -1,6 +1,7 @@
 package com.quickbite.quickbite.order.listener;
 
 import com.quickbite.quickbite.common.event.order.OrderPlacedEvent;
+import com.quickbite.quickbite.common.event.payment.CodPaymentInitiatedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentCancelledEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentFailedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentRefundRequestedEvent;
@@ -221,6 +222,22 @@ class PaymentEventListenerTest {
 
             assertThatThrownBy(() -> listener.handlePaymentSucceeded(event))
                     .isInstanceOf(OrderNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("handleCodPaymentInitiated transitions AWAITING_PAYMENT order to PLACED and emits OrderPlacedEvent")
+        void codPaymentInitiated_transitionsToPlaced() {
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+            CodPaymentInitiatedEvent event = new CodPaymentInitiatedEvent(
+                    paymentId, orderId, new BigDecimal("350.00"));
+
+            listener.handleCodPaymentInitiated(event);
+
+            assertThat(order.getCurrentStatus()).isEqualTo(OrderStatus.PLACED);
+            verify(orderRepository).save(order);
+            verify(orderStatusHistoryRepository).save(any(OrderStatusHistory.class));
+            verify(eventPublisher).publishEvent(any(OrderPlacedEvent.class));
         }
     }
 

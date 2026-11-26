@@ -2,6 +2,7 @@ package com.quickbite.quickbite.order.listener;
 
 import com.quickbite.quickbite.common.config.property.OrderProperties;
 import com.quickbite.quickbite.common.event.order.OrderPlacedEvent;
+import com.quickbite.quickbite.common.event.payment.CodPaymentInitiatedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentCancelledEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentFailedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentRefundRequestedEvent;
@@ -78,21 +79,7 @@ public class PaymentEventListener {
         OrderStatus current = order.getCurrentStatus();
 
         if (current == OrderStatus.AWAITING_PAYMENT || current == OrderStatus.PAYMENT_FAILED) {
-            order.setCurrentStatus(OrderStatus.PLACED);
-            order.setRestaurantAcceptanceDeadline(Instant.now().plus(orderProperties.restaurantAcceptanceWindow()));
-            orderRepository.save(order);
-            recordOrderHistory(order, OrderStatus.PLACED);
-
-            eventPublisher.publishEvent(new OrderPlacedEvent(
-                    order.getId(),
-                    order.getCustomer().getId(),
-                    order.getCustomer().getName(),
-                    order.getCustomer().getEmail(),
-                    order.getRestaurant().getId(),
-                    order.getRestaurant().getName(),
-                    order.getTotalAmount(),
-                    order.getCreatedAt()
-            ));
+            placeOrder(order);
 
         } else if (current == OrderStatus.ABANDONED
                 || current == OrderStatus.CANCELLED
@@ -117,6 +104,23 @@ public class PaymentEventListener {
                 log.warn("No gateway capture found for payment {} on {} order {} — nothing to refund.",
                         event.paymentId(), current, order.getId());
             }
+        }
+    }
+
+    /**
+     * Handles Cash on Delivery (COD) initiation.
+     *
+     * <p>The COD payment remains {@code PENDING} until doorstep cash collection upon delivery,
+     * while the order transitions immediately from {@code AWAITING_PAYMENT / PAYMENT_FAILED → PLACED}
+     * and emits {@link OrderPlacedEvent}.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void handleCodPaymentInitiated(CodPaymentInitiatedEvent event) {
+        Order order = loadOrder(event.orderId());
+        OrderStatus current = order.getCurrentStatus();
+
+        if (current == OrderStatus.AWAITING_PAYMENT || current == OrderStatus.PAYMENT_FAILED) {
+            placeOrder(order);
         }
     }
 
@@ -155,6 +159,24 @@ public class PaymentEventListener {
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
+
+    private void placeOrder(Order order) {
+        order.setCurrentStatus(OrderStatus.PLACED);
+        order.setRestaurantAcceptanceDeadline(Instant.now().plus(orderProperties.restaurantAcceptanceWindow()));
+        orderRepository.save(order);
+        recordOrderHistory(order, OrderStatus.PLACED);
+
+        eventPublisher.publishEvent(new OrderPlacedEvent(
+                order.getId(),
+                order.getCustomer().getId(),
+                order.getCustomer().getName(),
+                order.getCustomer().getEmail(),
+                order.getRestaurant().getId(),
+                order.getRestaurant().getName(),
+                order.getTotalAmount(),
+                order.getCreatedAt()
+        ));
+    }
 
     private void recordOrderHistory(Order order, OrderStatus status) {
         OrderStatusHistory history = new OrderStatusHistory();

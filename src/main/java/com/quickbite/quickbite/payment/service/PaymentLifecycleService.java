@@ -91,10 +91,4 @@ public interface PaymentLifecycleService {
      */
     void markRefundFailed(UUID paymentId, String reason);
 
-    /**
-     * Refunds a COD payment if its associated order is {@code DELIVERED},
-     * or cancels the payment if cash was never collected (pre-delivery).
-     */
-    void refundOrCancelCodPayment(Payment payment, String reason);
-
 }

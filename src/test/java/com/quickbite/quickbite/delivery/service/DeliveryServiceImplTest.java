@@ -2,7 +2,6 @@ package com.quickbite.quickbite.delivery.service;
 
 import com.quickbite.quickbite.common.config.property.DeliveryGeoProperties;
 import com.quickbite.quickbite.common.event.order.OrderStatusChangedEvent;
-import com.quickbite.quickbite.common.event.payment.PaymentStatusChangedEvent;
 import com.quickbite.quickbite.common.exception.BadRequestException;
 import com.quickbite.quickbite.delivery.dto.DeliveryAgentResponse;
 import com.quickbite.quickbite.delivery.dto.UpdateLocationRequest;
@@ -18,12 +17,7 @@ import com.quickbite.quickbite.order.model.OrderStatus;
 import com.quickbite.quickbite.order.model.OrderStatusHistory;
 import com.quickbite.quickbite.order.repository.OrderRepository;
 import com.quickbite.quickbite.order.repository.OrderStatusHistoryRepository;
-import com.quickbite.quickbite.payment.model.Payment;
-import com.quickbite.quickbite.payment.model.PaymentMethod;
-import com.quickbite.quickbite.payment.model.PaymentStatus;
-import com.quickbite.quickbite.payment.model.PaymentStatusHistory;
-import com.quickbite.quickbite.payment.repository.PaymentRepository;
-import com.quickbite.quickbite.payment.repository.PaymentStatusHistoryRepository;
+import com.quickbite.quickbite.payment.service.PaymentProcessingService;
 import com.quickbite.quickbite.restaurant.model.Restaurant;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.repository.UserRepository;
@@ -32,7 +26,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -64,10 +57,7 @@ class DeliveryServiceImplTest {
     private OrderStatusHistoryRepository orderStatusHistoryRepository;
 
     @Mock
-    private PaymentRepository paymentRepository;
-
-    @Mock
-    private PaymentStatusHistoryRepository paymentStatusHistoryRepository;
+    private PaymentProcessingService paymentService;
 
     @Mock
     private DeliveryAssignmentStrategy deliveryAssignmentStrategy;
@@ -96,8 +86,7 @@ class DeliveryServiceImplTest {
                 userRepository,
                 orderRepository,
                 orderStatusHistoryRepository,
-                paymentRepository,
-                paymentStatusHistoryRepository,
+                paymentService,
                 deliveryAssignmentStrategy,
                 eventPublisher,
                 deliveryTrackingService,
@@ -200,8 +189,7 @@ class DeliveryServiceImplTest {
                     userRepository,
                     orderRepository,
                     orderStatusHistoryRepository,
-                    paymentRepository,
-                    paymentStatusHistoryRepository,
+                    paymentService,
                     deliveryAssignmentStrategy,
                     eventPublisher,
                     deliveryTrackingService,
@@ -370,34 +358,24 @@ class DeliveryServiceImplTest {
         }
 
         @Test
-        @DisplayName("markDelivered transitions to DELIVERED, frees agent, and collects COD payment")
+        @DisplayName("markDelivered transitions to DELIVERED, frees agent, and delegates COD payment collection")
         void markDelivered_codSuccess() {
             order.setDeliveryAgent(agent);
             order.setCurrentStatus(OrderStatus.OUT_FOR_DELIVERY);
-
-            Payment codPayment = new Payment();
-            codPayment.setId(UUID.randomUUID());
-            codPayment.setPaymentMethod(PaymentMethod.COD);
-            codPayment.setCurrentStatus(PaymentStatus.PENDING);
-            codPayment.setAmount(BigDecimal.valueOf(250.00));
 
             when(userRepository.findById(userId)).thenReturn(Optional.of(user));
             when(deliveryAgentRepository.findByUser(user)).thenReturn(Optional.of(agent));
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
             when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
-            when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(codPayment));
             agent.setAssigned(true);
 
             OrderResponse res = deliveryService.markDelivered(orderId, userId);
 
             assertThat(res.currentStatus()).isEqualTo(OrderStatus.DELIVERED);
             assertThat(agent.isAssigned()).isFalse();
-            assertThat(codPayment.getCurrentStatus()).isEqualTo(PaymentStatus.SUCCESS);
 
             verify(deliveryAgentRepository).save(agent);
-            verify(paymentRepository).save(codPayment);
-            verify(paymentStatusHistoryRepository).save(any(PaymentStatusHistory.class));
-            verify(eventPublisher).publishEvent(any(PaymentStatusChangedEvent.class));
+            verify(paymentService).collectCodPayment(orderId);
             verify(eventPublisher).publishEvent(any(OrderStatusChangedEvent.class));
         }
     }

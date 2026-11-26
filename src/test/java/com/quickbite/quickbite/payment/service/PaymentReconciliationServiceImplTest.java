@@ -239,10 +239,10 @@ class PaymentReconciliationServiceImplTest {
     }
 
     @Test
-    @DisplayName("Returns CodPaymentResult when a COD payment attempt is already SUCCESS")
-    void codSuccess_returnsCodPaymentResult() {
+    @DisplayName("Returns CodPaymentResult when a COD payment attempt is PENDING or SUCCESS")
+    void codPendingOrSuccess_returnsCodPaymentResult() {
         payment.setPaymentMethod(PaymentMethod.COD);
-        payment.setCurrentStatus(PaymentStatus.SUCCESS);
+        payment.setCurrentStatus(PaymentStatus.PENDING);
         payment.setGatewayOrderId(null);
 
         when(paymentRepository.findAttemptsForReconciliation(eq(orderId), any()))
@@ -253,11 +253,12 @@ class PaymentReconciliationServiceImplTest {
         assertThat(result).isPresent();
         assertThat(result.get()).isInstanceOf(CodPaymentResult.class);
         assertThat(result.get().paymentId()).isEqualTo(paymentId);
+        assertThat(result.get().status()).isEqualTo(PaymentStatus.PENDING);
         verifyNoInteractions(paymentGateway, paymentLifecycle, eventPublisher);
     }
 
     @Test
-    @DisplayName("When earlier online attempt was paid and subsequent COD attempt is SUCCESS, online wins and COD is cancelled")
+    @DisplayName("When earlier online attempt was paid and subsequent COD attempt is PENDING, online wins and COD is cancelled")
     void onlinePaidThenCod_onlineWinsAndCodCancelled() {
         Payment onlineAttempt = new Payment();
         onlineAttempt.setId(UUID.randomUUID());
@@ -274,7 +275,7 @@ class PaymentReconciliationServiceImplTest {
         codAttempt.setTransactionId("TXN-COD");
         codAttempt.setAmount(BigDecimal.valueOf(499.00));
         codAttempt.setPaymentMethod(PaymentMethod.COD);
-        codAttempt.setCurrentStatus(PaymentStatus.SUCCESS);
+        codAttempt.setCurrentStatus(PaymentStatus.PENDING);
 
         order.setCurrentStatus(OrderStatus.PLACED);
 
@@ -289,7 +290,7 @@ class PaymentReconciliationServiceImplTest {
         assertThat(result).isPresent();
         assertThat(result.get().paymentId()).isEqualTo(onlineAttempt.getId());
         verify(paymentLifecycle).markSuccess(onlineAttempt.getId(), "pay_online_1");
-        verify(paymentLifecycle).refundOrCancelCodPayment(codAttempt, "Superseded by winning payment attempt");
+        verify(paymentLifecycle).markCancelled(codAttempt.getId(), "Superseded by winning attempt");
         verifyNoInteractions(eventPublisher);
     }
 }

@@ -377,8 +377,8 @@ class PaymentServiceImplTest {
         }
 
         @Test
-        @DisplayName("Delegates COD payment refund/cancellation decision to PaymentLifecycleService")
-        void refundSuccessfulPayment_cod_delegatesToPaymentLifecycle() {
+        @DisplayName("Marks collected COD payment as REFUNDED via PaymentLifecycleService")
+        void refundSuccessfulPayment_cod_marksRefunded() {
             payment.setPaymentMethod(PaymentMethod.COD);
             payment.setCurrentStatus(PaymentStatus.SUCCESS);
 
@@ -387,8 +387,22 @@ class PaymentServiceImplTest {
 
             paymentService.refundSuccessfulPayment(orderId, "Post-delivery COD refund");
 
-            verify(paymentLifecycle).refundOrCancelCodPayment(payment, "Post-delivery COD refund");
+            verify(paymentLifecycle).markRefunded(payment.getId(), "Post-delivery COD refund");
             verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("collectCodPayment marks pending COD payment as SUCCESS via PaymentLifecycleService")
+        void collectCodPayment_marksPendingCodSuccess() {
+            payment.setPaymentMethod(PaymentMethod.COD);
+            payment.setCurrentStatus(PaymentStatus.PENDING);
+
+            when(paymentRepository.findByOrderIdAndCurrentStatus(orderId, PaymentStatus.PENDING))
+                    .thenReturn(List.of(payment));
+
+            paymentService.collectCodPayment(orderId);
+
+            verify(paymentLifecycle).markSuccess(payment.getId(), null);
         }
     }
 }

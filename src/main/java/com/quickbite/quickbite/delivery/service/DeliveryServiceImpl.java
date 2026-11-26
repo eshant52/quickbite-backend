@@ -2,7 +2,6 @@ package com.quickbite.quickbite.delivery.service;
 
 import com.quickbite.quickbite.common.config.property.DeliveryGeoProperties;
 import com.quickbite.quickbite.common.event.order.OrderStatusChangedEvent;
-import com.quickbite.quickbite.common.event.payment.PaymentStatusChangedEvent;
 import com.quickbite.quickbite.common.exception.BadRequestException;
 import com.quickbite.quickbite.common.exception.ResourceNotFoundException;
 import com.quickbite.quickbite.delivery.dto.DeliveryAgentResponse;
@@ -21,12 +20,7 @@ import com.quickbite.quickbite.order.model.OrderStatus;
 import com.quickbite.quickbite.order.model.OrderStatusHistory;
 import com.quickbite.quickbite.order.repository.OrderRepository;
 import com.quickbite.quickbite.order.repository.OrderStatusHistoryRepository;
-import com.quickbite.quickbite.payment.model.Payment;
-import com.quickbite.quickbite.payment.model.PaymentMethod;
-import com.quickbite.quickbite.payment.model.PaymentStatus;
-import com.quickbite.quickbite.payment.model.PaymentStatusHistory;
-import com.quickbite.quickbite.payment.repository.PaymentRepository;
-import com.quickbite.quickbite.payment.repository.PaymentStatusHistoryRepository;
+import com.quickbite.quickbite.payment.service.PaymentProcessingService;
 import com.quickbite.quickbite.user.model.User;
 import com.quickbite.quickbite.user.repository.UserRepository;
 import org.locationtech.jts.geom.Coordinate;
@@ -50,8 +44,7 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
-    private final PaymentRepository paymentRepository;
-    private final PaymentStatusHistoryRepository paymentStatusHistoryRepository;
+    private final PaymentProcessingService paymentService;
     private final DeliveryAssignmentStrategy deliveryAssignmentStrategy;
     private final ApplicationEventPublisher eventPublisher;
     private final DeliveryTrackingService deliveryTrackingService;
@@ -62,8 +55,7 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
             UserRepository userRepository,
             OrderRepository orderRepository,
             OrderStatusHistoryRepository orderStatusHistoryRepository,
-            PaymentRepository paymentRepository,
-            PaymentStatusHistoryRepository paymentStatusHistoryRepository,
+            PaymentProcessingService paymentService,
             DeliveryAssignmentStrategy deliveryAssignmentStrategy,
             ApplicationEventPublisher eventPublisher,
             DeliveryTrackingService deliveryTrackingService,
@@ -73,8 +65,7 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
         this.userRepository = userRepository;
         this.orderRepository = orderRepository;
         this.orderStatusHistoryRepository = orderStatusHistoryRepository;
-        this.paymentRepository = paymentRepository;
-        this.paymentStatusHistoryRepository = paymentStatusHistoryRepository;
+        this.paymentService = paymentService;
         this.deliveryAssignmentStrategy = deliveryAssignmentStrategy;
         this.eventPublisher = eventPublisher;
         this.deliveryTrackingService = deliveryTrackingService;
@@ -233,30 +224,8 @@ public class DeliveryServiceImpl implements DeliveryAssignmentService, DeliveryA
         agent.setAssigned(false);
         deliveryAgentRepository.save(agent);
 
-        // Handle Cash on Delivery payment collection
-        Payment payment = paymentRepository.findByOrderId(savedOrder.getId()).orElse(null);
-        if (payment != null
-                && payment.getPaymentMethod() == PaymentMethod.COD
-                && payment.getCurrentStatus() == PaymentStatus.PENDING) {
-            payment.setCurrentStatus(PaymentStatus.SUCCESS);
-            paymentRepository.save(payment);
-
-            PaymentStatusHistory paymentHistory = new PaymentStatusHistory();
-            paymentHistory.setPayment(payment);
-            paymentHistory.setStatus(PaymentStatus.SUCCESS);
-            paymentStatusHistoryRepository.save(paymentHistory);
-
-            eventPublisher.publishEvent(new PaymentStatusChangedEvent(
-                    payment.getId(),
-                    savedOrder.getId(),
-                    savedOrder.getCustomer().getId(),
-                    PaymentStatus.PENDING,
-                    PaymentStatus.SUCCESS,
-                    PaymentMethod.COD,
-                    payment.getAmount(),
-                    Instant.now()
-            ));
-        }
+        // Handle Cash on Delivery payment collection upon doorstep delivery
+        paymentService.collectCodPayment(savedOrder.getId());
 
         eventPublisher.publishEvent(new OrderStatusChangedEvent(
                 savedOrder.getId(),

@@ -78,8 +78,11 @@ public class PaymentReconciliationServiceImpl implements PaymentReconciliationSe
             if (winningResult == null) {
                 return toSuccessPaymentResult(payment);
             }
-            paymentLifecycle.refundOrCancelCodPayment(payment, "Superseded by winning payment attempt");
-        } else if (payment.getCurrentStatus() == PaymentStatus.PENDING && winningResult != null) {
+            paymentLifecycle.markRefunded(payment.getId(), "Superseded by winning payment attempt");
+        } else if (payment.getCurrentStatus() == PaymentStatus.PENDING) {
+            if (winningResult == null) {
+                return toSuccessPaymentResult(payment);
+            }
             paymentLifecycle.markCancelled(payment.getId(), "Superseded by winning attempt");
         }
         return winningResult;
@@ -168,6 +171,8 @@ public class PaymentReconciliationServiceImpl implements PaymentReconciliationSe
                     payment.getId(),
                     payment.getOrder().getId(),
                     payment.getTransactionId(),
+                    PaymentMethod.COD,
+                    payment.getCurrentStatus(),
                     payment.getAmount()
             );
         }

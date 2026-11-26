@@ -15,10 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p><b>Transaction contract (TX 2 of checkout):</b>
  * <ol>
- *   <li>Creates the {@link Payment} entity (status = PENDING) and initial status history.</li>
- *   <li>Marks the payment {@code SUCCESS} via {@link PaymentLifecycleService#markSuccess},
- *       which publishes {@code PaymentSucceededEvent} ({@code BEFORE_COMMIT}) so the order
- *       domain transitions the order to {@code PLACED} and publishes {@code OrderPlacedEvent}.</li>
+ *   <li>Creates the {@link Payment} entity (status = {@code PENDING}) and initial status history.</li>
+ *   <li>{@link PaymentLifecycleService#createPendingPayment} publishes {@code CodPaymentInitiatedEvent}
+ *       ({@code BEFORE_COMMIT}) so the order domain transitions the order to {@code PLACED} and
+ *       publishes {@code OrderPlacedEvent}.</li>
+ *   <li>The payment remains {@code PENDING} until doorstep delivery collection transitions it
+ *       to {@code SUCCESS}.</li>
  * </ol>
  */
 @Component
@@ -37,14 +39,11 @@ public class CodPaymentStrategy implements PaymentStrategy {
     @Override
     @Transactional
     public PaymentResult initiate(Order order, PaymentMethod paymentMethod) {
-        // 1. Create the payment with status pending
         Payment payment = paymentLifecycle.createPendingPayment(
                 order,
                 transactionIdGenerator.generate("COD"),
                 paymentMethod
         );
-
-        paymentLifecycle.markSuccess(payment.getId(), null);
 
         return new CodPaymentResult(
                 payment.getId(),

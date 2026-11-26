@@ -106,7 +106,8 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
+        // OWASP Argon2id minimum configuration: 19 MiB (19456 KiB) memory, 2 iterations, 1 degree of parallelism
+        return new Argon2PasswordEncoder(16, 32, 1, 19 * 1024, 2);
     }
 
     @Bean

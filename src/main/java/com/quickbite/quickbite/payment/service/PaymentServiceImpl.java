@@ -82,7 +82,17 @@ public class PaymentServiceImpl implements PaymentProcessingService, PaymentQuer
                         reason
                 ));
             } else if (payment.getPaymentMethod() == PaymentMethod.COD) {
-                paymentLifecycle.refundOrCancelCodPayment(payment, reason);
+                paymentLifecycle.markRefunded(payment.getId(), reason);
+            }
+        }
+    }
+
+    @Override
+    public void collectCodPayment(UUID orderId) {
+        List<Payment> pendingPayments = paymentRepository.findByOrderIdAndCurrentStatus(orderId, PaymentStatus.PENDING);
+        for (Payment payment : pendingPayments) {
+            if (payment.getPaymentMethod() == PaymentMethod.COD) {
+                paymentLifecycle.markSuccess(payment.getId(), null);
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.quickbite.quickbite.payment.service;
 
+import com.quickbite.quickbite.common.event.payment.CodPaymentInitiatedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentCancelledEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentFailedEvent;
 import com.quickbite.quickbite.common.event.payment.PaymentStatusChangedEvent;
@@ -112,7 +113,7 @@ class PaymentLifecycleServiceImplTest {
         }
 
         @Test
-        @DisplayName("createPendingPayment without gatewayName saves payment for COD")
+        @DisplayName("createPendingPayment without gatewayName saves payment for COD and publishes CodPaymentInitiatedEvent")
         void createPendingPayment_cod() {
             when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -124,6 +125,7 @@ class PaymentLifecycleServiceImplTest {
             assertThat(created.getCurrentStatus()).isEqualTo(PaymentStatus.PENDING);
             verify(paymentRepository).save(any(Payment.class));
             verify(paymentStatusHistoryRepository).save(any(PaymentStatusHistory.class));
+            verify(eventPublisher).publishEvent(any(CodPaymentInitiatedEvent.class));
         }
 
         @Test
@@ -380,41 +382,13 @@ class PaymentLifecycleServiceImplTest {
         }
 
         @Test
-        @DisplayName("refundOrCancelCodPayment marks payment REFUNDED when order status is DELIVERED")
-        void refundOrCancelCodPayment_delivered_marksRefunded() {
-            payment.setPaymentMethod(PaymentMethod.COD);
-            payment.setCurrentStatus(PaymentStatus.SUCCESS);
-            order.setCurrentStatus(OrderStatus.DELIVERED);
-            when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
-
-            paymentLifecycle.refundOrCancelCodPayment(payment, "Damaged order");
-
-            assertThat(payment.getCurrentStatus()).isEqualTo(PaymentStatus.REFUNDED);
-            verify(paymentRepository).save(payment);
-        }
-
-        @Test
-        @DisplayName("refundOrCancelCodPayment marks payment CANCELLED when order status is not DELIVERED")
-        void refundOrCancelCodPayment_notDelivered_marksCancelled() {
-            payment.setPaymentMethod(PaymentMethod.COD);
-            payment.setCurrentStatus(PaymentStatus.SUCCESS);
-            order.setCurrentStatus(OrderStatus.CANCELLED);
-            when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
-
-            paymentLifecycle.refundOrCancelCodPayment(payment, "Cancelled before delivery");
-
-            assertThat(payment.getCurrentStatus()).isEqualTo(PaymentStatus.CANCELLED);
-            verify(paymentRepository).save(payment);
-        }
-
-        @Test
-        @DisplayName("Terminal state guard: ignores CANCELLED transition if online payment is already SUCCESS")
-        void terminalState_ignoreCancelledAfterOnlineSuccess() {
+        @DisplayName("Terminal state guard: ignores CANCELLED transition if payment is already SUCCESS")
+        void terminalState_ignoreCancelledAfterSuccess() {
             payment.setPaymentMethod(PaymentMethod.UPI);
             payment.setCurrentStatus(PaymentStatus.SUCCESS);
             when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
 
-            paymentLifecycle.markCancelled(paymentId, "Should not cancel online paid payment");
+            paymentLifecycle.markCancelled(paymentId, "Should not cancel paid payment");
 
             assertThat(payment.getCurrentStatus()).isEqualTo(PaymentStatus.SUCCESS);
             verify(paymentRepository, never()).save(payment);
